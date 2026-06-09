@@ -1,0 +1,236 @@
+{# ── Feature Detail Panel — include on any page that needs feature click-through ── #}
+<dialog id="featurePanel" style="
+  position:fixed; inset:0; margin:0; padding:0;
+  width:100vw; max-width:100vw; height:100vh; max-height:100vh;
+  border:none; background:transparent; overflow:hidden;">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,0.45);backdrop-filter:blur(2px);"
+       onclick="closeFeaturePanel()"></div>
+  <div id="featurePanelCard" style="
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:min(90vw,860px);max-height:88vh;background:#fff;
+    border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25);
+    display:flex;flex-direction:column;overflow:hidden;">
+
+    <div id="fdp-header" style="padding:1.25rem 1.5rem 0.75rem;border-bottom:1px solid #f1f5f9;flex-shrink:0;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
+        <div style="flex:1;min-width:0;">
+          <div id="fdp-meta" style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;"></div>
+          <input id="fdp-name" type="text" style="
+            width:100%;font-size:1.25rem;font-weight:700;color:#0f172a;
+            border:none;border-bottom:2px solid transparent;outline:none;padding:0.1rem 0;
+            background:transparent;transition:border-color 0.15s;"
+            onfocus="this.style.borderBottomColor='#2563eb'"
+            onblur="this.style.borderBottomColor='transparent'"
+            placeholder="Feature name">
+        </div>
+        <button onclick="closeFeaturePanel()" style="background:none;border:none;cursor:pointer;padding:0.35rem;color:#94a3b8;font-size:1.25rem;line-height:1;flex-shrink:0;">✕</button>
+      </div>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:1.25rem 1.5rem;">
+
+      <div style="display:grid;grid-template-columns:1fr 220px;gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
+        <div>
+          <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.4rem;">Description / Acceptance Criteria</label>
+          <textarea id="fdp-notes" rows="6" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.9rem;font-family:inherit;color:#1e293b;resize:vertical;line-height:1.6;background:#fafafa;"
+                    onfocus="this.style.background='#fff';this.style.borderColor='#2563eb'"
+                    onblur="this.style.background='#fafafa';this.style.borderColor='#e2e8f0'"
+                    placeholder="What does this feature do? How will we know it's done?"></textarea>
+          <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;">
+            <button class="btn btn-primary" onclick="saveFdp()">Save Changes</button>
+            <span id="fdp-save-status" style="font-size:0.8rem;color:#64748b;"></span>
+          </div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+          <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.75rem;">Scoring</label>
+          <span id="fdp-score-wbs-hint" style="display:block;font-size:0.72rem;color:#94a3b8;margin-bottom:0.75rem;line-height:1.4;"></span>
+          <div style="margin-bottom:0.65rem;">
+            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Value <span style="color:#94a3b8;font-size:0.65rem;">(10 = highest impact)</span></label>
+            <select id="fdp-value" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:#1e293b;background:#fff;cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
+              <option value="">—</option>
+              {% for n in range(10, 0, -1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+            </select>
+          </div>
+          <div style="margin-bottom:0.75rem;">
+            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Effort <span style="color:#94a3b8;font-size:0.65rem;">(1 = easy, 10 = very hard)</span></label>
+            <select id="fdp-effort" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:#1e293b;background:#fff;cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
+              <option value="">—</option>
+              {% for n in range(10, 0, -1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+            </select>
+          </div>
+          <div id="fdp-score-display" style="margin-bottom:0.5rem;"></div>
+          <div id="fdp-score-action"></div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #f1f5f9;padding-top:1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+          <label style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">Position in WBS — drag to reassign</label>
+          <span id="fdp-wbs-move-status" style="font-size:0.75rem;color:#16a34a;"></span>
+        </div>
+        <div id="fdp-wbs-tree" style="display:flex;gap:0.75rem;overflow-x:auto;padding-bottom:0.5rem;">
+          {% for area in product.wbs_areas %}
+          <div style="flex-shrink:0;min-width:180px;max-width:220px;">
+            <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#fff;background:#1e293b;padding:0.35rem 0.65rem;border-radius:5px 5px 0 0;">
+              {{ area.number }}. {{ area.title | truncate(22, true, '…') }}
+            </div>
+            <div style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 5px 5px;overflow:hidden;">
+              {% for sa in area.sub_areas %}
+              <div class="wbs-drop-target"
+                   id="wbs-drop-{{ sa.wbs_prefix | replace('.', '-') }}"
+                   data-prefix="{{ sa.wbs_prefix }}"
+                   ondragover="event.preventDefault();this.classList.add('drag-over');"
+                   ondragleave="this.classList.remove('drag-over');"
+                   ondrop="onWbsDrop(event,'{{ sa.wbs_prefix }}')"
+                   style="padding:0.45rem 0.65rem;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:0.78rem;transition:background 0.1s;background:#fff;"
+                   onclick="onWbsClick('{{ sa.wbs_prefix }}')">
+                <span style="font-family:monospace;font-size:0.65rem;color:#94a3b8;">{{ sa.wbs_prefix }}</span>
+                <div style="color:#1e293b;font-weight:500;line-height:1.3;margin-top:0.1rem;">{{ sa.title | truncate(30, true, '…') }}</div>
+                <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.15rem;">{{ sa.live_count }}L / {{ sa.planned_count }}P / {{ sa.gap_count }}G</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div id="fdp-drag-token" draggable="true" ondragstart="onTokenDragStart(event)"
+             style="display:none;margin-top:0.75rem;padding:0.5rem 0.75rem;background:#ede9fe;border:2px dashed #7c3aed;border-radius:6px;cursor:grab;font-size:0.82rem;font-weight:500;color:#4c1d95;width:fit-content;user-select:none;">
+          ☰ <span id="fdp-token-label"></span>
+        </div>
+        <p class="text-muted" style="margin-top:0.5rem;font-size:0.72rem;">Drag the feature token above onto a WBS sub-area, or click a sub-area to reassign.</p>
+      </div>
+
+    </div>
+  </div>
+</dialog>
+
+<style>
+.wbs-drop-target.drag-over   { background: #f5f3ff !important; }
+.wbs-drop-target.current-wbs { background: #ede9fe !important; border-left: 3px solid #7c3aed; }
+</style>
+
+<script>
+let _fdp = { wbs:null, subPrefix:null };
+let _fdpDirty = false;
+
+function openFeaturePanelFromEl(el) {
+  const d = el.dataset;
+  openFeaturePanel({
+    wbs: d.wbs||null, name: d.name||'', notes: d.notes||'',
+    stage: d.stage||'', value: d.value ? parseFloat(d.value) : null,
+    effort: d.effort ? parseFloat(d.effort) : null,
+  });
+}
+
+function openFeaturePanel(opts) {
+  _fdp = { ...opts };
+  _fdp.subPrefix = opts.wbs ? opts.wbs.split('.').slice(0,2).join('.') : null;
+  const colors = {'Gap':'#b45309','Idea':'#92400e','Scoped':'#5b21b6','Scored':'#4c1d95','In-Progress':'#f59e0b','Completed':'#16a34a','Planned':'#1e40af'};
+  let meta = '';
+  if (opts.wbs)   meta += `<span style="font-family:monospace;font-size:0.72rem;background:#f1f5f9;padding:0.15rem 0.45rem;border-radius:3px;color:#475569;">${opts.wbs}</span>`;
+  if (opts.stage) meta += `<span style="font-size:0.72rem;font-weight:700;color:${colors[opts.stage]||'#475569'};">${opts.stage}</span>`;
+  document.getElementById('fdp-meta').innerHTML  = meta;
+  document.getElementById('fdp-name').value       = opts.name  || '';
+  document.getElementById('fdp-notes').value      = opts.notes || '';
+  document.getElementById('fdp-value').value      = opts.value  ? String(opts.value)  : '';
+  document.getElementById('fdp-effort').value     = opts.effort ? String(opts.effort) : '';
+  document.getElementById('fdp-score-action').innerHTML = '';
+  onFdpScoreInput();
+  document.querySelectorAll('.wbs-drop-target').forEach(el => el.classList.remove('current-wbs'));
+  if (_fdp.subPrefix) {
+    const cur = document.getElementById('wbs-drop-' + _fdp.subPrefix.replace(/\./g,'-'));
+    if (cur) cur.classList.add('current-wbs');
+  }
+  const token = document.getElementById('fdp-drag-token');
+  document.getElementById('fdp-token-label').textContent = opts.name || 'Feature';
+  token.style.display = 'block';
+  document.getElementById('fdp-save-status').textContent   = '';
+  document.getElementById('fdp-wbs-move-status').textContent = '';
+  _fdpDirty = false;
+  document.getElementById('featurePanel').showModal();
+}
+
+function closeFeaturePanel() { document.getElementById('featurePanel').close(); if (_fdpDirty) { _fdpDirty=false; location.reload(); } }
+
+function onFdpScoreInput() {
+  const vRaw = document.getElementById('fdp-value').value;
+  const eRaw = document.getElementById('fdp-effort').value;
+  const v = parseInt(vRaw), e = parseInt(eRaw);
+  const vValid = vRaw !== '' && !isNaN(v);
+  const eValid = eRaw !== '' && !isNaN(e);
+  const scoreEl = document.getElementById('fdp-score-display');
+  scoreEl.innerHTML = (vValid && eValid)
+    ? `<span style="background:#d1fae5;color:#065f46;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.9rem;font-weight:700;">${(v/e).toFixed(1)} priority</span>`
+    : '';
+  const hint = document.getElementById('fdp-score-wbs-hint');
+  const action = document.getElementById('fdp-score-action');
+  if (vValid && eValid) {
+    hint.textContent='';
+    action.innerHTML=`<button class="btn btn-success" style="font-size:0.875rem;width:100%;justify-content:center;" onclick="scoreFdp(${v},${e})">→ Save Score</button>`;
+  } else {
+    hint.textContent='— enter 1–10 for both fields to score'; hint.style.color='#94a3b8'; action.innerHTML='';
+  }
+  document.getElementById('fdp-value').style.borderColor  = vValid ? '#16a34a' : '#e2e8f0';
+  document.getElementById('fdp-effort').style.borderColor = eValid ? '#16a34a' : '#e2e8f0';
+}
+
+function scoreFdp(v, e) {
+  if (!_fdp.wbs) return;
+  const actionEl = document.getElementById('fdp-score-action');
+  actionEl.innerHTML = '<span style="font-size:0.8rem;color:#64748b;">Scoring…</span>';
+  fetch('/api/features/'+encodeURIComponent(_fdp.wbs),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:v,effort:e})})
+  .then(r=>{
+    if(r.ok){
+      document.getElementById('fdp-score-display').innerHTML=`<span style="background:#d1fae5;color:#065f46;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.9rem;font-weight:700;">${(v/e).toFixed(1)} priority</span>`;
+      actionEl.innerHTML=`<span style="color:#16a34a;font-weight:600;font-size:0.875rem;">✓ Scored</span>`;
+      _fdpDirty=true;
+    } else { actionEl.innerHTML='<span style="color:#dc2626;">Failed</span>'; }
+  });
+}
+
+function saveFdp() {
+  if (!_fdp.wbs) return;
+  const name=document.getElementById('fdp-name').value.trim();
+  const notes=document.getElementById('fdp-notes').value.trim();
+  const status=document.getElementById('fdp-save-status');
+  status.textContent='Saving…';
+  const body={notes};if(name)body.name=name;
+  fetch('/api/features/'+encodeURIComponent(_fdp.wbs),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  .then(r=>{
+    if(r.ok){status.textContent='Saved ✓';if(name){_fdp.name=name;document.getElementById('fdp-token-label').textContent=name;}_fdpDirty=true;}
+    else{status.textContent='Error';}
+  })
+  .catch(()=>{status.textContent='Error';});
+}
+
+function onTokenDragStart(event) {
+  event.dataTransfer.setData('text/plain', _fdp.wbs||'');
+  event.dataTransfer.effectAllowed='move';
+}
+function onWbsDrop(event, targetPrefix) {
+  event.preventDefault();
+  document.querySelectorAll('.wbs-drop-target').forEach(el=>el.classList.remove('drag-over'));
+  _reassignToPrefix(targetPrefix);
+}
+function onWbsClick(targetPrefix) {
+  if (targetPrefix===_fdp.subPrefix) return;
+  if (!confirm(`Move this feature to ${targetPrefix}?`)) return;
+  _reassignToPrefix(targetPrefix);
+}
+function _reassignToPrefix(targetPrefix) {
+  const moveStatus=document.getElementById('fdp-wbs-move-status');
+  const _markMoved = (prefix) => {
+    _fdpDirty=true;_fdp.subPrefix=prefix;
+    document.querySelectorAll('.wbs-drop-target').forEach(el=>el.classList.remove('current-wbs'));
+    const cur=document.getElementById('wbs-drop-'+prefix.replace(/\./g,'-'));if(cur)cur.classList.add('current-wbs');
+  };
+  if (_fdp.wbs) {
+    moveStatus.textContent='Moving…';moveStatus.style.color='#64748b';
+    fetch('/api/features/'+encodeURIComponent(_fdp.wbs)+'/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_prefix:targetPrefix})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){moveStatus.textContent=`Moved → ${d.new_wbs} ✓`;moveStatus.style.color='#16a34a';_fdp.wbs=d.new_wbs;_markMoved(targetPrefix);}
+      else{moveStatus.textContent=d.detail||'Move failed';moveStatus.style.color='#dc2626';}
+    });
+  }
+}
+</script>

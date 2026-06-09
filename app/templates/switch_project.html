@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}Switch Project — {{ app_title }}{% endblock %}
+
+{% block extra_styles %}
+  .pac-upload-card {
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem 1rem;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .pac-upload-card.dragover { border-color: #2563eb; background: #eff6ff; }
+  .pac-upload-card.ready    { border-color: #16a34a; border-style: solid; }
+
+  .pac-drop-area {
+    text-align: center; padding: 1.25rem 1rem 0.75rem; cursor: pointer;
+  }
+  .pac-drop-icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
+  .pac-drop-area p { margin: 0.2rem 0; color: #555; font-size: 0.9rem; }
+  .pac-drop-area .hint { font-size: 0.78rem; color: #94a3b8; margin-top: 0.4rem; }
+  #uploadFiles, #dirPicker { display: none; }
+
+  .pac-divider { border: none; border-top: 1px solid #e2e8f0; margin: 0.75rem 0 0.65rem; }
+
+  .pac-checklist { display: flex; flex-direction: column; gap: 0.3rem; }
+  .pac-file-row {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.3rem 0.4rem; border-radius: 6px;
+    font-size: 0.85rem; font-weight: 500;
+  }
+  .pac-file-row.provided { color: #15803d; background: #f0fdf4; }
+  .pac-file-row.pending  { color: #94a3b8; }
+  .pac-file-row.optional { color: #cbd5e1; }
+  .pac-file-icon { width: 1.1rem; text-align: center; flex-shrink: 0; font-size: 0.9rem; }
+  .pac-file-name { flex: 1; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+  .pac-optional-tag {
+    font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #cbd5e1; margin-left: auto;
+  }
+  .pac-file-remove {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: #94a3b8; font-size: 0.9rem; padding: 0 0.15rem; line-height: 1;
+    border-radius: 3px; transition: color 0.1s, background 0.1s;
+  }
+  .pac-file-remove:hover { color: #dc2626; background: #fee2e2; }
+
+  .pac-warn { font-size: 0.78rem; color: #dc2626; margin-top: 0.5rem; min-height: 1rem; }
+
+  .pac-actions {
+    margin-top: 0.85rem; display: flex; gap: 0.65rem; align-items: center;
+  }
+  .pac-upload-status { font-size: 0.8rem; color: #94a3b8; }
+{% endblock %}
+
+{% block content %}
+<div style="max-width:32rem;margin:2rem auto;">
+  <div class="page-header">
+    <h1>Switch Project</h1>
+    <p class="subtitle">Open a different project or download and share the current one.</p>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem;">
+    <p class="card-title">Current Project</p>
+    <p style="font-size:1rem;font-weight:700;color:#1e293b;margin:0 0 0.35rem;">{{ project_title }}</p>
+    {% if source_path %}
+    <p style="font-family:monospace;font-size:0.8rem;color:#64748b;background:#f1f5f9;
+              padding:0.4rem 0.65rem;border-radius:5px;word-break:break-all;margin:0 0 0.75rem;">
+      {{ source_path }}
+    </p>
+    {% else %}
+    <p style="font-size:0.8rem;color:#94a3b8;margin:0 0 0.75rem;">In-memory only (changes are not saved to disk)</p>
+    {% endif %}
+    <a href="/api/project/download" class="btn btn-ghost btn-sm" download>
+      Download project files (.zip)
+    </a>
+  </div>
+
+  <div style="margin-bottom:1rem;">
+    <input type="file" id="dirPicker" multiple accept=".md,.MD" style="display:none;">
+    <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;"
+            onclick="openFolderPicker()">Open Project Folder…</button>
+    <span id="dir-status" class="text-muted" style="font-size:0.8rem;display:block;margin-top:0.4rem;text-align:center;"></span>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem;">
+    <p class="card-title">Open from Files</p>
+    <p class="text-muted" style="margin-bottom:0.75rem;">
+      Drop project files one at a time or all at once.
+    </p>
+
+    <div class="pac-upload-card" id="uploadDropZone">
+      <div class="pac-drop-area" onclick="document.getElementById('uploadFiles').click()">
+        <div class="pac-drop-icon">📂</div>
+        <p><strong>Drag &amp; drop files here</strong></p>
+        <p>or click to browse</p>
+        <p class="hint">Drop files one at a time, all at once, or as a .zip</p>
+      </div>
+      <input type="file" id="uploadFiles" accept=".md,.MD,.zip" multiple>
+
+      <hr class="pac-divider">
+
+      <div class="pac-checklist" id="fileChecklist"></div>
+      <div class="pac-warn" id="uploadWarn"></div>
+
+      <div class="pac-actions" id="uploadActions" style="display:none;">
+        <button class="btn btn-primary btn-sm" onclick="openProject()">Open Project</button>
+        <span class="pac-upload-status" id="upload-status"></span>
+      </div>
+    </div>
+  </div>
+
+  {% if recent_projects %}
+  <div class="card" style="margin-top:1rem;">
+    <p class="card-title">Recent Projects</p>
+    {% for proj in recent_projects %}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.45rem 0;border-bottom:1px solid #f1f5f9;">
+      <div style="min-width:0;margin-right:0.75rem;">
+        <div style="font-size:0.875rem;font-weight:600;color:#1e293b;">{{ proj.title }}</div>
+        {% if not proj.uploaded %}
+        <div style="font-family:monospace;font-size:0.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ proj.path }}</div>
+        {% endif %}
+      </div>
+      <button class="btn btn-ghost btn-sm" style="flex-shrink:0;"
+              onclick="openRecent({{ proj.path | tojson }})">Open</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+const REQUIRED = ['PRODUCT.MD', 'ABOUT.MD', 'README.MD'];
+const OPTIONAL  = ['BUGS.MD'];
+const ALLOWED   = new Set([...REQUIRED, ...OPTIONAL]);
+
+const droppedFiles = new Map(); // uppercase name -> File
+
+/* ── Checklist rendering ── */
+function renderChecklist() {
+  const listEl    = document.getElementById('fileChecklist');
+  const actionsEl = document.getElementById('uploadActions');
+  const dropZone  = document.getElementById('uploadDropZone');
+  const allRequiredMet = REQUIRED.every(n => droppedFiles.has(n));
+
+  listEl.innerHTML = [...REQUIRED, ...OPTIONAL].map(name => {
+    const has      = droppedFiles.has(name);
+    const optional = OPTIONAL.includes(name);
+    const rowClass = has ? 'provided' : (optional ? 'optional' : 'pending');
+    const icon     = has ? '✓' : (optional ? '·' : '○');
+    const tag      = optional && !has
+      ? '<span class="pac-optional-tag">optional</span>' : '';
+    const remove   = has
+      ? `<button class="pac-file-remove" onclick="removeFile('${name}')" title="Remove">✕</button>` : '';
+    return `<div class="pac-file-row ${rowClass}">
+      <span class="pac-file-icon">${icon}</span>
+      <span class="pac-file-name">${name}</span>
+      ${tag}${remove}
+    </div>`;
+  }).join('');
+
+  actionsEl.style.display = allRequiredMet ? 'flex' : 'none';
+  dropZone.classList.toggle('ready', allRequiredMet);
+}
+
+function removeFile(name) {
+  droppedFiles.delete(name);
+  renderChecklist();
+}
+
+/* ── Adding files ── */
+let warnTimer = null;
+function showWarn(msg) {
+  const el = document.getElementById('uploadWarn');
+  el.textContent = msg;
+  clearTimeout(warnTimer);
+  warnTimer = setTimeout(() => { el.textContent = ''; }, 3500);
+}
+
+function addFiles(incoming) {
+  const unknown = [];
+  for (const f of Array.from(incoming)) {
+    const name = f.name.toUpperCase();
+    if (!name.endsWith('.MD')) { unknown.push(f.name); continue; }
+    if (!ALLOWED.has(name))   { unknown.push(f.name); continue; }
+    droppedFiles.set(name, f);
+  }
+  if (unknown.length) showWarn('Ignored: ' + unknown.join(', '));
+  renderChecklist();
+}
+
+/* ── Zip extraction ── */
+let _JSZip = null;
+async function loadJSZip() {
+  if (_JSZip) return _JSZip;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  _JSZip = window.JSZip;
+  return _JSZip;
+}
+
+async function extractAndAddZip(zipFile) {
+  let JSZip;
+  try { JSZip = await loadJSZip(); }
+  catch { showWarn('Could not load zip reader — check your connection.'); return; }
+  try {
+    const zip = await JSZip.loadAsync(zipFile);
+    const extracted = [];
+    for (const [path, entry] of Object.entries(zip.files)) {
+      if (entry.dir) continue;
+      const name = path.split('/').pop().toUpperCase();
+      if (!name.endsWith('.MD') || !ALLOWED.has(name)) continue;
+      const buf = await entry.async('arraybuffer');
+      extracted.push(new File([buf], name, { type: 'text/markdown' }));
+    }
+    if (extracted.length) addFiles(extracted);
+    else showWarn('No project .md files found in ' + zipFile.name);
+  } catch {
+    showWarn('Could not read zip: ' + zipFile.name);
+  }
+}
+
+async function handleIncoming(fileList) {
+  const regular = [], zips = [];
+  for (const f of Array.from(fileList)) {
+    if (f.name.toLowerCase().endsWith('.zip')) zips.push(f);
+    else regular.push(f);
+  }
+  if (regular.length) addFiles(regular);
+  for (const z of zips) await extractAndAddZip(z);
+}
+
+/* ── Open project ── */
+async function openProject() {
+  const statusEl = document.getElementById('upload-status');
+  statusEl.style.color = '';
+  statusEl.textContent = 'Opening…';
+  const form = new FormData();
+  for (const [, file] of droppedFiles) form.append('files', file);
+  try {
+    const resp = await fetch('/api/project/upload', { method: 'POST', body: form });
+    const d = await resp.json();
+    if (d.ok) { if (d.session_id) sessionStorage.setItem('pac_session_id', d.session_id); window.location = '/dashboard'; }
+    else { statusEl.style.color = '#dc2626'; statusEl.textContent = d.detail || 'Failed to open.'; }
+  } catch {
+    statusEl.style.color = '#dc2626';
+    statusEl.textContent = 'Request failed.';
+  }
+}
+
+/* ── File input ── */
+const uploadFilesInput = document.getElementById('uploadFiles');
+uploadFilesInput.addEventListener('change', () => {
+  if (uploadFilesInput.files.length) { handleIncoming(uploadFilesInput.files); uploadFilesInput.value = ''; }
+});
+
+/* ── Drag-and-drop ── */
+const uploadDropZone = document.getElementById('uploadDropZone');
+let dragDepth = 0;
+const hasFileData = e => Array.from(e.dataTransfer?.types || []).includes('Files');
+
+uploadDropZone.addEventListener('dragenter', e => {
+  if (!hasFileData(e)) return;
+  e.preventDefault(); dragDepth++;
+  uploadDropZone.classList.add('dragover');
+});
+uploadDropZone.addEventListener('dragover', e => { if (hasFileData(e)) e.preventDefault(); });
+uploadDropZone.addEventListener('dragleave', () => {
+  if (dragDepth > 0) dragDepth--;
+  if (dragDepth === 0) uploadDropZone.classList.remove('dragover');
+});
+uploadDropZone.addEventListener('drop', e => {
+  if (!hasFileData(e)) return;
+  e.preventDefault(); dragDepth = 0;
+  uploadDropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleIncoming(e.dataTransfer.files);
+});
+
+/* ── Folder picker ── */
+const dirStatus = document.getElementById('dir-status');
+
+async function openFolderPicker() {
+  dirStatus.style.color = ''; dirStatus.textContent = '';
+  if ('showDirectoryPicker' in window) {
+    let handle;
+    try { handle = await window.showDirectoryPicker(); }
+    catch (e) { if (e.name !== 'AbortError') { dirStatus.style.color='#dc2626'; dirStatus.textContent='Could not open folder.'; } return; }
+    const files = [];
+    for await (const [name, entry] of handle.entries()) {
+      if (entry.kind !== 'file') continue;
+      const upper = name.toUpperCase();
+      if (!upper.endsWith('.MD')) continue;
+      const f = await entry.getFile();
+      files.push(new File([f], upper, { type: f.type }));
+    }
+    await _openFilesAsSession(files);
+  } else {
+    document.getElementById('dirPicker').click();
+  }
+}
+
+document.getElementById('dirPicker').addEventListener('change', async function() {
+  const files = Array.from(this.files)
+    .map(f => new File([f], f.name.toUpperCase(), { type: f.type }));
+  this.value = '';
+  await _openFilesAsSession(files);
+});
+
+async function _openFilesAsSession(files) {
+  if (!files.length) { dirStatus.style.color='#dc2626'; dirStatus.textContent='No .md files found in the selected folder.'; return; }
+  dirStatus.style.color = ''; dirStatus.textContent = 'Opening…';
+  const form = new FormData();
+  files.forEach(f => form.append('files', f));
+  try {
+    const resp = await fetch('/api/project/upload', { method: 'POST', body: form });
+    const d = await resp.json();
+    if (d.ok) { if (d.session_id) sessionStorage.setItem('pac_session_id', d.session_id); window.location = '/dashboard'; }
+    else { dirStatus.style.color='#dc2626'; dirStatus.textContent = d.detail || 'Failed to open.'; }
+  } catch { dirStatus.style.color='#dc2626'; dirStatus.textContent='Request failed.'; }
+}
+
+function openRecent(path) {
+  dirStatus.style.color = ''; dirStatus.textContent = 'Switching…';
+  fetch('/api/switch-project', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project_dir: path }),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { window.location = '/dashboard'; }
+    else { dirStatus.style.color = '#dc2626'; dirStatus.textContent = d.detail || 'Failed.'; }
+  }).catch(() => { dirStatus.style.color = '#dc2626'; dirStatus.textContent = 'Request failed.'; });
+}
+
+/* ── Init ── */
+renderChecklist();
+</script>
+{% endblock %}

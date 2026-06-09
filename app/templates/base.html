@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ app_title }}{% endblock %}</title>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2/dist/htmx.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx-ext-json-enc@2.0.1/json-enc.js" defer></script>
+  <style>
+    :root {
+      --sidebar-bg: #1e293b;
+      --sidebar-width: 14rem;
+      --live: #16a34a;
+      --planned: #2563eb;
+      --gap: #dc2626;
+      --live-bg: #dcfce7;
+      --planned-bg: #dbeafe;
+      --gap-bg: #fee2e2;
+      --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      --radius: 8px;
+    }
+    html { font-size: clamp(13px, 1vw, 16px); }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f1f5f9; margin: 0; color: #1e293b; display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    .sidebar-brand { padding: 1.25rem 1rem 1rem; font-size: 0.95rem; font-weight: 700; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1); line-height: 1.4; }
+    .sidebar-brand small { display: block; font-size: 0.65rem; font-weight: 400; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.2rem; }
+    nav { padding: 0.5rem 0; flex: 1; }
+    nav a { display: block; padding: 0.5rem 1rem; color: rgba(255,255,255,0.65); text-decoration: none; font-size: 0.875rem; border-left: 3px solid transparent; transition: background 0.1s, color 0.1s; }
+    nav a:hover { background: rgba(255,255,255,0.07); color: #fff; }
+    nav a.active { color: #fff; border-left-color: #2563eb; background: rgba(255,255,255,0.08); font-weight: 500; }
+    .nav-section { display: block; padding: 0.75rem 1rem 0.2rem; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); pointer-events: none; }
+    .sidebar-footer { padding: 0.75rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; color: rgba(255,255,255,0.35); }
+
+    /* Main */
+    .main { flex: 1; padding: 2rem; min-width: 0; }
+    .page-header { margin-bottom: 1.5rem; }
+    .page-header h1 { font-size: 1.5rem; margin: 0 0 0.25rem; font-weight: 700; }
+    .page-header .subtitle { color: #64748b; font-size: 0.875rem; margin: 0; }
+
+    /* Cards */
+    .card { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; }
+    .card-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin: 0 0 0.75rem; }
+
+    /* Stat blocks */
+    .stats-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .stat-card { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1rem 1.25rem; flex: 1; min-width: 8rem; }
+    .stat-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin: 0 0 0.3rem; }
+    .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; margin: 0; }
+    .stat-value.live { color: var(--live); }
+    .stat-value.planned { color: var(--planned); }
+    .stat-value.gap { color: var(--gap); }
+
+    /* Status badges */
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .badge-live { background: var(--live-bg); color: var(--live); }
+    .badge-planned { background: var(--planned-bg); color: var(--planned); }
+    .badge-gap { background: var(--gap-bg); color: var(--gap); }
+
+    /* Progress bar */
+    .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #2563eb, #16a34a); transition: width 0.3s; }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.45rem 1rem; border: none; border-radius: 6px; font-size: 0.875rem; cursor: pointer; font-weight: 500; text-decoration: none; transition: background 0.15s; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-success { background: #16a34a; color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn-ghost { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+    .btn-ghost:hover { background: #e2e8f0; }
+    .btn-danger { background: transparent; color: #dc2626; border: 1px solid #dc2626; }
+    .btn-danger:hover { background: #fef2f2; }
+    .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.78rem; }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { text-align: left; padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    td { padding: 0.55rem 0.75rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* Status select */
+    .status-select { padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid transparent; font-size: 0.72rem; font-weight: 600; cursor: pointer; appearance: none; text-align: center; }
+    .status-select.live { background: var(--live-bg); color: var(--live); border-color: #86efac; }
+    .status-select.planned { background: var(--planned-bg); color: var(--planned); border-color: #93c5fd; }
+    .status-select.gap { background: var(--gap-bg); color: var(--gap); border-color: #fca5a5; }
+
+    /* Forms */
+    .form-group { margin-bottom: 0.75rem; }
+    label { display: block; font-size: 0.78rem; font-weight: 500; color: #374151; margin-bottom: 0.3rem; }
+    input[type=text], input[type=number], textarea, select.form-select {
+      width: 100%; padding: 0.45rem 0.65rem; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 0.875rem; font-family: inherit; color: #1e293b; background: #fff;
+    }
+    input:focus, textarea:focus, select.form-select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    textarea { resize: vertical; min-height: 3rem; }
+
+    /* Grid helpers */
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    /* Misc */
+    .text-muted { color: #94a3b8; font-size: 0.8rem; }
+    .wbs-code { font-family: monospace; font-size: 0.75rem; color: #64748b; white-space: nowrap; }
+    .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
+    .htmx-request .htmx-indicator { opacity: 1; }
+
+    {% block extra_styles %}{% endblock %}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <a href="/switch-project" class="sidebar-brand" style="text-decoration:none;display:block;"
+     title="Switch project">
+    <small>strategy-as-code</small>
+    {{ app_title }}
+  </a>
+  <nav>
+    <span class="nav-section">Planning</span>
+    <a href="/dashboard" {% if active_page == 'dashboard' %}class="active"{% endif %}>Summary</a>
+    <a href="/structure" {% if active_page == 'structure' %}class="active"{% endif %}>Structure</a>
+    <a href="/roadmap" {% if active_page == 'roadmap' %}class="active"{% endif %}>Roadmap</a>
+    <a href="/features" {% if active_page == 'features' %}class="active"{% endif %}>Features</a>
+    <a href="/bugs" {% if active_page == 'bugs' %}class="active"{% endif %}>Bugs</a>
+    <span class="nav-section">Reference</span>
+    <a href="/registry" {% if active_page == 'registry' %}class="active"{% endif %}>Registry</a>
+    <a href="/readme" {% if active_page == 'readme' %}class="active"{% endif %}>README</a>
+  </nav>
+  <div class="sidebar-footer">
+    <button id="sync-btn"
+            style="width:100%;display:flex;align-items:center;justify-content:center;gap:0.4rem;
+                   padding:0.4rem 0.75rem;border-radius:5px;cursor:pointer;font-size:0.72rem;
+                   font-weight:600;font-family:inherit;letter-spacing:0.02em;
+                   background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);
+                   color:rgba(255,255,255,0.8);transition:background 0.15s,color 0.15s;"
+            onmouseover="this.style.background='rgba(255,255,255,0.14)';this.style.color='#fff'"
+            onmouseout="this.style.background='rgba(255,255,255,0.08)';this.style.color='rgba(255,255,255,0.8)'"
+            onclick="{% if is_uploaded %}exportMarkdown(){% else %}syncMarkdown(){% endif %}">
+      {% if is_uploaded %}⬇ Export Markdown{% else %}⟳ Sync to Markdown{% endif %}
+    </button>
+    <div id="sync-msg" style="font-size:0.65rem;margin-top:0.35rem;text-align:center;min-height:0.85rem;color:rgba(255,255,255,0.5);"></div>
+  </div>
+</aside>
+
+<main class="main">
+  {% block content %}{% endblock %}
+</main>
+
+<script>
+// Session injection: attach X-Session-ID to all /api/ requests
+(function() {
+  const _sid = () => sessionStorage.getItem('pac_session_id');
+  const _orig = window.fetch;
+  window.fetch = function(url, opts = {}) {
+    const sid = _sid();
+    if (sid && typeof url === 'string' && url.startsWith('/api/')) {
+      opts = { ...opts, headers: { ...(opts.headers || {}), 'X-Session-ID': sid } };
+    }
+    return _orig.call(this, url, opts).then(resp => {
+      if (resp.status === 401) {
+        resp.clone().json().then(d => {
+          if (d.detail === 'session_expired') {
+            sessionStorage.removeItem('pac_session_id');
+            window.location.href = '/switch-project';
+          }
+        }).catch(() => {});
+      }
+      return resp;
+    });
+  };
+  // Inject into HTMX requests too
+  document.addEventListener('htmx:configRequest', function(e) {
+    const sid = _sid();
+    if (sid) e.detail.headers['X-Session-ID'] = sid;
+  });
+})();
+
+function exportMarkdown() {
+  const sid = sessionStorage.getItem('pac_session_id');
+  const url = sid ? `/api/project/download` : '/api/project/download';
+  // For session-based downloads, need the header — use fetch + blob
+  if (sid) {
+    fetch(url, { headers: { 'X-Session-ID': sid } })
+      .then(r => r.blob())
+      .then(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'project.zip';
+        a.click();
+      });
+  } else {
+    window.location.href = url;
+  }
+}
+function syncMarkdown() {
+  const btn = document.getElementById('sync-btn');
+  const msg = document.getElementById('sync-msg');
+  btn.disabled = true;
+  msg.style.color = 'rgba(255,255,255,0.5)';
+  msg.textContent = 'Checking…';
+  fetch('/api/markdown/sync', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      msg.textContent = d.ok ? '✓ All files saved' : (d.detail || 'Error');
+      msg.style.color = d.ok ? '#86efac' : '#fca5a5';
+      setTimeout(() => { msg.textContent = ''; }, 3000);
+    })
+    .catch(() => { msg.textContent = 'Check failed'; msg.style.color = '#fca5a5'; })
+    .finally(() => { btn.disabled = false; });
+}
+</script>
+</body>
+</html>

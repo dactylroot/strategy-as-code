@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Features — {{ app_title }}{% endblock %}
+
+{% block extra_styles %}
+.lifecycle-board {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 2rem;
+}
+@media (max-width: 1200px) { .lifecycle-board { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 800px)  { .lifecycle-board { grid-template-columns: 1fr; } }
+
+.lc-col {}
+.lc-header {
+  padding: 0.55rem 0.875rem;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.lc-count { font-size: 0.78rem; font-weight: 700; opacity: 0.75; }
+.col-ideas      .lc-header { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; border-bottom: none; }
+.col-scoped     .lc-header { background: #f5f3ff; color: #5b21b6; border: 1px solid #ddd6fe; border-bottom: none; }
+.col-scored     .lc-header { background: #ede9fe; color: #4c1d95; border: 1px solid #c4b5fd; border-bottom: none; }
+.col-inprogress .lc-header { background: #fff7ed; color: #92400e; border: 1px solid #fed7aa; border-bottom: none; }
+.col-completed  .lc-header { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-bottom: none; }
+
+.lc-body {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 0.5rem;
+  min-height: 5rem;
+}
+
+/* ── Feature cards ── */
+.fc {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  transition: box-shadow 0.1s;
+}
+.fc:last-child { margin-bottom: 0; }
+.fc:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.07); }
+.fc-head { padding: 0.65rem 0.75rem; cursor: pointer; }
+.fc-meta { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; }
+.fc-id   { font-family: monospace; font-size: 0.62rem; color: #94a3b8; }
+.fc-wbs  { font-family: monospace; font-size: 0.62rem; padding: 0.1rem 0.3rem; border-radius: 3px; font-weight: 600; }
+.fc-stage-badge { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.fc-title { font-size: 0.85rem; font-weight: 500; color: #1e293b; line-height: 1.4; margin-bottom: 0.25rem; }
+.fc-notes { font-size: 0.75rem; color: #64748b; line-height: 1.4; }
+.fc-actions { display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-top: 0.45rem; }
+
+/* Inline edit panel */
+.fc-edit { display: none; padding: 0.65rem 0.75rem; border-top: 1px solid #f1f5f9; background: #fafafa; }
+.fc-edit.open { display: block; }
+.fc-edit-field { margin-bottom: 0.5rem; }
+.fc-edit-field label { display: block; font-size: 0.68rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
+.fc-edit-field input, .fc-edit-field textarea {
+  width: 100%; padding: 0.35rem 0.5rem;
+  border: 1px solid #d1d5db; border-radius: 4px;
+  font-size: 0.82rem; font-family: inherit; color: #1e293b;
+}
+.fc-edit-field textarea { resize: vertical; min-height: 2.5rem; }
+.fc-edit-field input:focus, .fc-edit-field textarea:focus { outline: none; border-color: #7c3aed; }
+.score-pair { display: flex; gap: 0.5rem; }
+.score-pair .fc-edit-field { flex: 1; }
+.score-pair input { text-align: center; }
+
+/* Stage-specific card accents */
+.col-ideas      .fc { border-left: 3px solid #f59e0b; }
+.col-scoped     .fc { border-left: 3px solid #7c3aed; }
+.col-scored     .fc { border-left: 3px solid #5b21b6; }
+.col-inprogress .fc { border-left: 3px solid #f59e0b; }
+.col-completed  .fc { border-left: 3px solid #16a34a; opacity: 0.8; }
+
+.priority-badge { background: #d1fae5; color: #065f46; padding: 0.15rem 0.4rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
+.wbs-pill { background: #f1f5f9; color: #475569; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.65rem; font-family: monospace; }
+
+/* Priority matrix */
+.matrix-card { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; margin-bottom: 1.5rem; }
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;">
+  <div class="page-header" style="margin-bottom:0;">
+    <h1>Features</h1>
+    <p class="subtitle">
+      {{ ideas|length }} to scope &middot;
+      {{ scoped|length }} scoped &middot;
+      {{ scored|length }} scored &middot;
+      {{ in_progress|length }} in progress &middot;
+      {{ completed|length }} completed
+    </p>
+  </div>
+  <button class="btn btn-primary" onclick="document.getElementById('captureModal').showModal()">+ Capture Idea</button>
+</div>
+
+<!-- 5-column lifecycle board -->
+<div class="lifecycle-board">
+
+  <!-- ── Ideas ── -->
+  <div class="lc-col col-ideas">
+    <div class="lc-header">Ideas <span class="lc-count">{{ ideas|length }}</span></div>
+    <div class="lc-body" id="col-ideas">
+      {% for item in ideas %}
+        {% include "partials/fc_idea.html" %}
+      {% endfor %}
+      {% if not ideas %}
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">All gaps are scoped. Capture new ideas above.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Scoped ── -->
+  <div class="lc-col col-scoped">
+    <div class="lc-header">Scoped <span class="lc-count">{{ scoped|length }}</span></div>
+    <div class="lc-body" id="col-scoped">
+      {% for item in scoped %}
+        {% include "partials/fc_scoped.html" %}
+      {% endfor %}
+      {% if not scoped %}
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Scope an idea to see it here.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Scored ── -->
+  <div class="lc-col col-scored">
+    <div class="lc-header">Scored <span class="lc-count">{{ scored|length }}</span></div>
+    <div class="lc-body" id="col-scored">
+      {% for item in scored %}
+        {% include "partials/fc_scored.html" %}
+      {% endfor %}
+      {% if not scored %}
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Score a scoped item to see it here.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── In Progress ── -->
+  <div class="lc-col col-inprogress">
+    <div class="lc-header">In Progress <span class="lc-count">{{ in_progress|length }}</span></div>
+    <div class="lc-body" id="col-inprogress">
+      {% for item in in_progress %}
+        {% include "partials/fc_inprogress.html" %}
+      {% endfor %}
+      {% if not in_progress %}
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Advance a scored item to start work.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Completed ── -->
+  <div class="lc-col col-completed">
+    <div class="lc-header">Completed <span class="lc-count">{{ completed|length }}</span></div>
+    <div class="lc-body" id="col-completed">
+      {% for item in completed %}
+        {% include "partials/fc_completed.html" %}
+      {% endfor %}
+      {% if not completed %}
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Completed features appear here.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Priority matrix (scored items only) -->
+{% if scored %}
+<div class="matrix-card">
+  <p class="card-title">Priority Matrix — Scored Items</p>
+  <svg style="width:100%;max-width:520px;display:block;overflow:visible;" viewBox="0 0 520 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="50" y="10" width="220" height="130" fill="#fef3c7" opacity="0.5" rx="2"/>
+    <rect x="270" y="10" width="220" height="130" fill="#d1fae5" opacity="0.6" rx="2"/>
+    <rect x="50" y="140" width="220" height="130" fill="#fee2e2" opacity="0.3" rx="2"/>
+    <rect x="270" y="140" width="220" height="130" fill="#dbeafe" opacity="0.4" rx="2"/>
+    <text x="160" y="75" text-anchor="middle" fill="#92400e" font-size="9" font-weight="600" opacity="0.7">NICE TO HAVE</text>
+    <text x="380" y="75" text-anchor="middle" fill="#065f46" font-size="9" font-weight="600" opacity="0.8">QUICK WINS</text>
+    <text x="160" y="205" text-anchor="middle" fill="#991b1b" font-size="9" font-weight="600" opacity="0.6">AVOID</text>
+    <text x="380" y="205" text-anchor="middle" fill="#1e40af" font-size="9" font-weight="600" opacity="0.7">STRATEGIC</text>
+    <line x1="50" y1="270" x2="490" y2="270" stroke="#cbd5e1" stroke-width="1.5"/>
+    <line x1="50" y1="10" x2="50" y2="270" stroke="#cbd5e1" stroke-width="1.5"/>
+    <line x1="270" y1="10" x2="270" y2="270" stroke="#cbd5e1" stroke-width="0.75" stroke-dasharray="3,3"/>
+    <line x1="50" y1="140" x2="490" y2="140" stroke="#cbd5e1" stroke-width="0.75" stroke-dasharray="3,3"/>
+    <text x="270" y="290" text-anchor="middle" fill="#64748b" font-size="10" font-weight="500">Business Value →</text>
+    <text x="16" y="140" text-anchor="middle" fill="#64748b" font-size="10" font-weight="500" transform="rotate(-90,16,140)">Low Effort ↑</text>
+    {% for v in range(1, 11) %}
+    <text x="{{ 50 + (v - 1) * 48.9 }}" y="282" text-anchor="middle" fill="#94a3b8" font-size="8">{{ v }}</text>
+    {% endfor %}
+    {% for e in range(1, 11) %}
+    <text x="42" y="{{ 10 + (e - 1) * 28.9 }}" text-anchor="end" fill="#94a3b8" font-size="8">{{ e }}</text>
+    {% endfor %}
+    {% for item in scored %}
+    {% set cx = 50 + (item.value - 1) * 48.9 %}
+    {% set cy = 10 + (item.effort - 1) * 28.9 %}
+    <circle cx="{{ cx }}" cy="{{ cy }}" r="14" fill="#5b21b6" opacity="0.8" stroke="#fff" stroke-width="2">
+      <title>{{ item.wbs }} {{ item.name }} (V:{{ item.value }}, E:{{ item.effort }}, Score:{{ '%.1f'|format(item.priority_score) }})</title>
+    </circle>
+    <text x="{{ cx }}" y="{{ cy + 4 }}" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">{{ item.wbs }}</text>
+    {% endfor %}
+  </svg>
+  <p class="text-muted" style="margin-top:0.5rem;font-size:0.75rem;">Top-right = Quick Wins (high value, low effort). Hover a circle for details.</p>
+</div>
+{% endif %}
+
+<!-- Capture modal -->
+<dialog id="captureModal" style="border:1px solid #d1d5db;border-radius:8px;padding:1.5rem;min-width:26rem;max-width:36rem;">
+  <h3 style="margin:0 0 1rem;font-size:1rem;">Capture New Idea</h3>
+  <form id="captureForm" onsubmit="return false;">
+    <div class="form-group"><label>Name</label>
+      <input type="text" id="captureIdea" required placeholder="Describe the feature or improvement">
+    </div>
+    <div class="form-group"><label>WBS Area <span style="color:#dc2626;">*</span></label>
+      <select id="captureWbs" required style="width:100%;padding:0.4rem 0.5rem;border:1px solid #d1d5db;border-radius:4px;font-size:0.85rem;">
+        <option value="">— select a WBS area —</option>
+        {% for sa in sub_areas %}
+        <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} — {{ sa.title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group"><label>Notes <span class="text-muted">(optional)</span></label>
+      <textarea id="captureNotes" rows="2" placeholder="Context, source, or acceptance criteria"></textarea>
+    </div>
+    <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('captureModal').close()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="submitCapture()">Add to Ideas</button>
+    </div>
+  </form>
+</dialog>
+
+{% include "partials/feature_panel.html" %}
+
+<script>
+/* ── Capture idea ── */
+function submitCapture() {
+  const name = document.getElementById('captureIdea').value.trim();
+  const wbs  = document.getElementById('captureWbs').value;
+  if (!name) return;
+  if (!wbs) { alert('Please select a WBS area.'); return; }
+  const notes = document.getElementById('captureNotes').value.trim();
+  fetch('/api/features', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, notes, wbs_prefix: wbs, status: 'Idea' }),
+  }).then(r => { if (r.ok) { document.getElementById('captureModal').close(); location.reload(); } });
+}
+
+/* ── Advance scored → In-Progress ── */
+function startWork(wbs, name) {
+  if (!confirm(`Start work on "${name}"?\nThis will mark it as In-Progress.`)) return;
+  fetch('/api/features/' + encodeURIComponent(wbs), {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'In-Progress' }),
+  }).then(r => { if (r.ok) location.reload();
+    else r.json().then(d => alert(d.detail || 'Failed')); });
+}
+
+/* ── Complete → Live ── */
+function completeFeature(wbs, name) {
+  if (!confirm(`Mark "${name}" as Completed?\nThis will set it to Live in the feature registry.`)) return;
+  fetch('/api/features/' + encodeURIComponent(wbs), {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'Live' }),
+  }).then(r => { if (r.ok) location.reload();
+    else r.json().then(d => alert(d.detail || 'Failed')); });
+}
+</script>
+{% endblock %}

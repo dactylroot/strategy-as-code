@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ app_title }}{% endblock %}
+
+{% block extra_styles %}
+/* ── Lifecycle Pipeline ────────────────────────────── */
+.pipeline-wrap {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 1.5rem;
+}
+.pipeline-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+.pipeline-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+  text-decoration: none;
+  border: 1.5px solid transparent;
+  transition: transform 0.1s, box-shadow 0.1s;
+  min-width: 5.5rem;
+  flex: 1;
+}
+.pipeline-stage:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+.pipeline-count {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.pipeline-label {
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: nowrap;
+}
+.pipeline-arrow {
+  font-size: 1.4rem;
+  color: #cbd5e1;
+  padding: 0 0.1rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: -0.5rem;
+}
+@media (max-width: 700px) {
+  .pipeline-row { flex-wrap: wrap; gap: 0.5rem; }
+  .pipeline-stage { flex: 1 1 40%; }
+  .pipeline-arrow { display: none; }
+}
+
+.stage-gap   { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.stage-gap .pipeline-count { color: #b45309; }
+
+.stage-backlog  { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.stage-backlog .pipeline-count { color: #6d28d9; }
+
+.stage-scored   { background: #ede9fe; border-color: #c4b5fd; color: #4c1d95; }
+.stage-scored .pipeline-count { color: #5b21b6; }
+
+.stage-planned  { background: #dbeafe; border-color: #bfdbfe; color: #1e40af; }
+.stage-planned .pipeline-count { color: #2563eb; }
+
+.stage-inprogress { background: #fff7ed; border-color: #fed7aa; color: #92400e; }
+.stage-inprogress .pipeline-count { color: #f59e0b; }
+
+.stage-live     { background: #dcfce7; border-color: #bbf7d0; color: #14532d; }
+.stage-live .pipeline-count { color: var(--live); }
+
+.stage-zero { opacity: 0.45; }
+
+/* ── Roadmap Planning section ──────────────────────── */
+.rp-section { margin-bottom: 1.5rem; }
+
+.rp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.rp-section-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+}
+.rp-section-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.rp-ip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.rp-ip-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-top: 3px solid #f59e0b;
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  box-shadow: var(--card-shadow);
+}
+.rp-ip-wbs {
+  font-family: monospace;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  margin-bottom: 0.2rem;
+}
+.rp-ip-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+.rp-ip-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.75rem;
+}
+.rp-ip-pct { font-weight: 700; }
+.rp-ip-counts { color: #64748b; }
+
+.rp-release-ready {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--live);
+}
+.rp-ready-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--live);
+  flex-shrink: 0;
+}
+
+.rp-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 18rem;
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .rp-bottom-row { grid-template-columns: 1fr; }
+}
+
+.rp-planned-card { padding: 1rem 1.25rem; }
+.rp-queue-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+.rp-planned-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: planned-counter;
+}
+.rp-planned-item {
+  counter-increment: planned-counter;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.85rem;
+}
+.rp-planned-item:last-child { border-bottom: none; }
+.rp-planned-item::before {
+  content: counter(planned-counter);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #94a3b8;
+  min-width: 1rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+.rp-planned-wbs {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+.rp-planned-label {
+  color: #334155;
+  font-weight: 500;
+}
+
+.rp-cut-card { padding: 1rem 1.25rem; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ product.title }}</h1>
+  <p class="subtitle">{{ product.summary | truncate(180) }}</p>
+</div>
+
+<!-- Stats row -->
+<div class="stats-row">
+  <div class="stat-card">
+    <p class="stat-label">Total Features</p>
+    <p class="stat-value">{{ product.total_features }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Live</p>
+    <p class="stat-value live">{{ product.live_count }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Planned</p>
+    <p class="stat-value planned">{{ product.planned_count }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Gaps</p>
+    <p class="stat-value gap">{{ product.gap_count }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Overall</p>
+    <p class="stat-value" style="color:#1e293b;">{{ (product.overall_completion_pct * 100)|int }}%</p>
+  </div>
+</div>
+
+<!-- Feature Lifecycle Pipeline -->
+{% set ideas_count = ideas | length %}
+{% set scoped_count = scoped | length %}
+{% set scored_count = scored | length %}
+{% set in_progress_count = in_progress_items | length %}
+{% set live_count = product.live_count %}
+
+<div class="pipeline-wrap">
+  <p class="card-title" style="margin:0 0 0.75rem;">Feature Lifecycle Pipeline</p>
+  <div class="pipeline-row">
+
+    <a href="/features" class="pipeline-stage stage-gap {% if ideas_count == 0 %}stage-zero{% endif %}">
+      <span class="pipeline-count">{{ ideas_count }}</span>
+      <span class="pipeline-label">Ideas</span>
+    </a>
+
+    <span class="pipeline-arrow">&#8250;</span>
+
+    <a href="/features" class="pipeline-stage stage-backlog {% if scoped_count == 0 %}stage-zero{% endif %}">
+      <span class="pipeline-count">{{ scoped_count }}</span>
+      <span class="pipeline-label">Scoped</span>
+    </a>
+
+    <span class="pipeline-arrow">&#8250;</span>
+
+    <a href="/features" class="pipeline-stage stage-scored {% if scored_count == 0 %}stage-zero{% endif %}">
+      <span class="pipeline-count">{{ scored_count }}</span>
+      <span class="pipeline-label">Scored</span>
+    </a>
+
+    <span class="pipeline-arrow">&#8250;</span>
+
+    <a href="/roadmap" class="pipeline-stage stage-inprogress {% if in_progress_count == 0 %}stage-zero{% endif %}">
+      <span class="pipeline-count">{{ in_progress_count }}</span>
+      <span class="pipeline-label">In Progress</span>
+    </a>
+
+    <span class="pipeline-arrow">&#8250;</span>
+
+    <a href="/product" class="pipeline-stage stage-live {% if live_count == 0 %}stage-zero{% endif %}">
+      <span class="pipeline-count">{{ live_count }}</span>
+      <span class="pipeline-label">Live</span>
+    </a>
+
+  </div>
+</div>
+
+<!-- WBS Chart — inline render so features are clickable -->
+<div style="margin-bottom:1.5rem;">
+  <p class="card-title" style="margin-bottom:0.5rem;">Work Breakdown Structure</p>
+  <div style="overflow-x:auto;">
+    {% for area in product.wbs_areas %}
+    <div style="display:flex;margin-bottom:6px;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+      <!-- Lane label -->
+      <div style="width:84px;min-width:84px;background:#1e293b;color:#fff;display:flex;align-items:center;
+                  justify-content:center;text-align:center;font-size:0.7rem;font-weight:700;
+                  padding:8px;line-height:1.45;">
+        {{ area.number }}.<br>{{ area.title | truncate(18, true, '…') }}
+      </div>
+      <!-- Sub-area sections -->
+      <div style="display:flex;flex:1;gap:3px;background:#e2e8f0;padding:3px;">
+        {% for sa in area.sub_areas %}
+        {% set pct = sa.completion_pct %}
+        <div style="flex:{{ [sa.features|length, 1]|max }};background:{{ pct | wbs_body_color }};
+                    display:flex;flex-direction:column;border-radius:4px;overflow:hidden;min-width:0;">
+          <!-- Section header -->
+          <div style="background:{{ pct | wbs_header_color }};padding:5px 8px;min-height:38px;
+                      display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+            <span style="font-size:0.7rem;font-weight:700;color:#fff;line-height:1.35;flex:1;">
+              {{ sa.wbs_prefix }} {{ sa.title }}
+            </span>
+            <span style="font-size:0.85rem;font-weight:700;color:#fff;white-space:nowrap;flex-shrink:0;">
+              {{ (pct * 100)|int }}%
+            </span>
+          </div>
+          <!-- Feature list — each item clickable -->
+          <div style="padding:5px 8px 8px;font-size:0.72rem;color:#1e293b;line-height:1.75;">
+            <ul style="list-style:none;margin:0;padding:0;">
+              {% for feature in sa.features %}
+              <li data-source="product"
+                  data-wbs="{{ feature.wbs }}"
+                  data-name="{{ feature.name }}"
+                  data-notes="{{ feature.notes }}"
+                  data-stage="{{ feature.status.value }}"
+                  onclick="openFeaturePanelFromEl(this)"
+                  style="cursor:pointer;padding:0 0 0 0.5rem;border-radius:3px;transition:background 0.1s;
+                         {% if feature.status.value == 'Live' %}text-decoration:line-through;color:#94a3b8;{% endif %}"
+                  onmouseover="this.style.background='rgba(0,0,0,0.06)'"
+                  onmouseout="this.style.background='transparent'">
+                • {{ feature.name }}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% include "partials/feature_panel.html" %}
+
+<!-- Recent Releases -->
+{% if recent_changelog %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+    <p class="card-title" style="margin:0;">Recent Releases</p>
+    <a href="/roadmap" class="btn btn-ghost btn-sm">View Roadmap</a>
+  </div>
+  {% for entry in recent_changelog %}
+  <div style="padding:0.75rem 0;border-bottom:1px solid #f1f5f9;{% if loop.last %}border-bottom:none;{% endif %}">
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">
+      <span style="font-weight:600;font-size:0.875rem;">v{{ entry.version }}</span>
+      {% if entry.in_progress %}
+      <span class="badge" style="background:#fef3c7;color:#92400e;">In Progress</span>
+      {% endif %}
+    </div>
+    {% for group in entry.groups[:2] %}
+    <div style="font-size:0.8rem;color:#64748b;margin-bottom:0.15rem;">
+      <strong style="color:#475569;">{{ group.label }}</strong> —
+      {{ group.items | join(', ') | truncate(80) }}
+    </div>
+    {% endfor %}
+    {% if entry.bug_fixes %}
+    <div style="font-size:0.8rem;color:#64748b;">
+      <strong style="color:#475569;">Bug fixes:</strong> {{ entry.bug_fixes | join(', ') | truncate(80) }}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

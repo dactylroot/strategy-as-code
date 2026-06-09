@@ -1,0 +1,20 @@
+<div class="fc" id="gap-{{ item.wbs | replace('.', '-') }}"
+     style="cursor:pointer;"
+     data-source="product"
+     data-wbs="{{ item.wbs }}"
+     data-name="{{ item.name }}"
+     data-notes="{{ item.notes }}"
+     data-stage="Gap"
+     onclick="openFeaturePanelFromEl(this)">
+  <div class="fc-head">
+    <div class="fc-meta">
+      <span class="fc-wbs" style="background:#fef3c7;color:#92400e;">{{ item.wbs }}</span>
+      <span class="fc-stage-badge" style="color:#b45309;">Gap</span>
+    </div>
+    <div class="fc-title">{{ item.name }}</div>
+    {% if item.notes %}<div class="fc-notes">{{ item.notes }}</div>{% endif %}
+    <div class="fc-actions">
+      <span class="text-muted" style="font-size:0.7rem;">Click to review, edit &amp; scope →</span>
+    </div>
+  </div>
+</div>

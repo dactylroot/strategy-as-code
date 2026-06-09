@@ -1,0 +1,41 @@
+<div class="bug-card"
+     data-id="{{ bug.id }}"
+     data-title="{{ bug.title }}"
+     data-severity="{{ bug.severity.value }}"
+     data-status="{{ bug.status.value }}"
+     data-notes="{{ bug.notes }}"
+     data-wbs="{{ bug.wbs_ref or '' }}"
+     onclick="openBugPanel(
+       parseInt(this.dataset.id),
+       this.dataset.title,
+       this.dataset.severity,
+       this.dataset.status,
+       this.dataset.notes,
+       this.dataset.wbs
+     )">
+  <div class="bug-meta">
+    <span class="bug-id">#{{ bug.id }}</span>
+    <span class="severity-badge sev-{{ bug.severity.value | lower }}">{{ bug.severity.value }}</span>
+  </div>
+  <div class="bug-title">{{ bug.title }}</div>
+  {% if bug.notes %}<div class="bug-notes">{{ bug.notes | truncate(80) }}</div>{% endif %}
+  {% if bug.wbs_ref %}<div class="bug-wbs">{{ bug.wbs_ref }}</div>{% endif %}
+  <div class="bug-actions" onclick="event.stopPropagation()">
+    {% if bug.status.value == 'Open' %}
+    <button class="btn btn-ghost btn-sm" style="font-size:0.7rem;"
+            onclick="quickAdvance({{ bug.id }}, 'Investigating')">→ Investigate</button>
+    {% elif bug.status.value == 'Investigating' %}
+    <button class="btn btn-ghost btn-sm" style="font-size:0.7rem;"
+            onclick="quickAdvance({{ bug.id }}, 'Fix In Progress')">→ Start Fix</button>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function quickAdvance(id, newStatus) {
+  fetch('/api/bugs/' + id, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus }),
+  }).then(r => { if (r.ok) location.reload(); });
+}
+</script>

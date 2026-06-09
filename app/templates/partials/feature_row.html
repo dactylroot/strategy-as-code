@@ -1,0 +1,13 @@
+<tr id="feature-{{ feature.wbs | replace('.', '-') }}">
+  <td class="wbs-code">{{ feature.wbs }}</td>
+  <td style="font-size:0.875rem;">{{ feature.name }}</td>
+  <td>
+    <select class="status-select {{ feature.status.value | lower }}"
+            onchange="updateFeatureStatus('{{ feature.wbs }}', this)">
+      <option value="Live" {% if feature.status.value == 'Live' %}selected{% endif %}>Live</option>
+      <option value="Planned" {% if feature.status.value == 'Planned' %}selected{% endif %}>Planned</option>
+      <option value="Gap" {% if feature.status.value == 'Gap' %}selected{% endif %}>Gap</option>
+    </select>
+  </td>
+  <td class="notes-cell" title="{{ feature.notes }}">{{ feature.notes or '—' }}</td>
+</tr>

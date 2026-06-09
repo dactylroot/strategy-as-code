@@ -1,0 +1,15 @@
+services:
+  docs:
+    build: .
+    container_name: strategy-docs
+    ports:
+      - "8765:8000"
+    volumes:
+      - ${PROJECT_SOURCE_PATH}:/project
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+    environment:
+      PROJECT_DIR: /project
+      APP_TITLE: Renewals Manager
+      SOURCE_PATH: ${PROJECT_SOURCE_PATH}
+    restart: unless-stopped

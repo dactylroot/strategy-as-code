@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Structure — {{ app_title }}{% endblock %}
+
+{% block extra_styles %}
+.structure-section { background:#fff; border-radius:var(--radius); box-shadow:var(--card-shadow); margin-bottom:1.5rem; overflow:hidden; }
+.structure-header {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:0.9rem 1.25rem; border-bottom:1px solid #f1f5f9; background:#f8fafc;
+}
+.structure-title { font-size:0.95rem; font-weight:700; color:#1e293b; margin:0; }
+.structure-subtitle { font-size:0.78rem; color:#64748b; margin:0.1rem 0 0; }
+.structure-body { display:grid; grid-template-columns:1fr 1fr; min-height:200px; }
+@media (max-width:900px) { .structure-body { grid-template-columns:1fr; } }
+.editor-pane { display:flex; flex-direction:column; border-right:1px solid #f1f5f9; }
+.preview-pane { padding:1rem 1.25rem; overflow-y:auto; }
+.editor-pane textarea {
+  flex:1; padding:1rem 1.25rem; border:none; outline:none; resize:none;
+  font-family:'SF Mono',Consolas,monospace; font-size:0.82rem; line-height:1.6;
+  color:#334155; background:#fafafa; min-height:200px;
+}
+.editor-pane textarea:focus { background:#fff; }
+.editor-toolbar { padding:0.5rem 1rem; border-top:1px solid #f1f5f9; background:#f8fafc; display:flex; align-items:center; gap:0.5rem; }
+.save-status { font-size:0.75rem; color:#64748b; }
+
+/* Preview styles */
+.preview-pane h3 { font-size:0.95rem; font-weight:700; margin:0.75rem 0 0.3rem; color:#1e293b; }
+.preview-pane h4 { font-size:0.875rem; font-weight:600; margin:0.6rem 0 0.25rem; color:#374151; }
+.preview-pane p { font-size:0.875rem; line-height:1.6; color:#374151; margin:0 0 0.5rem; }
+.preview-pane ul, .preview-pane ol { font-size:0.875rem; line-height:1.7; padding-left:1.25rem; color:#374151; margin:0 0 0.5rem; }
+.preview-pane li { margin-bottom:0.1rem; }
+.preview-pane li s { color:#94a3b8; }
+.preview-pane hr { border:none; border-top:1px solid #f1f5f9; margin:0.75rem 0; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Structure</h1>
+  <p class="subtitle">User personas, core workflows, and product scope — the strategic foundation of {{ product.title }}.</p>
+</div>
+
+{% macro editable_section(title, subtitle, section_id, endpoint, raw_content) %}
+<div class="structure-section" id="section-{{ section_id }}">
+  <div class="structure-header">
+    <div>
+      <p class="structure-title">{{ title }}</p>
+      <p class="structure-subtitle">{{ subtitle }}</p>
+    </div>
+  </div>
+  <div class="structure-body">
+    <div class="editor-pane">
+      <textarea id="editor-{{ section_id }}"
+                oninput="previewSection('{{ section_id }}')"
+                placeholder="Markdown…">{{ raw_content }}</textarea>
+      <div class="editor-toolbar">
+        <button class="btn btn-primary btn-sm" onclick="saveSection('{{ section_id }}', '{{ endpoint }}')">Save</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetSection('{{ section_id }}')">Reset</button>
+        <span id="status-{{ section_id }}" class="save-status"></span>
+      </div>
+    </div>
+    <div class="preview-pane" id="preview-{{ section_id }}">
+      {{ raw_content | markdown_to_html | safe }}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{{ editable_section(
+     "User Personas",
+     "Roles that interact with the product — their responsibilities and goals.",
+     "users",
+     "/api/structure/users",
+     product.users_md
+) }}
+
+{{ editable_section(
+     "Core Workflows",
+     "End-to-end step sequences per persona showing how the product is used.",
+     "workflows",
+     "/api/structure/workflows",
+     product.workflows_md
+) }}
+
+{{ editable_section(
+     "Product Scope",
+     "High-level scope areas and initiatives. Use ~~strikethrough~~ 🎆 for completed items.",
+     "scope",
+     "/api/structure/scope",
+     product.scope_md
+) }}
+
+<script>
+const _originals = {};
+
+document.addEventListener('DOMContentLoaded', () => {
+  ['users','workflows','scope'].forEach(id => {
+    const ta = document.getElementById('editor-' + id);
+    if (ta) _originals[id] = ta.value;
+  });
+});
+
+function previewSection(id) {
+  const md = document.getElementById('editor-' + id)?.value || '';
+  fetch('/api/markdown/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: md }),
+  }).then(r => r.json()).then(d => {
+    const pane = document.getElementById('preview-' + id);
+    if (pane && d.html) pane.innerHTML = d.html;
+  }).catch(() => {});
+}
+
+function saveSection(id, endpoint) {
+  const content = document.getElementById('editor-' + id)?.value || '';
+  const status = document.getElementById('status-' + id);
+  status.textContent = 'Saving…';
+  fetch(endpoint, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  }).then(r => r.json()).then(d => {
+    status.textContent = d.ok ? 'Saved ✓' : (d.detail || 'Error');
+    status.style.color = d.ok ? '#16a34a' : '#dc2626';
+    if (d.ok) { _originals[id] = content; setTimeout(() => { status.textContent = ''; }, 3000); }
+  }).catch(() => { status.textContent = 'Save failed'; status.style.color = '#dc2626'; });
+}
+
+function resetSection(id) {
+  const ta = document.getElementById('editor-' + id);
+  if (ta && _originals[id] !== undefined) {
+    ta.value = _originals[id];
+    previewSection(id);
+    document.getElementById('status-' + id).textContent = '';
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Features — {{ app_title }}{% endblock %}
+
+{% block extra_styles %}
+details > summary { cursor: pointer; list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details[open] .chevron { transform: rotate(90deg); }
+.chevron { display: inline-block; transition: transform 0.15s; margin-right: 0.4rem; color: #94a3b8; }
+.notes-cell { max-width: 20rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #64748b; font-size: 0.8rem; }
+.add-form { display: none; margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid #f1f5f9; }
+.add-form.open { display: block; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+  <div>
+    <h1>Features</h1>
+    <p class="subtitle">WBS feature registry — {{ product.total_features }} total &middot;
+      <span style="color:var(--live);">{{ product.live_count }} live</span> &middot;
+      <span style="color:var(--planned);">{{ product.planned_count }} planned</span> &middot;
+      <span style="color:var(--gap);">{{ product.gap_count }} gaps</span>
+    </p>
+  </div>
+  <a href="/roadmap" class="btn btn-ghost btn-sm">Roadmap</a>
+</div>
+
+{% for area in product.wbs_areas %}
+<details open style="margin-bottom:1rem;">
+  <summary>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1.25rem;">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span class="chevron">&#9654;</span>
+        <span style="font-weight:600;">{{ area.number }}. {{ area.title }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <div style="width:8rem;">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:{{ (area.completion_pct * 100)|int }}%;"></div>
+          </div>
+        </div>
+        <span style="font-size:0.78rem;color:#64748b;white-space:nowrap;">{{ (area.completion_pct * 100)|int }}% live</span>
+        <span style="font-size:0.78rem;color:#94a3b8;white-space:nowrap;">
+          {{ area.live_count }}L / {{ area.planned_count }}P / {{ area.gap_count }}G
+        </span>
+      </div>
+    </div>
+  </summary>
+
+  {% for sa in area.sub_areas %}
+  <div class="card" style="margin-top:0.5rem;margin-left:1rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+      <div>
+        <span class="wbs-code">{{ sa.wbs_prefix }}</span>
+        <span style="font-weight:600;margin-left:0.5rem;">{{ sa.title }}</span>
+        <span class="text-muted" style="margin-left:0.5rem;">
+          {{ sa.features|length }} features &middot; {{ (sa.completion_pct * 100)|int }}% live
+        </span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="toggleAddForm('{{ sa.wbs_prefix }}')">+ Add Feature</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:5rem;">WBS</th>
+            <th>Feature</th>
+            <th style="width:7rem;">Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-{{ sa.wbs_prefix | replace('.', '-') }}">
+          {% for feature in sa.features %}
+          {% include "partials/feature_row.html" %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Add feature form -->
+    <div id="add-form-{{ sa.wbs_prefix | replace('.', '-') }}" class="add-form">
+      <form hx-post="/api/features"
+            hx-target="#tbody-{{ sa.wbs_prefix | replace('.', '-') }}"
+            hx-swap="beforeend"
+            hx-ext="json-enc"
+            onsubmit="closeAddForm('{{ sa.wbs_prefix }}')"
+            style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+        <input type="hidden" name="wbs_prefix" value="{{ sa.wbs_prefix }}">
+        <div class="form-group" style="margin:0;flex:1;min-width:10rem;">
+          <label>Feature name</label>
+          <input type="text" name="name" required placeholder="Describe the feature">
+        </div>
+        <div class="form-group" style="margin:0;width:8rem;">
+          <label>Status</label>
+          <select name="status" class="form-select">
+            <option value="Planned" selected>Planned</option>
+            <option value="Gap">Gap</option>
+            <option value="Live">Live</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;flex:1;min-width:10rem;">
+          <label>Notes</label>
+          <input type="text" name="notes" placeholder="Optional notes">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Add</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeAddForm('{{ sa.wbs_prefix }}')">Cancel</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</details>
+{% endfor %}
+
+<!-- Known Gaps section -->
+{% if product.gaps_md %}
+<div class="card" id="gaps" style="margin-top:1.5rem;">
+  <p class="card-title">Known Gaps for Team Discussion</p>
+  <div class="prose">{{ product.gaps_md | markdown_to_html | safe }}</div>
+</div>
+{% endif %}
+
+<style>
+.prose h3 { font-size:0.95rem; font-weight:600; margin:1rem 0 0.3rem; color:#1e293b; }
+.prose p { font-size:0.875rem; line-height:1.6; color:#374151; margin:0 0 0.75rem; }
+</style>
+
+<script>
+function toggleAddForm(prefix) {
+  const form = document.getElementById('add-form-' + prefix.replace(/\./g, '-'));
+  if (form) form.classList.toggle('open');
+}
+function closeAddForm(prefix) {
+  const form = document.getElementById('add-form-' + prefix.replace(/\./g, '-'));
+  if (form) {
+    form.classList.remove('open');
+    form.querySelector('form').reset();
+  }
+}
+
+function updateFeatureStatus(wbs, select) {
+  const rowId = 'feature-' + wbs.replace(/\./g, '-');
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  fetch('/api/features/' + encodeURIComponent(wbs), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'HX-Request': 'true' },
+    body: JSON.stringify({ status: select.value }),
+  }).then(r => {
+    if (!r.ok) { select.value = select.querySelector('[selected]')?.value || select.value; return; }
+    return r.text();
+  }).then(html => {
+    if (!html) return;
+    const tmp = document.createElement('table');
+    tmp.innerHTML = '<tbody>' + html + '</tbody>';
+    const newRow = tmp.querySelector('tr');
+    if (newRow) row.replaceWith(newRow);
+  });
+}
+</script>
+{% endblock %}

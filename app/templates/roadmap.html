@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% block title %}Roadmap — {{ app_title }}{% endblock %}
+
+{% block extra_styles %}
+/* ── Planning board ── */
+.roadmap-board { display: grid; grid-template-columns: 200px 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; align-items: start; }
+@media (max-width: 1100px) { .roadmap-board { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px)  { .roadmap-board { grid-template-columns: 1fr; } }
+
+.roadmap-col { display: flex; flex-direction: column; }
+.roadmap-col-header {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 0.55rem 0.75rem; border-radius: var(--radius) var(--radius) 0 0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.roadmap-col-count { font-weight: 400; font-size: 0.78rem; opacity: 0.75; }
+.col-defining    .roadmap-col-header { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; border-bottom: none; }
+.col-planned     .roadmap-col-header { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; border-bottom: none; }
+.col-inprogress  .roadmap-col-header { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-bottom: none; }
+.roadmap-list {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 var(--radius) var(--radius);
+  padding: 0.4rem; min-height: 4rem; flex: 1;
+}
+.col-inprogress .roadmap-list { border-top: none; }
+
+/* ── Feature cards ── */
+.rm-feat {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 5px;
+  padding: 0.5rem 0.65rem; margin-bottom: 0.35rem;
+  cursor: grab; transition: box-shadow 0.1s;
+}
+.rm-feat:last-child { margin-bottom: 0; }
+.rm-feat:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+.rm-feat.sortable-ghost  { opacity: 0.35; }
+.rm-feat.sortable-chosen { box-shadow: 0 3px 10px rgba(0,0,0,0.14); }
+.col-inprogress .rm-feat { border-left: 3px solid #f97316; }
+.col-planned    .rm-feat { border-left: 3px solid #3b82f6; }
+.rm-feat-wbs   { font-family: monospace; font-size: 0.62rem; color: #94a3b8; }
+.rm-feat-title { font-size: 0.82rem; font-weight: 500; color: #1e293b; line-height: 1.4; margin: 0.1rem 0; }
+.rm-feat-sa    { font-size: 0.68rem; color: #94a3b8; }
+
+/* Defining cards (read-only) */
+.defining-card { background: #fffbeb; border: 1px solid #fde68a; border-radius: 5px; padding: 0.5rem 0.65rem; margin-bottom: 0.35rem; }
+.defining-card-wbs   { font-family: monospace; font-size: 0.62rem; color: #b45309; }
+.defining-card-title { font-size: 0.82rem; font-weight: 500; color: #1e293b; line-height: 1.4; margin: 0.1rem 0; }
+.defining-gap-badge  { display: inline-block; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.65rem; font-weight: 600; }
+
+/* ── Backlog section ── */
+.backlog-section { background: #fff; border: 1px solid #e2e8f0; border-radius: var(--radius); margin-bottom: 1.5rem; overflow: hidden; }
+.backlog-section-header { background: #f1f5f9; color: #475569; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
+.backlog-pool { padding: 0.5rem; min-height: 3.5rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: flex-start; }
+.rm-feat-chip {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px;
+  padding: 0.35rem 0.65rem; cursor: grab; font-size: 0.8rem; color: #1e293b;
+  display: inline-flex; align-items: center; gap: 0.35rem; transition: box-shadow 0.1s;
+}
+.rm-feat-chip:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.rm-feat-chip.sortable-ghost  { opacity: 0.35; }
+.rm-feat-chip.sortable-chosen { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.rm-feat-chip .rm-feat-wbs { color: #94a3b8; font-size: 0.62rem; }
+.rm-freeform-chip { border-left: 3px solid #94a3b8; color: #475569; }
+
+/* ── Next release indicator ── */
+.ip-version-badge { font-size: 0.78rem; font-weight: 800; color: #9a3412; letter-spacing: -0.02em; }
+
+/* ── Changelog ── */
+.changelog-card { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; margin-bottom: 0.75rem; }
+.changelog-version { font-weight: 700; font-size: 1rem; color: #1e293b; }
+.changelog-group { font-size: 0.82rem; font-weight: 600; color: #374151; margin: 0.5rem 0 0.2rem; }
+.changelog-items { list-style: disc; padding-left: 1.25rem; margin: 0; }
+.changelog-items li { font-size: 0.82rem; color: #4b5563; line-height: 1.5; margin-bottom: 0.15rem; }
+{% endblock %}
+
+{% block content %}
+{# ── Macro: feature card (used in Planned and In Progress sortable lists) ── #}
+{% macro feat_card(entry) %}
+<div class="rm-feat"
+     data-type="feature"
+     data-wbs="{{ entry.f.wbs }}"
+     data-source="product"
+     data-name="{{ entry.f.name }}"
+     data-notes="{{ entry.f.notes }}"
+     data-stage="{{ entry.f.status.value }}"
+     onclick="openFeaturePanelFromEl(this)"
+     title="Click to open · drag to move">
+  <div class="rm-feat-wbs">{{ entry.f.wbs }}</div>
+  <div class="rm-feat-title">{{ entry.f.name }}</div>
+  <div class="rm-feat-sa">{{ entry.sa_prefix }} {{ entry.sa_title | truncate(30, true, '…') }}</div>
+</div>
+{% endmacro %}
+
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+  <div>
+    <h1>Roadmap</h1>
+    <p class="subtitle">Drag features between columns to plan. Backlog items can be promoted to Planned or In Progress.</p>
+  </div>
+</div>
+
+<!-- ── 4-column board: Defining (read-only) | Planned | In Progress | (version badge) ── -->
+<div class="roadmap-board">
+
+  <!-- Defining (read-only) -->
+  <div class="roadmap-col col-defining">
+    <div class="roadmap-col-header">
+      Defining
+      <span class="roadmap-col-count">{{ defining_sub_areas | length }}</span>
+    </div>
+    <div class="roadmap-list">
+      {% for d in defining_sub_areas %}
+      <div class="defining-card">
+        <div class="defining-card-wbs">{{ d.prefix }}</div>
+        <div class="defining-card-title">{{ d.title | truncate(34, true, '…') }}</div>
+        <span class="defining-gap-badge">{{ d.gap_count }} gap{{ 's' if d.gap_count != 1 }}</span>
+      </div>
+      {% endfor %}
+      {% if not defining_sub_areas %}
+      <p class="text-muted" style="padding:0.4rem 0.25rem;font-size:0.75rem;">All gaps are in the scoping queue.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Planned (draggable) -->
+  <div class="roadmap-col col-planned">
+    <div class="roadmap-col-header">
+      Planned
+      <span class="roadmap-col-count">{{ planned_features | length }}</span>
+    </div>
+    <div class="roadmap-list" id="col-planned">
+      {% for entry in planned_features %}{{ feat_card(entry) }}{% endfor %}
+      {% if not planned_features %}
+      <p class="text-muted" style="padding:0.4rem 0.25rem;font-size:0.75rem;">Drag features here to plan them.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- In Progress (draggable) + next release badge -->
+  <div class="roadmap-col col-inprogress" style="grid-column: span 2;">
+    <div class="roadmap-col-header" style="border-radius:var(--radius) var(--radius) 0 0;">
+      <div>
+        In Progress
+        <span class="roadmap-col-count" style="margin-left:0.35rem;">{{ in_progress_features | length }}</span>
+      </div>
+      {% if next_version %}
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.1rem;">
+        <span style="font-size:0.62rem;color:#9a3412;opacity:0.8;font-weight:400;">next release</span>
+        <span class="ip-version-badge">v{{ next_version }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if version_rationale %}
+    <div style="padding:0.35rem 0.75rem;font-size:0.7rem;color:#92400e;background:#fff7ed;border:1px solid #fed7aa;border-top:none;border-bottom:none;">
+      {{ version_rationale }}
+    </div>
+    {% endif %}
+    <div class="roadmap-list" id="col-in-progress" style="border-top:none;display:flex;flex-wrap:wrap;gap:0.35rem;align-items:flex-start;min-height:4rem;padding:0.5rem;">
+      {% for entry in in_progress_features %}
+      <div class="rm-feat" style="flex:0 0 auto;max-width:280px;"
+           data-type="feature" data-wbs="{{ entry.f.wbs }}"
+           data-source="product"
+           data-name="{{ entry.f.name }}"
+           data-notes="{{ entry.f.notes }}"
+           data-stage="{{ entry.f.status.value }}"
+           onclick="openFeaturePanelFromEl(this)"
+           title="Click to open · drag to move">
+        <div class="rm-feat-wbs">{{ entry.f.wbs }}</div>
+        <div class="rm-feat-title">{{ entry.f.name }}</div>
+        <div class="rm-feat-sa">{{ entry.sa_prefix }} {{ entry.sa_title | truncate(30, true, '…') }}</div>
+      </div>
+      {% endfor %}
+      {% if not in_progress_features %}
+      <p class="text-muted" style="padding:0.4rem 0.25rem;font-size:0.75rem;align-self:center;">Drag features here to start work.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Backlog: Gap features + freeform items (all draggable) ── -->
+<div class="backlog-section">
+  <div class="backlog-section-header">
+    Backlog
+    <span style="font-weight:400;">{{ (backlog_features | length) + (freeform_backlog | length) }} items</span>
+  </div>
+  <div class="backlog-pool" id="col-backlog">
+    {% for entry in backlog_features %}
+    <div class="rm-feat-chip"
+         data-type="feature" data-wbs="{{ entry.f.wbs }}"
+         data-source="product"
+         data-name="{{ entry.f.name }}"
+         data-notes="{{ entry.f.notes }}"
+         data-stage="{{ entry.f.status.value }}"
+         onclick="openFeaturePanelFromEl(this)"
+         title="Click to open · drag to move">
+      <span class="rm-feat-wbs">{{ entry.f.wbs }}</span>
+      {{ entry.f.name | truncate(40, true, '…') }}
+    </div>
+    {% endfor %}
+    {% for item in freeform_backlog %}
+    <div class="rm-feat-chip rm-freeform-chip"
+         data-type="freeform" data-item="{{ item }}">
+      {{ item | truncate(50, true, '…') }}
+    </div>
+    {% endfor %}
+    {% if not backlog_features and not freeform_backlog %}
+    <p class="text-muted" style="font-size:0.78rem;padding:0.35rem;">Backlog is clear.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Release History ── -->
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem;color:#1e293b;">Release History</h2>
+{% for entry in about.changelog %}
+<div class="changelog-card">
+  <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+    <span class="changelog-version">v{{ entry.version }}</span>
+    {% if entry.in_progress %}
+    <span class="badge" style="background:#fef3c7;color:#92400e;">In Progress</span>
+    {% endif %}
+  </div>
+  {% for group in entry.groups %}
+  <p class="changelog-group">{{ group.label }}</p>
+  <ul class="changelog-items">{% for item in group.items %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endfor %}
+  {% if entry.bug_fixes %}
+  <p class="changelog-group">Bug fixes</p>
+  <ul class="changelog-items">{% for fix in entry.bug_fixes %}<li>{{ fix }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% include "partials/feature_panel.html" %}
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+const DRAG_GROUP = 'roadmap-features';
+
+function getItems(colId) {
+  const el = document.getElementById(colId);
+  if (!el) return { features: [], freeform: [] };
+  const features = [], freeform = [];
+  el.querySelectorAll('[data-type]').forEach(card => {
+    if (card.dataset.type === 'feature') features.push(card.dataset.wbs);
+    else if (card.dataset.type === 'freeform') freeform.push(card.dataset.item);
+  });
+  return { features, freeform };
+}
+
+function saveRoadmap() {
+  const ip      = getItems('col-in-progress');
+  const pl      = getItems('col-planned');
+  const bl      = getItems('col-backlog');
+  fetch('/api/roadmap/features', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      in_progress_wbs: ip.features,
+      planned_wbs:     pl.features,
+      backlog_wbs:     bl.features,
+      freeform_backlog: [...bl.freeform, ...ip.freeform, ...pl.freeform],
+    }),
+  });
+}
+
+// Planned ↔ In Progress (columns share a drag group)
+['col-planned', 'col-in-progress'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  Sortable.create(el, {
+    group: DRAG_GROUP,
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: saveRoadmap,
+  });
+});
+
+// Backlog pool (drags TO columns, and accepts FROM columns)
+const backlogEl = document.getElementById('col-backlog');
+if (backlogEl) {
+  Sortable.create(backlogEl, {
+    group: DRAG_GROUP,
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: saveRoadmap,
+  });
+}
+</script>
+{% endblock %}

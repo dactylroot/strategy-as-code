@@ -1,0 +1,511 @@
+from __future__ import annotations
+import io
+import re
+import zipfile
+import tempfile
+from pathlib import Path
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi.responses import HTMLResponse, StreamingResponse
+from pydantic import BaseModel
+
+from ..config import settings
+from .. import session_store
+from ..models import (
+    FeatureUpdate, NewFeature, RoadmapUpdate, RoadmapFeaturesUpdate, NewRelease,
+    BugCreate, BugUpdate, FeatureStatus,
+)
+from ..parsers import product as product_parser
+from ..parsers import about as about_parser
+from ..parsers import bugs as bugs_parser
+from .. import wbs as wbs_module
+from ..template_env import templates
+
+router = APIRouter()
+
+_EMPTY_BUGS = bugs_parser._EMPTY_BUGS
+
+
+def _is_htmx(request: Request) -> bool:
+    return request.headers.get("HX-Request") == "true"
+
+
+def _session(request: Request) -> session_store.Session | None:
+    return session_store.get(request.headers.get("X-Session-ID"))
+
+
+def _require_session(request: Request) -> session_store.Session:
+    s = _session(request)
+    if s is None:
+        raise HTTPException(status_code=401, detail="session_expired")
+    return s
+
+
+# ── Product / Features ───────────────────────────────────────────────────────
+
+@router.get("/product")
+def get_product(request: Request):
+    s = _session(request)
+    if s:
+        return product_parser._parse_text(s.get_file("PRODUCT.MD"))
+    return product_parser.parse(settings.product_md)
+
+
+@router.patch("/features/{wbs:path}")
+def patch_feature(wbs: str, body: FeatureUpdate, request: Request):
+    s = _session(request)
+    if body.name is not None and (
+        not body.name.strip() or "|" in body.name or len(body.name.splitlines()) > 1
+    ):
+        raise HTTPException(status_code=400, detail="Feature name cannot be empty, contain '|', or span multiple lines")
+    def _apply(text: str) -> str:
+        if body.name is not None:
+            text = product_parser.transform_feature_name(text, wbs, body.name)
+        if body.status is not None:
+            text = product_parser.transform_feature_status(text, wbs, body.status)
+        if body.value is not None and body.effort is not None:
+            text = product_parser.transform_feature_score(text, wbs, body.value, body.effort)
+            if body.status is None:
+                text = product_parser.transform_feature_status(text, wbs, FeatureStatus.scored)
+        if body.notes is not None:
+            text = product_parser.transform_feature_notes(text, wbs, body.notes)
+        return text
+
+    try:
+        if s:
+            text = _apply(s.get_file("PRODUCT.MD"))
+            s.set_file("PRODUCT.MD", text)
+            updated = {"product_md": text}
+        else:
+            lock = product_parser._lock_for(settings.product_md)
+            with lock:
+                text = _apply(settings.product_md.read_text(encoding="utf-8"))
+                product_parser._atomic_write(settings.product_md, text)
+            updated = {}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if _is_htmx(request):
+        text_src = s.get_file("PRODUCT.MD") if s else settings.product_md.read_text(encoding="utf-8")
+        product = product_parser._parse_text(text_src)
+        feature = next(
+            (f for area in product.wbs_areas for sa in area.sub_areas for f in sa.features if f.wbs == wbs),
+            None,
+        )
+        if feature is None:
+            raise HTTPException(status_code=404, detail=f"Feature {wbs} not found after update")
+        return templates.TemplateResponse(request, "partials/feature_row.html", {"feature": feature})
+    return {"ok": True, **updated}
+
+
+class MoveFeatureBody(BaseModel):
+    target_prefix: str
+
+
+@router.post("/features/{wbs:path}/move")
+def move_feature(wbs: str, body: MoveFeatureBody, request: Request):
+    s = _session(request)
+    try:
+        if s:
+            product_text = s.get_file("PRODUCT.MD")
+            product_text, new_feature = product_parser.transform_move_feature(product_text, wbs, body.target_prefix)
+            s.set_file("PRODUCT.MD", product_text)
+            return {"ok": True, "new_wbs": new_feature.wbs, "updated": {"product_md": product_text}}
+        else:
+            new_feature = product_parser.move_feature(settings.product_md, wbs, body.target_prefix)
+            return {"ok": True, "new_wbs": new_feature.wbs}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/features")
+def post_feature(body: NewFeature, request: Request):
+    s = _session(request)
+    if "|" in body.name or len(body.name.splitlines()) > 1:
+        raise HTTPException(status_code=400, detail="Feature name cannot contain '|' or span multiple lines")
+    if "|" in body.notes or len(body.notes.splitlines()) > 1:
+        raise HTTPException(status_code=400, detail="Feature notes cannot contain '|' or span multiple lines")
+    try:
+        if s:
+            text = s.get_file("PRODUCT.MD")
+            text, feature = product_parser.transform_add_feature(text, body)
+            s.set_file("PRODUCT.MD", text)
+        else:
+            feature = product_parser.add_feature(settings.product_md, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if _is_htmx(request):
+        return templates.TemplateResponse(request, "partials/feature_row.html", {"feature": feature})
+    return feature
+
+
+# ── Roadmap ───────────────────────────────────────────────────────────────────
+
+@router.get("/about")
+def get_about(request: Request):
+    s = _session(request)
+    if s:
+        return about_parser._parse_text(s.get_file("ABOUT.MD"))
+    return about_parser.parse(settings.about_md)
+
+
+@router.put("/roadmap")
+def put_roadmap(body: RoadmapUpdate, request: Request):
+    s = _session(request)
+    if s:
+        text = s.get_file("ABOUT.MD")
+        s.set_file("ABOUT.MD", about_parser.transform_update_roadmap(text, body))
+    else:
+        about_parser.update_roadmap(settings.about_md, body)
+    return {"ok": True}
+
+
+@router.put("/roadmap/features")
+def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
+    from ..models import FeatureStatus
+    s = _session(request)
+
+    if s:
+        product_text = s.get_file("PRODUCT.MD")
+        prod = product_parser._parse_text(product_text)
+        wbs_to_feature = {f.wbs: f for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
+        wbs_to_prefix  = {f.wbs: sa.wbs_prefix for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
+
+        for wbs in body.backlog_wbs:
+            f = wbs_to_feature.get(wbs)
+            if f and f.status == FeatureStatus.planned:
+                try:
+                    product_text = product_parser.transform_feature_status(product_text, wbs, FeatureStatus.gap)
+                except Exception:
+                    pass
+        all_active = set(body.in_progress_wbs) | set(body.planned_wbs)
+        for wbs in all_active:
+            f = wbs_to_feature.get(wbs)
+            if f and f.status == FeatureStatus.gap:
+                try:
+                    product_text = product_parser.transform_feature_status(product_text, wbs, FeatureStatus.planned)
+                except Exception:
+                    pass
+        s.set_file("PRODUCT.MD", product_text)
+
+        prod2 = product_parser._parse_text(product_text)
+        sa_label = {sa.wbs_prefix: f"{sa.wbs_prefix} {sa.title}" for area in prod2.wbs_areas for sa in area.sub_areas}
+        ip_prefixes: set[str] = {wbs_to_prefix[w] for w in body.in_progress_wbs if w in wbs_to_prefix}
+        pl_prefixes: set[str] = {wbs_to_prefix[w] for w in body.planned_wbs if w in wbs_to_prefix} - ip_prefixes
+
+        about_text = s.get_file("ABOUT.MD")
+        about_text = about_parser.transform_update_roadmap(about_text, RoadmapUpdate(
+            in_progress=[sa_label.get(p, p) for p in sorted(ip_prefixes)],
+            planned=[sa_label.get(p, p) for p in sorted(pl_prefixes)],
+            backlog=body.freeform_backlog,
+        ))
+        s.set_file("ABOUT.MD", about_text)
+    else:
+        prod = product_parser.parse(settings.product_md)
+        wbs_to_feature = {f.wbs: f for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
+        wbs_to_prefix  = {f.wbs: sa.wbs_prefix for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
+
+        all_active = set(body.in_progress_wbs) | set(body.planned_wbs)
+        for wbs in body.backlog_wbs:
+            f = wbs_to_feature.get(wbs)
+            if f and f.status == FeatureStatus.planned:
+                try:
+                    product_parser.update_feature_status(settings.product_md, wbs, FeatureStatus.gap)
+                except Exception:
+                    pass
+        for wbs in all_active:
+            f = wbs_to_feature.get(wbs)
+            if f and f.status == FeatureStatus.gap:
+                try:
+                    product_parser.update_feature_status(settings.product_md, wbs, FeatureStatus.planned)
+                except Exception:
+                    pass
+
+        prod2 = product_parser.parse(settings.product_md)
+        sa_label = {sa.wbs_prefix: f"{sa.wbs_prefix} {sa.title}" for area in prod2.wbs_areas for sa in area.sub_areas}
+        ip_prefixes = {wbs_to_prefix[w] for w in body.in_progress_wbs if w in wbs_to_prefix}
+        pl_prefixes = {wbs_to_prefix[w] for w in body.planned_wbs if w in wbs_to_prefix} - ip_prefixes
+
+        about_parser.update_roadmap(settings.about_md, RoadmapUpdate(
+            in_progress=[sa_label.get(p, p) for p in sorted(ip_prefixes)],
+            planned=[sa_label.get(p, p) for p in sorted(pl_prefixes)],
+            backlog=body.freeform_backlog,
+        ))
+    return {"ok": True}
+
+
+@router.post("/releases")
+def post_release(body: NewRelease, request: Request):
+    s = _session(request)
+    if s:
+        about_text = s.get_file("ABOUT.MD")
+        about = about_parser._parse_text(about_text)
+        in_progress_section = about.roadmap_section("In Progress")
+        in_progress_items = in_progress_section.items if in_progress_section else []
+        about_text = about_parser.transform_add_changelog_entry(about_text, body, in_progress_items)
+        s.set_file("ABOUT.MD", about_text)
+    else:
+        about = about_parser.parse(settings.about_md)
+        in_progress_section = about.roadmap_section("In Progress")
+        in_progress_items = in_progress_section.items if in_progress_section else []
+        about_parser.add_changelog_entry(settings.about_md, body, in_progress_items)
+    return {"ok": True, "version": body.version}
+
+
+# ── WBS Chart ─────────────────────────────────────────────────────────────────
+
+@router.post("/wbs/regenerate")
+def regenerate_wbs(request: Request):
+    s = _session(request)
+    if s:
+        # Write session files to a temp dir, run the script, clean up
+        import tempfile as _tmp, shutil
+        tmp_dir = Path(_tmp.mkdtemp(prefix="pac_wbs_"))
+        try:
+            for fname, content in s.files.items():
+                (tmp_dir / fname).write_text(content, encoding="utf-8")
+            result = wbs_module.regenerate(tmp_dir)
+        except (FileNotFoundError, RuntimeError) as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        return result
+    else:
+        try:
+            result = wbs_module.regenerate(settings.project_dir)
+        except (FileNotFoundError, RuntimeError) as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        return result
+
+
+# ── Project switching (disk-mode only) ───────────────────────────────────────
+
+class SwitchProjectBody(BaseModel):
+    project_dir: str
+
+@router.post("/switch-project")
+def switch_project_api(body: SwitchProjectBody):
+    from ..config import switch_project as _switch
+    try:
+        _switch(Path(body.project_dir))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "project_dir": str(settings.project_dir), "title": settings.app_title}
+
+
+@router.get("/project/download")
+def download_project(request: Request):
+    s = _session(request)
+    if s:
+        candidates = {k: v for k, v in s.files.items() if k.endswith(".MD")}
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name, content in candidates.items():
+                zf.writestr(name, content)
+        buf.seek(0)
+        safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in s.title)
+        filename = f"{safe_title or 'project'}_project.zip"
+    else:
+        candidates = {
+            "PRODUCT.MD": settings.product_md,
+            "ABOUT.MD":   settings.about_md,
+            "README.MD":  settings.readme_md,
+            "BUGS.MD":    settings.bugs_md,
+        }
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name, path in candidates.items():
+                if path.exists():
+                    zf.write(path, name)
+        buf.seek(0)
+        safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in settings.app_title)
+        filename = f"{safe_title}_project.zip"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/project/upload")
+async def upload_project(files: list[UploadFile] = File(...)):
+    for f in files:
+        if not (f.filename or "").lower().endswith(".md"):
+            raise HTTPException(status_code=400, detail=f"Only .md files are accepted, got: {f.filename}")
+
+    file_contents: dict[str, str] = {}
+    for f in files:
+        content = await f.read()
+        filename = Path(f.filename).name.upper()
+        file_contents[filename] = content.decode("utf-8")
+
+    if "PRODUCT.MD" not in file_contents:
+        raise HTTPException(status_code=400, detail="PRODUCT.MD is required.")
+
+    text = file_contents["PRODUCT.MD"]
+    m = re.match(r"^# (.+)", text)
+    raw = m.group(1).strip() if m else "Project"
+    title = re.sub(r"\s*[-–—]\s*(Product\s+)?Overview\s*$", "", raw, flags=re.IGNORECASE).strip()
+
+    sid = session_store.create(file_contents, title=title)
+    return {"ok": True, "title": title, "session_id": sid}
+
+
+# ── Markdown preview ─────────────────────────────────────────────────────────
+
+class MarkdownPreviewBody(BaseModel):
+    content: str
+
+
+@router.post("/markdown/preview")
+def markdown_preview(body: MarkdownPreviewBody):
+    import markdown as md
+    html = md.markdown(body.content, extensions=["tables", "fenced_code"])
+    return {"html": html}
+
+
+# ── Product structure editing ─────────────────────────────────────────────────
+
+class SectionUpdate(BaseModel):
+    content: str
+
+
+@router.put("/structure/users")
+def put_users(body: SectionUpdate, request: Request):
+    s = _session(request)
+    try:
+        if s:
+            s.set_file("PRODUCT.MD", product_parser.transform_users(s.get_file("PRODUCT.MD"), body.content))
+        else:
+            product_parser.update_users(settings.product_md, body.content)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@router.put("/structure/workflows")
+def put_workflows(body: SectionUpdate, request: Request):
+    s = _session(request)
+    try:
+        if s:
+            s.set_file("PRODUCT.MD", product_parser.transform_workflows(s.get_file("PRODUCT.MD"), body.content))
+        else:
+            product_parser.update_workflows(settings.product_md, body.content)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@router.put("/structure/scope")
+def put_scope(body: SectionUpdate, request: Request):
+    s = _session(request)
+    try:
+        if s:
+            s.set_file("PRODUCT.MD", product_parser.transform_scope(s.get_file("PRODUCT.MD"), body.content))
+        else:
+            product_parser.update_scope(settings.product_md, body.content)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+# ── Bug tracking ─────────────────────────────────────────────────────────────
+
+@router.get("/bugs")
+def get_bugs(request: Request):
+    s = _session(request)
+    if s:
+        return bugs_parser._parse_text(s.get_file("BUGS.MD") or _EMPTY_BUGS)
+    return bugs_parser.parse(settings.bugs_md)
+
+
+@router.post("/bugs")
+def post_bug(body: BugCreate, request: Request):
+    s = _session(request)
+    if s:
+        text = s.get_file("BUGS.MD") or _EMPTY_BUGS
+        text, bug = bugs_parser.transform_add_bug(text, body)
+        s.set_file("BUGS.MD", text)
+        return bug
+    return bugs_parser.add_bug(settings.bugs_md, body)
+
+
+@router.patch("/bugs/{bug_id}")
+def patch_bug(bug_id: int, body: BugUpdate, request: Request):
+    s = _session(request)
+    try:
+        if s:
+            text = s.get_file("BUGS.MD") or _EMPTY_BUGS
+            text, bug = bugs_parser.transform_update_bug(text, bug_id, body)
+            s.set_file("BUGS.MD", text)
+            return bug
+        return bugs_parser.update_bug(settings.bugs_md, bug_id, body)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/bugs/{bug_id}/resolve")
+def resolve_bug(bug_id: int, request: Request, body: dict = {}):
+    resolved_in = body.get("resolved_in", "") if isinstance(body, dict) else ""
+    s = _session(request)
+    try:
+        if s:
+            text = s.get_file("BUGS.MD") or _EMPTY_BUGS
+            s.set_file("BUGS.MD", bugs_parser.transform_resolve_bug(text, bug_id, resolved_in))
+        else:
+            bugs_parser.resolve_bug(settings.bugs_md, bug_id, resolved_in)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True}
+
+
+# ── Markdown sync (health check) ──────────────────────────────────────────────
+
+@router.get("/markdown/status")
+def markdown_status(request: Request):
+    s = _session(request)
+    if s:
+        required = ["PRODUCT.MD", "ABOUT.MD"]
+        missing = [f for f in required if not s.get_file(f)]
+        return {"ok": len(missing) == 0, "missing": missing, "files": len(s.files)}
+    files = {
+        "PRODUCT.MD": settings.product_md,
+        "ABOUT.MD":   settings.about_md,
+        "README.MD":  settings.readme_md,
+    }
+    missing = [name for name, path in files.items() if not path.exists()]
+    return {"ok": len(missing) == 0, "missing": missing, "files": len(files) - len(missing)}
+
+
+@router.post("/markdown/sync")
+def markdown_sync(request: Request):
+    s = _session(request)
+    if s:
+        required = {"PRODUCT.MD": True, "ABOUT.MD": True}
+        results = {k: f"{len(s.get_file(k)):,} bytes" if s.get_file(k) else "missing" for k in required}
+        missing = [k for k, v in results.items() if v == "missing"]
+        if missing:
+            raise HTTPException(status_code=500, detail=f"Missing files: {', '.join(missing)}")
+        return {"ok": True, "message": "All markdown files in session.", "files": results}
+
+    files = {
+        "PRODUCT.MD": settings.product_md,
+        "ABOUT.MD":   settings.about_md,
+        "README.MD":  settings.readme_md,
+    }
+    results = {}
+    for name, path in files.items():
+        if not path.exists():
+            results[name] = "missing"
+        else:
+            try:
+                size = path.stat().st_size
+                results[name] = f"{size:,} bytes"
+            except Exception as e:
+                results[name] = f"error: {e}"
+
+    missing = [k for k, v in results.items() if v == "missing"]
+    if missing:
+        raise HTTPException(status_code=500, detail=f"Missing files: {', '.join(missing)}")
+    return {"ok": True, "message": "All markdown files saved.", "files": results}

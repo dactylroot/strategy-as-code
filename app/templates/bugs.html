@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Bugs — {{ app_title }}{% endblock %}
+
+{% block extra_styles %}
+.bug-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 2rem; align-items: start; }
+@media (max-width: 1100px) { .bug-board { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px)  { .bug-board { grid-template-columns: 1fr; } }
+
+.bug-col-header {
+  padding: 0.55rem 0.875rem; font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  display: flex; justify-content: space-between; align-items: center;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.bug-col-count { font-size: 0.78rem; font-weight: 700; opacity: 0.75; }
+.col-open       .bug-col-header { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; border-bottom: none; }
+.col-invest     .bug-col-header { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-bottom: none; }
+.col-fixing     .bug-col-header { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; border-bottom: none; }
+
+.bug-list {
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 0.5rem; min-height: 5rem;
+}
+
+.bug-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 0.7rem 0.75rem; margin-bottom: 0.5rem; cursor: pointer;
+  transition: box-shadow 0.1s;
+}
+.bug-card:last-child { margin-bottom: 0; }
+.bug-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+
+.col-open   .bug-card { border-left: 3px solid #ef4444; }
+.col-invest .bug-card { border-left: 3px solid #f97316; }
+.col-fixing .bug-card { border-left: 3px solid #3b82f6; }
+
+.bug-meta { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; flex-wrap: wrap; }
+.bug-id   { font-family: monospace; font-size: 0.62rem; color: #94a3b8; }
+.severity-badge {
+  font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+  padding: 0.1rem 0.35rem; border-radius: 3px;
+}
+.sev-critical { background: #fee2e2; color: #991b1b; }
+.sev-high     { background: #ffedd5; color: #9a3412; }
+.sev-medium   { background: #fef3c7; color: #92400e; }
+.sev-low      { background: #f1f5f9; color: #475569; }
+
+.bug-title { font-size: 0.875rem; font-weight: 500; color: #1e293b; line-height: 1.4; margin-bottom: 0.2rem; }
+.bug-notes { font-size: 0.75rem; color: #64748b; line-height: 1.4; }
+.bug-wbs   { font-family: monospace; font-size: 0.65rem; color: #94a3b8; margin-top: 0.2rem; }
+.bug-actions { display: flex; gap: 0.35rem; margin-top: 0.45rem; flex-wrap: wrap; }
+
+/* Resolved section */
+.resolved-section { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; }
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;">
+  <div class="page-header" style="margin-bottom:0;">
+    <h1>Bugs</h1>
+    <p class="subtitle">
+      {{ open_bugs|length }} open &middot;
+      {{ investigating_bugs|length }} investigating &middot;
+      {{ fixing_bugs|length }} fixing &middot;
+      {{ doc.resolved|length }} resolved
+    </p>
+  </div>
+  <button class="btn btn-primary" onclick="document.getElementById('newBugModal').showModal()">+ Report Bug</button>
+</div>
+
+<!-- Bug board -->
+<div class="bug-board">
+
+  <!-- Open -->
+  <div class="col-open">
+    <div class="bug-col-header">Open <span class="bug-col-count">{{ open_bugs|length }}</span></div>
+    <div class="bug-list">
+      {% for bug in open_bugs %}{% include "partials/bug_card.html" %}{% endfor %}
+      {% if not open_bugs %}<p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">No open bugs.</p>{% endif %}
+    </div>
+  </div>
+
+  <!-- Investigating -->
+  <div class="col-invest">
+    <div class="bug-col-header">Investigating <span class="bug-col-count">{{ investigating_bugs|length }}</span></div>
+    <div class="bug-list">
+      {% for bug in investigating_bugs %}{% include "partials/bug_card.html" %}{% endfor %}
+      {% if not investigating_bugs %}<p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">None under investigation.</p>{% endif %}
+    </div>
+  </div>
+
+  <!-- Fix In Progress -->
+  <div class="col-fixing">
+    <div class="bug-col-header">Fix In Progress <span class="bug-col-count">{{ fixing_bugs|length }}</span></div>
+    <div class="bug-list">
+      {% for bug in fixing_bugs %}{% include "partials/bug_card.html" %}{% endfor %}
+      {% if not fixing_bugs %}<p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">No fixes in progress.</p>{% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Resolved -->
+{% if doc.resolved %}
+<div class="resolved-section">
+  <p class="card-title">Resolved <span style="font-weight:400;text-transform:none;letter-spacing:0;">— {{ doc.resolved|length }} total</span></p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:2.5rem;">#</th>
+          <th>Bug</th>
+          <th style="width:8rem;">Resolved In</th>
+          <th style="width:6rem;">Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in doc.resolved %}
+        <tr>
+          <td class="wbs-code">{{ r.id }}</td>
+          <td style="font-size:0.875rem;text-decoration:line-through;color:#94a3b8;">{{ r.title }}</td>
+          <td class="text-muted">{{ r.resolved_in or '—' }}</td>
+          <td class="text-muted">{{ r.date }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- New bug modal -->
+<dialog id="newBugModal" style="border:1px solid #d1d5db;border-radius:8px;padding:1.5rem;min-width:28rem;max-width:34rem;">
+  <h3 style="margin:0 0 1rem;font-size:1rem;">Report a Bug</h3>
+  <div class="form-group">
+    <label>Title</label>
+    <input type="text" id="bugTitle" placeholder="Brief description of the bug">
+  </div>
+  <div class="form-group">
+    <label>Severity</label>
+    <select id="bugSeverity" class="form-select">
+      <option value="Critical">Critical</option>
+      <option value="High">High</option>
+      <option value="Medium" selected>Medium</option>
+      <option value="Low">Low</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Notes <span class="text-muted">(steps to reproduce, context)</span></label>
+    <textarea id="bugNotes" rows="3" placeholder="How to reproduce, expected vs actual behavior..."></textarea>
+  </div>
+  <div class="form-group">
+    <label>Affected WBS Area <span class="text-muted">(optional)</span></label>
+    <select id="bugWbs" class="form-select">
+      <option value="">— None —</option>
+      {% for sa in sub_areas %}
+      <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} — {{ sa.title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+    <button class="btn btn-ghost" onclick="document.getElementById('newBugModal').close()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitBug()">Report Bug</button>
+  </div>
+</dialog>
+
+<!-- Bug detail panel -->
+<dialog id="bugPanel" style="
+  position:fixed;inset:0;margin:0;padding:0;
+  width:100vw;max-width:100vw;height:100vh;max-height:100vh;
+  border:none;background:transparent;overflow:hidden;">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,0.45);backdrop-filter:blur(2px);"
+       onclick="closeBugPanel()"></div>
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+              width:min(90vw,700px);max-height:80vh;background:#fff;
+              border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25);
+              display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:1.25rem 1.5rem 0.75rem;border-bottom:1px solid #f1f5f9;flex-shrink:0;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
+        <div style="flex:1;min-width:0;">
+          <div id="bpMeta" style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;"></div>
+          <input id="bpTitle" type="text" style="width:100%;font-size:1.1rem;font-weight:700;color:#0f172a;
+                 border:none;border-bottom:2px solid transparent;outline:none;padding:0.1rem 0;
+                 background:transparent;transition:border-color 0.15s;"
+                 onfocus="this.style.borderBottomColor='#ef4444'"
+                 onblur="this.style.borderBottomColor='transparent'">
+        </div>
+        <button onclick="closeBugPanel()" style="background:none;border:none;cursor:pointer;padding:0.35rem;color:#94a3b8;font-size:1.25rem;line-height:1;">✕</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:1.25rem 1.5rem;">
+      <div style="display:grid;grid-template-columns:1fr 180px;gap:1.25rem;margin-bottom:1.25rem;">
+        <div>
+          <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.4rem;">Notes / Steps to Reproduce</label>
+          <textarea id="bpNotes" rows="5" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.9rem;font-family:inherit;color:#1e293b;resize:vertical;background:#fafafa;line-height:1.6;"
+                    onfocus="this.style.background='#fff';this.style.borderColor='#ef4444'"
+                    onblur="this.style.background='#fafafa';this.style.borderColor='#e2e8f0'"
+                    placeholder="Steps to reproduce, expected vs actual..."></textarea>
+          <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;">
+            <button class="btn btn-primary" onclick="saveBug()">Save Changes</button>
+            <span id="bpSaveStatus" style="font-size:0.8rem;color:#64748b;"></span>
+          </div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+          <div style="margin-bottom:0.75rem;">
+            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Severity</label>
+            <select id="bpSeverity" class="form-select" style="font-size:0.875rem;" onchange="saveBugField()">
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+          <div style="margin-bottom:0.75rem;">
+            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Status</label>
+            <select id="bpStatus" class="form-select" style="font-size:0.875rem;" onchange="saveBugField()">
+              <option value="Open">Open</option>
+              <option value="Investigating">Investigating</option>
+              <option value="Fix In Progress">Fix In Progress</option>
+            </select>
+          </div>
+          <div id="bpResolveSection">
+            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Resolved In</label>
+            <input type="text" id="bpResolvedIn" placeholder="e.g. v0.3.0" style="font-size:0.82rem;margin-bottom:0.5rem;">
+            <button class="btn btn-success btn-sm" style="width:100%;justify-content:center;" onclick="resolveBug()">✓ Mark Resolved</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+let _bugId = null;
+
+function submitBug() {
+  const title = document.getElementById('bugTitle').value.trim();
+  if (!title) return;
+  const severity   = document.getElementById('bugSeverity').value;
+  const notes      = document.getElementById('bugNotes').value.trim();
+  const wbs_ref    = document.getElementById('bugWbs').value || null;
+  fetch('/api/bugs', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, severity, notes, wbs_ref }),
+  }).then(r => { if (r.ok) { document.getElementById('newBugModal').close(); location.reload(); } });
+}
+
+function openBugPanel(id, title, severity, status, notes, wbs) {
+  _bugId = id;
+  document.getElementById('bpTitle').value    = title;
+  document.getElementById('bpNotes').value    = notes;
+  document.getElementById('bpSeverity').value = severity;
+  document.getElementById('bpStatus').value   = status;
+  document.getElementById('bpSaveStatus').textContent = '';
+  // Meta badges
+  const sevColors = { Critical:'#991b1b', High:'#9a3412', Medium:'#92400e', Low:'#475569' };
+  const sevBgs    = { Critical:'#fee2e2', High:'#ffedd5', Medium:'#fef3c7', Low:'#f1f5f9' };
+  let meta = `<span style="font-size:0.72rem;font-weight:700;background:${sevBgs[severity]};color:${sevColors[severity]};padding:0.15rem 0.45rem;border-radius:3px;">${severity}</span>`;
+  meta += `<span style="font-size:0.72rem;color:#64748b;">${status}</span>`;
+  if (wbs) meta += `<span style="font-family:monospace;font-size:0.68rem;color:#94a3b8;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:3px;">${wbs}</span>`;
+  document.getElementById('bpMeta').innerHTML = meta;
+  document.getElementById('bpResolvedIn').value = '';
+  document.getElementById('bugPanel').showModal();
+}
+
+function closeBugPanel() { document.getElementById('bugPanel').close(); }
+
+function saveBug() {
+  const status = document.getElementById('bpSaveStatus');
+  status.textContent = 'Saving…';
+  fetch('/api/bugs/' + _bugId, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: document.getElementById('bpTitle').value.trim(),
+      notes: document.getElementById('bpNotes').value.trim(),
+    }),
+  }).then(r => {
+    status.textContent = r.ok ? 'Saved ✓' : 'Error';
+    if (r.ok) setTimeout(() => location.reload(), 600);
+  });
+}
+
+function saveBugField() {
+  fetch('/api/bugs/' + _bugId, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      severity: document.getElementById('bpSeverity').value,
+      status:   document.getElementById('bpStatus').value,
+    }),
+  }).then(r => { if (r.ok) setTimeout(() => location.reload(), 400); });
+}
+
+function resolveBug() {
+  const resolved_in = document.getElementById('bpResolvedIn').value.trim();
+  if (!confirm('Mark this bug as Resolved?')) return;
+  fetch('/api/bugs/' + _bugId + '/resolve', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resolved_in }),
+  }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });
+}
+</script>
+{% endblock %}
