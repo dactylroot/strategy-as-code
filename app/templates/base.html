@@ -124,14 +124,20 @@
   <nav>
     <span class="nav-section">Planning</span>
     <a href="/dashboard" {% if active_page == 'dashboard' %}class="active"{% endif %}>Summary</a>
-    <a href="/structure" {% if active_page == 'structure' %}class="active"{% endif %}>Structure</a>
-    <a href="/roadmap" {% if active_page == 'roadmap' %}class="active"{% endif %}>Roadmap</a>
     <a href="/features" {% if active_page == 'features' %}class="active"{% endif %}>Features</a>
+    <a href="/roadmap" {% if active_page == 'roadmap' %}class="active"{% endif %}>Roadmap</a>
+    <a href="/structure" {% if active_page == 'structure' %}class="active"{% endif %}>Structure</a>
     <a href="/bugs" {% if active_page == 'bugs' %}class="active"{% endif %}>Bugs</a>
     <span class="nav-section">Reference</span>
     <a href="/registry" {% if active_page == 'registry' %}class="active"{% endif %}>Registry</a>
+    <a href="/about" {% if active_page == 'about' %}class="active"{% endif %}>About</a>
     <a href="/readme" {% if active_page == 'readme' %}class="active"{% endif %}>README</a>
+    {% if auth_enabled %}
+    <span class="nav-section">Account</span>
+    <a href="/logout">Sign Out</a>
+    {% endif %}
   </nav>
+  {% if is_uploaded %}
   <div class="sidebar-footer">
     <button id="sync-btn"
             style="width:100%;display:flex;align-items:center;justify-content:center;gap:0.4rem;
@@ -141,11 +147,11 @@
                    color:rgba(255,255,255,0.8);transition:background 0.15s,color 0.15s;"
             onmouseover="this.style.background='rgba(255,255,255,0.14)';this.style.color='#fff'"
             onmouseout="this.style.background='rgba(255,255,255,0.08)';this.style.color='rgba(255,255,255,0.8)'"
-            onclick="{% if is_uploaded %}exportMarkdown(){% else %}syncMarkdown(){% endif %}">
-      {% if is_uploaded %}⬇ Export Markdown{% else %}⟳ Sync to Markdown{% endif %}
+            onclick="exportMarkdown()">
+      ⬇ Export Markdown
     </button>
-    <div id="sync-msg" style="font-size:0.65rem;margin-top:0.35rem;text-align:center;min-height:0.85rem;color:rgba(255,255,255,0.5);"></div>
   </div>
+  {% endif %}
 </aside>
 
 <main class="main">
@@ -198,22 +204,16 @@ function exportMarkdown() {
     window.location.href = url;
   }
 }
-function syncMarkdown() {
-  const btn = document.getElementById('sync-btn');
-  const msg = document.getElementById('sync-msg');
-  btn.disabled = true;
-  msg.style.color = 'rgba(255,255,255,0.5)';
-  msg.textContent = 'Checking…';
-  fetch('/api/markdown/sync', { method: 'POST' })
-    .then(r => r.json())
-    .then(d => {
-      msg.textContent = d.ok ? '✓ All files saved' : (d.detail || 'Error');
-      msg.style.color = d.ok ? '#86efac' : '#fca5a5';
-      setTimeout(() => { msg.textContent = ''; }, 3000);
-    })
-    .catch(() => { msg.textContent = 'Check failed'; msg.style.color = '#fca5a5'; })
-    .finally(() => { btn.disabled = false; });
-}
+(function() {
+  const es = new EventSource('/api/events');
+  es.onmessage = (e) => {
+    if (e.data !== 'changed') return;
+    const panel = document.getElementById('featurePanel');
+    if (panel && panel.open) return;
+    location.reload();
+  };
+  es.onerror = () => es.close();
+})();
 </script>
 </body>
 </html>

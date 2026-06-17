@@ -9,7 +9,7 @@ from ..models import (
     ScopeItem, ScopeGroup, UserPersona, ProductDoc, NewFeature, FeatureUpdate,
 )
 
-_STATUS_PAT = r"(?:Live|Planned|Gap|Idea|Scoped|Scored|In-Progress)"
+_STATUS_PAT = r"(?:Released|Live|Planned|Gap|Idea|Scoped|Scored|In-Progress)"
 
 _locks: dict[Path, threading.Lock] = {}
 _locks_mutex = threading.Lock()
@@ -245,7 +245,7 @@ def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
     new_notes = new_notes.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
     # Match 6-column rows (WBS|Name|Status|Value|Effort|Notes) and legacy 4-col (WBS|Name|Status|Notes)
     pattern = re.compile(
-        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \| [^|]* \| [^|]* \|)([^|]*\|)$",
+        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|[^|]*\|[^|]*\|)([^|]*\|)$",
         re.MULTILINE,
     )
     new_text, n = pattern.subn(lambda m: f"{m.group(1)} {new_notes} |", text)
@@ -262,14 +262,32 @@ def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
     return new_text
 
 
-def transform_feature_score(text: str, wbs: str, value: int, effort: int) -> str:
-    """Update value and effort columns; normalises legacy 4-col rows to 6-col."""
+def get_feature_status(text: str, wbs: str) -> FeatureStatus | None:
+    """Return the current status of a feature without a full parse."""
+    m = re.search(
+        rf"^\| {re.escape(wbs)} \| [^|]+ \| ({_STATUS_PAT}) \|",
+        text, re.MULTILINE,
+    )
+    if not m:
+        return None
+    try:
+        return FeatureStatus(m.group(1).strip())
+    except ValueError:
+        return None
+
+
+def transform_feature_score(text: str, wbs: str, value: int | None, effort: int | None) -> str:
+    """Update value and effort columns; pass None to clear a column.
+
+    Normalises legacy 4-col rows to 6-col."""
+    v_str = f" {value} " if value is not None else "  "
+    e_str = f" {effort} " if effort is not None else " "
     # 6-column row: replace value/effort columns
     pat6 = re.compile(
         rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|)[^|]*\|[^|]*(\|[^|]*\|)$",
         re.MULTILINE,
     )
-    new_text, n = pat6.subn(lambda m: f"{m.group(1)} {value} | {effort} {m.group(2)}", text)
+    new_text, n = pat6.subn(lambda m: f"{m.group(1)}{v_str}|{e_str}{m.group(2)}", text)
     if n == 1:
         return new_text
     # Legacy 4-column row: expand to 6 columns by inserting value/effort before notes
@@ -277,7 +295,7 @@ def transform_feature_score(text: str, wbs: str, value: int, effort: int) -> str
         rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|)([^|]*)(\|)$",
         re.MULTILINE,
     )
-    new_text, n = pat4.subn(lambda m: f"{m.group(1)} {value} | {effort} |{m.group(2)}{m.group(3)}", text)
+    new_text, n = pat4.subn(lambda m: f"{m.group(1)}{v_str}|{e_str}|{m.group(2)}{m.group(3)}", text)
     if n != 1:
         raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
     return new_text

@@ -3,9 +3,9 @@
 
 {% block extra_styles %}
 /* ── Planning board ── */
-.roadmap-board { display: grid; grid-template-columns: 200px 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; align-items: start; }
-@media (max-width: 1100px) { .roadmap-board { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 700px)  { .roadmap-board { grid-template-columns: 1fr; } }
+.roadmap-board { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; align-items: start; }
+@media (max-width: 1000px) { .roadmap-board { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 650px)  { .roadmap-board { grid-template-columns: 1fr; } }
 
 .roadmap-col { display: flex; flex-direction: column; }
 .roadmap-col-header {
@@ -14,14 +14,33 @@
   display: flex; justify-content: space-between; align-items: center;
 }
 .roadmap-col-count { font-weight: 400; font-size: 0.78rem; opacity: 0.75; }
-.col-defining    .roadmap-col-header { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; border-bottom: none; }
 .col-planned     .roadmap-col-header { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; border-bottom: none; }
 .col-inprogress  .roadmap-col-header { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-bottom: none; }
-.roadmap-list {
-  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 var(--radius) var(--radius);
+.col-nextrelease .roadmap-col-header { background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-bottom: none; }
+
+.col-planned .roadmap-col-body {
+  background: #f8fafc; border: 1px solid #bfdbfe; border-radius: 0 0 var(--radius) var(--radius);
   padding: 0.4rem; min-height: 4rem; flex: 1;
 }
-.col-inprogress .roadmap-list { border-top: none; }
+.col-inprogress  .roadmap-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 var(--radius) var(--radius); padding: 0.5rem; min-height: 4rem; flex: 1; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: flex-start; border-top: none; }
+.col-nextrelease .roadmap-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 var(--radius) var(--radius); padding: 0.5rem; min-height: 4rem; flex: 1; display: block; border-top: none; }
+
+/* ── fc card styles (shared with Features page) ── */
+.fc { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 0.5rem; overflow: hidden; transition: box-shadow 0.1s; }
+.fc:last-child { margin-bottom: 0; }
+.fc:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.07); }
+.fc-head { padding: 0.65rem 0.75rem; cursor: pointer; }
+.fc-meta { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; }
+.fc-wbs  { font-family: monospace; font-size: 0.62rem; padding: 0.1rem 0.3rem; border-radius: 3px; font-weight: 600; }
+.fc-stage-badge { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.fc-title { font-size: 0.85rem; font-weight: 500; color: #1e293b; line-height: 1.4; }
+.fc-group { margin-bottom: 0.5rem; }
+.fc-group > summary { list-style: none; cursor: pointer; }
+.fc-group > summary::-webkit-details-marker { display: none; }
+.fc-group > summary .fc { border-left: 3px solid #16a34a; }
+.fc-group > summary .fc-title::before { content: '▸ '; font-size: 0.7rem; color: #94a3b8; }
+.fc-group[open] > summary .fc-title::before { content: '▾ '; }
+.fc-live-item { cursor: pointer; opacity: 0.8; margin-left: 0.5rem; border-left: 3px solid #bbf7d0 !important; }
 
 /* ── Feature cards ── */
 .rm-feat {
@@ -33,22 +52,54 @@
 .rm-feat:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
 .rm-feat.sortable-ghost  { opacity: 0.35; }
 .rm-feat.sortable-chosen { box-shadow: 0 3px 10px rgba(0,0,0,0.14); }
-.col-inprogress .rm-feat { border-left: 3px solid #f97316; }
-.col-planned    .rm-feat { border-left: 3px solid #3b82f6; }
+.col-inprogress  .rm-feat { border-left: 3px solid #f97316; flex: 0 0 auto; max-width: 280px; }
 .rm-feat-wbs   { font-family: monospace; font-size: 0.62rem; color: #94a3b8; }
 .rm-feat-title { font-size: 0.82rem; font-weight: 500; color: #1e293b; line-height: 1.4; margin: 0.1rem 0; }
 .rm-feat-sa    { font-size: 0.68rem; color: #94a3b8; }
 
-/* Defining cards (read-only) */
-.defining-card { background: #fffbeb; border: 1px solid #fde68a; border-radius: 5px; padding: 0.5rem 0.65rem; margin-bottom: 0.35rem; }
-.defining-card-wbs   { font-family: monospace; font-size: 0.62rem; color: #b45309; }
-.defining-card-title { font-size: 0.82rem; font-weight: 500; color: #1e293b; line-height: 1.4; margin: 0.1rem 0; }
-.defining-gap-badge  { display: inline-block; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.65rem; font-weight: 600; }
+/* ── Version buckets ── */
+.version-bucket { margin-bottom: 0.35rem; }
+.version-bucket-header {
+  display: flex; align-items: center; gap: 0.45rem;
+  padding: 0.38rem 0.65rem; cursor: pointer; border-radius: 5px 5px 0 0;
+  background: #eff6ff; border: 1px solid #bfdbfe; border-bottom: none;
+  font-size: 0.75rem; font-weight: 600; user-select: none;
+}
+.version-bucket-header.unassigned { background: #f8fafc; border-color: #e2e8f0; }
+.version-bucket-header:hover { filter: brightness(0.97); }
+.vb-chevron { font-size: 0.65rem; color: #93c5fd; flex-shrink: 0; }
+.version-bucket-header.unassigned .vb-chevron { color: #94a3b8; }
+.vb-label { color: #1e40af; font-weight: 700; letter-spacing: -0.01em; }
+.version-bucket-header.unassigned .vb-label { color: #64748b; font-weight: 500; font-style: italic; }
+.vb-count { margin-left: auto; font-weight: 400; font-size: 0.7rem; color: #93c5fd; }
+.version-bucket-header.unassigned .vb-count { color: #94a3b8; }
+.vb-remove { margin-left: 0.25rem; background: none; border: none; cursor: pointer; color: #93c5fd; font-size: 0.8rem; padding: 0; line-height: 1; border-radius: 3px; }
+.vb-remove:hover { color: #dc2626; }
+.version-bucket-list {
+  background: #fff; border: 1px solid #bfdbfe; border-top: none;
+  border-radius: 0 0 5px 5px; padding: 0.35rem; min-height: 2.5rem;
+}
+.version-bucket-header.unassigned + .version-bucket-list { border-color: #e2e8f0; }
+.version-bucket-list .rm-feat { border-left: 3px solid #3b82f6; }
+.vb-empty { color: #94a3b8; font-size: 0.72rem; padding: 0.35rem 0.25rem; margin: 0; text-align: center; }
 
-/* ── Backlog section ── */
+/* ── Add version ── */
+.add-version-row {
+  display: flex; gap: 0.35rem; padding: 0.35rem 0.4rem; margin-top: 0.25rem;
+  background: #f8fafc; border: 1px dashed #bfdbfe; border-radius: 5px;
+}
+.add-version-input {
+  flex: 1; padding: 0.25rem 0.5rem; border: 1px solid #bfdbfe; border-radius: 4px;
+  font-size: 0.8rem; font-family: inherit; outline: none;
+}
+.add-version-input:focus { border-color: #3b82f6; }
+
+/* ── Backlog sub-area groups ── */
 .backlog-section { background: #fff; border: 1px solid #e2e8f0; border-radius: var(--radius); margin-bottom: 1.5rem; overflow: hidden; }
 .backlog-section-header { background: #f1f5f9; color: #475569; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
-.backlog-pool { padding: 0.5rem; min-height: 3.5rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: flex-start; }
+.backlog-pool { padding: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.3rem; min-height: 2.5rem; }
+
+/* ── Backlog chips ── */
 .rm-feat-chip {
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px;
   padding: 0.35rem 0.65rem; cursor: grab; font-size: 0.8rem; color: #1e293b;
@@ -58,10 +109,7 @@
 .rm-feat-chip.sortable-ghost  { opacity: 0.35; }
 .rm-feat-chip.sortable-chosen { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 .rm-feat-chip .rm-feat-wbs { color: #94a3b8; font-size: 0.62rem; }
-.rm-freeform-chip { border-left: 3px solid #94a3b8; color: #475569; }
-
-/* ── Next release indicator ── */
-.ip-version-badge { font-size: 0.78rem; font-weight: 800; color: #9a3412; letter-spacing: -0.02em; }
+.rm-freeform-chip { border-left: 3px solid #94a3b8; color: #475569; cursor: default; opacity: 0.8; }
 
 /* ── Changelog ── */
 .changelog-card { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; margin-bottom: 0.75rem; }
@@ -72,7 +120,7 @@
 {% endblock %}
 
 {% block content %}
-{# ── Macro: feature card (used in Planned and In Progress sortable lists) ── #}
+{# ── Macro: feature card ── #}
 {% macro feat_card(entry) %}
 <div class="rm-feat"
      data-type="feature"
@@ -92,69 +140,70 @@
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
   <div>
     <h1>Roadmap</h1>
-    <p class="subtitle">Drag features between columns to plan. Backlog items can be promoted to Planned or In Progress.</p>
+    <p class="subtitle">Drag features between columns to plan. Use version buckets in Planned to target specific releases.</p>
   </div>
 </div>
 
-<!-- ── 4-column board: Defining (read-only) | Planned | In Progress | (version badge) ── -->
+<!-- ── 3-column board: Planned (with version buckets) | In Progress | Next Release ── -->
 <div class="roadmap-board">
 
-  <!-- Defining (read-only) -->
-  <div class="roadmap-col col-defining">
-    <div class="roadmap-col-header">
-      Defining
-      <span class="roadmap-col-count">{{ defining_sub_areas | length }}</span>
-    </div>
-    <div class="roadmap-list">
-      {% for d in defining_sub_areas %}
-      <div class="defining-card">
-        <div class="defining-card-wbs">{{ d.prefix }}</div>
-        <div class="defining-card-title">{{ d.title | truncate(34, true, '…') }}</div>
-        <span class="defining-gap-badge">{{ d.gap_count }} gap{{ 's' if d.gap_count != 1 }}</span>
-      </div>
-      {% endfor %}
-      {% if not defining_sub_areas %}
-      <p class="text-muted" style="padding:0.4rem 0.25rem;font-size:0.75rem;">All gaps are in the scoping queue.</p>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Planned (draggable) -->
+  <!-- Planned (version buckets) -->
   <div class="roadmap-col col-planned">
     <div class="roadmap-col-header">
-      Planned
-      <span class="roadmap-col-count">{{ planned_features | length }}</span>
+      <div>Planned <span class="roadmap-col-count">{{ version_buckets | map(attribute='features') | map('length') | sum + (unassigned_planned | length) }}</span></div>
+      <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:rgba(37,99,235,0.1);color:#1e40af;border:1px solid #bfdbfe;"
+              onclick="showAddVersion()" title="Add milestone">+ version</button>
     </div>
-    <div class="roadmap-list" id="col-planned">
-      {% for entry in planned_features %}{{ feat_card(entry) }}{% endfor %}
-      {% if not planned_features %}
-      <p class="text-muted" style="padding:0.4rem 0.25rem;font-size:0.75rem;">Drag features here to plan them.</p>
-      {% endif %}
+    <div class="col-planned col-planned-body roadmap-col-body">
+      <div id="add-version-form" style="display:none;margin-bottom:0.35rem;">
+        <div class="add-version-row">
+          <input id="new-version-input" class="add-version-input" type="text"
+                 placeholder="e.g. v0.3"
+                 onkeydown="handleVersionKey(event)">
+          <button class="btn btn-sm btn-primary" onclick="addVersionBucket()">Add</button>
+          <button class="btn btn-sm btn-ghost" onclick="hideAddVersion()">✕</button>
+        </div>
+      </div>
+
+      {% for bucket in version_buckets %}
+      <div class="version-bucket" data-bucket-label="{{ bucket.label }}">
+        <div class="version-bucket-header" onclick="toggleBucket(this)">
+          <span class="vb-chevron">▾</span>
+          <span class="vb-label">{{ bucket.label }}</span>
+          <span class="vb-count">{{ bucket.features | length }}</span>
+          <button class="vb-remove" onclick="removeBucket(event, this)" title="Remove">✕</button>
+        </div>
+        <div class="version-bucket-list">
+          {% for entry in bucket.features %}{{ feat_card(entry) }}{% endfor %}
+          {% if not bucket.features %}<p class="vb-empty">Drop features here</p>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+
+      <!-- Unassigned bucket (always last) -->
+      <div class="version-bucket" data-bucket-label="">
+        <div class="version-bucket-header unassigned" onclick="toggleBucket(this)">
+          <span class="vb-chevron">▾</span>
+          <span class="vb-label">Unassigned</span>
+          <span class="vb-count">{{ unassigned_planned | length }}</span>
+        </div>
+        <div class="version-bucket-list">
+          {% for entry in unassigned_planned %}{{ feat_card(entry) }}{% endfor %}
+          {% if not unassigned_planned %}<p class="vb-empty">No unassigned features</p>{% endif %}
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- In Progress (draggable) + next release badge -->
-  <div class="roadmap-col col-inprogress" style="grid-column: span 2;">
-    <div class="roadmap-col-header" style="border-radius:var(--radius) var(--radius) 0 0;">
-      <div>
-        In Progress
-        <span class="roadmap-col-count" style="margin-left:0.35rem;">{{ in_progress_features | length }}</span>
-      </div>
-      {% if next_version %}
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.1rem;">
-        <span style="font-size:0.62rem;color:#9a3412;opacity:0.8;font-weight:400;">next release</span>
-        <span class="ip-version-badge">v{{ next_version }}</span>
-      </div>
-      {% endif %}
+  <!-- In Progress -->
+  <div class="roadmap-col col-inprogress">
+    <div class="roadmap-col-header">
+      In Progress
+      <span class="roadmap-col-count">{{ in_progress_features | length }}</span>
     </div>
-    {% if version_rationale %}
-    <div style="padding:0.35rem 0.75rem;font-size:0.7rem;color:#92400e;background:#fff7ed;border:1px solid #fed7aa;border-top:none;border-bottom:none;">
-      {{ version_rationale }}
-    </div>
-    {% endif %}
-    <div class="roadmap-list" id="col-in-progress" style="border-top:none;display:flex;flex-wrap:wrap;gap:0.35rem;align-items:flex-start;min-height:4rem;padding:0.5rem;">
+    <div class="roadmap-list" id="col-in-progress">
       {% for entry in in_progress_features %}
-      <div class="rm-feat" style="flex:0 0 auto;max-width:280px;"
+      <div class="rm-feat"
            data-type="feature" data-wbs="{{ entry.f.wbs }}"
            data-source="product"
            data-name="{{ entry.f.name }}"
@@ -168,27 +217,97 @@
       </div>
       {% endfor %}
       {% if not in_progress_features %}
-      <p class="text-muted" style="padding:0.4rem 0.25rem;font-size:0.75rem;align-self:center;">Drag features here to start work.</p>
+      <p class="text-muted" style="font-size:0.75rem;align-self:center;">Drag features here to start work.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Next Release (read-only) -->
+  <div class="roadmap-col col-nextrelease">
+    <div class="roadmap-col-header">
+      <div>
+        Next Release
+        <span class="roadmap-col-count" style="margin-left:0.35rem;">{{ next_release_features | length }}</span>
+      </div>
+      {% if next_version %}
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.1rem;">
+        <span style="font-size:0.62rem;color:#15803d;opacity:0.8;font-weight:400;">version</span>
+        <span style="font-size:0.78rem;font-weight:800;color:#15803d;letter-spacing:-0.02em;">v{{ next_version }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if version_rationale %}
+    <div style="padding:0.35rem 0.75rem;font-size:0.7rem;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-top:none;border-bottom:none;">
+      {{ version_rationale }}
+    </div>
+    {% endif %}
+    <div class="roadmap-list">
+      {% for sa in sub_areas %}
+        {% set sa_entries = [] %}
+        {% for entry in next_release_features %}
+          {% if entry.sa_prefix == sa.wbs_prefix %}
+            {% if sa_entries.append(entry) %}{% endif %}
+          {% endif %}
+        {% endfor %}
+        {% if sa_entries %}
+        <details class="fc-group">
+          <summary>
+            <div class="fc">
+              <div class="fc-head">
+                <div class="fc-meta">
+                  <span class="fc-wbs" style="background:#f0fdf4;color:#166534;">{{ sa.wbs_prefix }}</span>
+                  <span class="fc-stage-badge" style="color:#16a34a;">{{ sa_entries|length }} live</span>
+                </div>
+                <div class="fc-title">{{ sa.title }}</div>
+              </div>
+            </div>
+          </summary>
+          {% for entry in sa_entries %}
+          <div class="fc fc-live-item"
+               data-wbs="{{ entry.f.wbs }}"
+               data-name="{{ entry.f.name }}"
+               data-notes="{{ entry.f.notes }}"
+               data-stage="{{ entry.f.status.value }}"
+               {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
+               {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
+               onclick="openFeaturePanelFromEl(this)">
+            <div class="fc-head" style="padding:0.4rem 0.65rem;">
+              <div class="fc-meta">
+                <span class="fc-wbs" style="background:#f0fdf4;color:#166534;">{{ entry.f.wbs }}</span>
+              </div>
+              <div class="fc-title" style="color:#94a3b8;font-size:0.8rem;">{{ entry.f.name }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </details>
+        {% endif %}
+      {% endfor %}
+      {% if not next_release_features %}
+      <p class="text-muted" style="font-size:0.75rem;">No completed features yet.</p>
       {% endif %}
     </div>
   </div>
 
 </div>
 
-<!-- ── Backlog: Gap features + freeform items (all draggable) ── -->
+<!-- ── Backlog: sorted by priority score ── -->
 <div class="backlog-section">
   <div class="backlog-section-header">
     Backlog
-    <span style="font-weight:400;">{{ (backlog_features | length) + (freeform_backlog | length) }} items</span>
+    <span style="font-weight:400;">{{ backlog_sorted | length + (freeform_backlog | length) }} items</span>
   </div>
-  <div class="backlog-pool" id="col-backlog">
-    {% for entry in backlog_features %}
+
+  {% if backlog_sorted or freeform_backlog %}
+  <div class="backlog-pool" id="col-backlog-wbs" data-pool="backlog">
+    {% for entry in backlog_sorted %}
     <div class="rm-feat-chip"
          data-type="feature" data-wbs="{{ entry.f.wbs }}"
          data-source="product"
          data-name="{{ entry.f.name }}"
          data-notes="{{ entry.f.notes }}"
          data-stage="{{ entry.f.status.value }}"
+         {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
+         {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
          onclick="openFeaturePanelFromEl(this)"
          title="Click to open · drag to move">
       <span class="rm-feat-wbs">{{ entry.f.wbs }}</span>
@@ -196,15 +315,14 @@
     </div>
     {% endfor %}
     {% for item in freeform_backlog %}
-    <div class="rm-feat-chip rm-freeform-chip"
-         data-type="freeform" data-item="{{ item }}">
+    <div class="rm-feat-chip rm-freeform-chip" data-type="freeform" data-item="{{ item }}">
       {{ item | truncate(50, true, '…') }}
     </div>
     {% endfor %}
-    {% if not backlog_features and not freeform_backlog %}
-    <p class="text-muted" style="font-size:0.78rem;padding:0.35rem;">Backlog is clear.</p>
-    {% endif %}
   </div>
+  {% else %}
+  <p class="text-muted" style="padding:0.75rem 1rem;font-size:0.78rem;">Backlog is clear.</p>
+  {% endif %}
 </div>
 
 <!-- ── Release History ── -->
@@ -234,56 +352,124 @@
 <script>
 const DRAG_GROUP = 'roadmap-features';
 
-function getItems(colId) {
-  const el = document.getElementById(colId);
-  if (!el) return { features: [], freeform: [] };
-  const features = [], freeform = [];
-  el.querySelectorAll('[data-type]').forEach(card => {
-    if (card.dataset.type === 'feature') features.push(card.dataset.wbs);
-    else if (card.dataset.type === 'freeform') freeform.push(card.dataset.item);
-  });
-  return { features, freeform };
-}
-
+/* ── Save ── */
 function saveRoadmap() {
-  const ip      = getItems('col-in-progress');
-  const pl      = getItems('col-planned');
-  const bl      = getItems('col-backlog');
+  // In Progress
+  const ipEl = document.getElementById('col-in-progress');
+  const ip_wbs    = ipEl ? [...ipEl.querySelectorAll('[data-type="feature"]')].map(c => c.dataset.wbs) : [];
+  const ip_free   = ipEl ? [...ipEl.querySelectorAll('[data-type="freeform"]')].map(c => c.dataset.item) : [];
+
+  // Version buckets (named + unassigned)
+  const planned_buckets = [];
+  const planned_wbs = [];
+  document.querySelectorAll('[data-bucket-label]').forEach(bucket => {
+    const label = bucket.dataset.bucketLabel;
+    const list = bucket.querySelector('.version-bucket-list');
+    if (!list) return;
+    const wbs = [...list.querySelectorAll('[data-type="feature"]')].map(c => c.dataset.wbs);
+    if (label) planned_buckets.push({ label, wbs });
+    else planned_wbs.push(...wbs);
+  });
+
+  // Backlog (all sub-area pools)
+  const backlog_wbs = [], backlog_free = [];
+  document.querySelectorAll('[data-pool="backlog"]').forEach(pool => {
+    pool.querySelectorAll('[data-type="feature"]').forEach(c => backlog_wbs.push(c.dataset.wbs));
+    pool.querySelectorAll('[data-type="freeform"]').forEach(c => backlog_free.push(c.dataset.item));
+  });
+
   fetch('/api/roadmap/features', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      in_progress_wbs: ip.features,
-      planned_wbs:     pl.features,
-      backlog_wbs:     bl.features,
-      freeform_backlog: [...bl.freeform, ...ip.freeform, ...pl.freeform],
+      in_progress_wbs:  ip_wbs,
+      planned_wbs,
+      planned_buckets,
+      backlog_wbs,
+      freeform_backlog: [...backlog_free, ...ip_free],
     }),
   });
 }
 
-// Planned ↔ In Progress (columns share a drag group)
-['col-planned', 'col-in-progress'].forEach(id => {
-  const el = document.getElementById(id);
+/* ── Sortable setup ── */
+function makeSortable(el) {
   if (!el) return;
   Sortable.create(el, {
     group: DRAG_GROUP,
     animation: 150,
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
-    onEnd: saveRoadmap,
-  });
-});
-
-// Backlog pool (drags TO columns, and accepts FROM columns)
-const backlogEl = document.getElementById('col-backlog');
-if (backlogEl) {
-  Sortable.create(backlogEl, {
-    group: DRAG_GROUP,
-    animation: 150,
-    ghostClass: 'sortable-ghost',
-    chosenClass: 'sortable-chosen',
+    filter: '.rm-freeform-chip',
     onEnd: saveRoadmap,
   });
 }
+
+makeSortable(document.getElementById('col-in-progress'));
+document.querySelectorAll('.version-bucket-list').forEach(makeSortable);
+document.querySelectorAll('[data-pool="backlog"]').forEach(makeSortable);
+
+/* ── Version bucket UI ── */
+function showAddVersion() {
+  document.getElementById('add-version-form').style.display = '';
+  document.getElementById('new-version-input').focus();
+}
+function hideAddVersion() {
+  document.getElementById('add-version-form').style.display = 'none';
+  document.getElementById('new-version-input').value = '';
+}
+function handleVersionKey(e) {
+  if (e.key === 'Enter')  addVersionBucket();
+  if (e.key === 'Escape') hideAddVersion();
+}
+
+function addVersionBucket() {
+  const input = document.getElementById('new-version-input');
+  const label = input.value.trim();
+  if (!label) return;
+
+  const unassigned = document.querySelector('[data-bucket-label=""]');
+  const div = document.createElement('div');
+  div.className = 'version-bucket';
+  div.dataset.bucketLabel = label;
+  div.innerHTML = `
+    <div class="version-bucket-header" onclick="toggleBucket(this)">
+      <span class="vb-chevron">▾</span>
+      <span class="vb-label">${label}</span>
+      <span class="vb-count">0</span>
+      <button class="vb-remove" onclick="removeBucket(event, this)" title="Remove">✕</button>
+    </div>
+    <div class="version-bucket-list">
+      <p class="vb-empty">Drop features here</p>
+    </div>`;
+  unassigned.parentElement.insertBefore(div, unassigned);
+  makeSortable(div.querySelector('.version-bucket-list'));
+  hideAddVersion();
+  saveRoadmap();
+}
+
+function removeBucket(e, btn) {
+  e.stopPropagation();
+  const bucket = btn.closest('[data-bucket-label]');
+  const unassigned = document.querySelector('[data-bucket-label=""]');
+  const list = unassigned.querySelector('.version-bucket-list');
+  // Move features to unassigned before removing
+  bucket.querySelectorAll('[data-type="feature"]').forEach(card => {
+    list.querySelector('.vb-empty')?.remove();
+    list.appendChild(card);
+  });
+  bucket.remove();
+  saveRoadmap();
+}
+
+function toggleBucket(header) {
+  const list = header.nextElementSibling;
+  const chevron = header.querySelector('.vb-chevron');
+  const collapsed = list.style.display === 'none';
+  list.style.display = collapsed ? '' : 'none';
+  chevron.textContent = collapsed ? '▾' : '▸';
+}
+
+/* ── Backlog sub-area toggle ── */
+
 </script>
 {% endblock %}

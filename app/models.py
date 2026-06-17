@@ -12,6 +12,7 @@ class FeatureStatus(str, Enum):
     planned    = "Planned"    # backward-compat alias for In-Progress
     in_progress = "In-Progress"
     live       = "Live"
+    released   = "Released"
 
 
 class Feature(BaseModel):
@@ -170,9 +171,15 @@ class ChangelogEntry(BaseModel):
     bug_fixes: list[str] = []
 
 
+class VersionBucket(BaseModel):
+    label: str
+    items: list[str] = []
+
+
 class RoadmapSection(BaseModel):
     name: str
     items: list[str] = []
+    buckets: list[VersionBucket] = []   # version sub-buckets (Planned section only)
 
 
 class AboutDoc(BaseModel):
@@ -264,14 +271,21 @@ class NewFeature(BaseModel):
 
 class RoadmapUpdate(BaseModel):
     in_progress: list[str]
-    planned: list[str]
+    planned: list[str]          # unassigned planned sub-areas
     backlog: list[str]
+    planned_buckets: list[VersionBucket] = []  # version-bucketed planned sub-areas
+
+
+class VersionBucketUpdate(BaseModel):
+    label: str
+    wbs: list[str] = []
 
 
 class RoadmapFeaturesUpdate(BaseModel):
     """Feature-level roadmap save: WBS codes per column + freeform items."""
     in_progress_wbs: list[str] = []
-    planned_wbs: list[str] = []
+    planned_wbs: list[str] = []           # unassigned planned features
+    planned_buckets: list[VersionBucketUpdate] = []  # version-bucketed planned features
     backlog_wbs: list[str] = []
     freeform_backlog: list[str] = []
 

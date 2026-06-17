@@ -53,6 +53,10 @@
 
 /* Resolved section */
 .resolved-section { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; }
+
+/* Screenshot lightbox */
+.screenshot-lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:1000; align-items:center; justify-content:center; cursor:zoom-out; }
+.screenshot-lightbox img { max-width:92vw; max-height:88vh; border-radius:8px; box-shadow:0 8px 48px rgba(0,0,0,0.5); cursor:default; }
 {% endblock %}
 
 {% block content %}
@@ -117,7 +121,8 @@
       </thead>
       <tbody>
         {% for r in doc.resolved %}
-        <tr>
+        <tr style="cursor:pointer;"
+            onclick="openResolvedPanel({{ r.id }}, {{ r.title | tojson }}, {{ (r.resolved_in or '') | tojson }}, {{ (r.date or '') | tojson }})">
           <td class="wbs-code">{{ r.id }}</td>
           <td style="font-size:0.875rem;text-decoration:line-through;color:#94a3b8;">{{ r.title }}</td>
           <td class="text-muted">{{ r.resolved_in or '—' }}</td>
@@ -129,6 +134,41 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Resolved bug panel -->
+<dialog id="resolvedPanel" style="border:none;border-radius:12px;padding:0;width:min(90vw,520px);
+        box-shadow:0 20px 60px rgba(0,0,0,0.22);overflow:hidden;background:#fff;">
+  <div style="padding:1.1rem 1.4rem 0.9rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
+        <span id="rpId" style="font-family:monospace;font-size:0.72rem;color:#94a3b8;"></span>
+        <span style="font-size:0.72rem;font-weight:700;background:#dcfce7;color:#15803d;padding:0.15rem 0.45rem;border-radius:3px;">Resolved</span>
+      </div>
+      <p id="rpTitle" style="font-size:1.05rem;font-weight:700;color:#1e293b;margin:0;"></p>
+    </div>
+    <button onclick="document.getElementById('resolvedPanel').close()"
+            style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.2rem;padding:0.2rem 0.35rem;border-radius:4px;flex-shrink:0;">✕</button>
+  </div>
+  <div style="padding:1.2rem 1.4rem;">
+    <div style="display:flex;gap:1.5rem;margin-bottom:1rem;">
+      <div>
+        <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 0.2rem;">Resolved In</p>
+        <p id="rpResolvedIn" style="font-size:0.9rem;color:#1e293b;margin:0;"></p>
+      </div>
+      <div>
+        <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 0.2rem;">Date</p>
+        <p id="rpDate" style="font-size:0.9rem;color:#1e293b;margin:0;"></p>
+      </div>
+    </div>
+    <div id="rpScreenshotSection" style="display:none;">
+      <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 0.4rem;">Screenshot</p>
+      <img id="rpScreenshotImg"
+           style="max-width:100%;max-height:280px;border-radius:6px;border:1px solid #e2e8f0;display:block;cursor:zoom-in;"
+           alt="Screenshot"
+           onclick="openScreenshotLightbox(_rpId)">
+    </div>
+  </div>
+</dialog>
 
 <!-- New bug modal -->
 <dialog id="newBugModal" style="border:1px solid #d1d5db;border-radius:8px;padding:1.5rem;min-width:28rem;max-width:34rem;">
@@ -158,6 +198,16 @@
       <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} — {{ sa.title }}</option>
       {% endfor %}
     </select>
+  </div>
+  <div class="form-group">
+    <label>Screenshot <span class="text-muted">(optional)</span></label>
+    <input type="file" id="bugScreenshot" accept="image/*"
+           style="font-size:0.875rem;width:100%;"
+           onchange="previewNewBugScreenshot(this)">
+    <div id="bugScreenshotPreview" style="display:none;margin-top:0.5rem;">
+      <img id="bugScreenshotPreviewImg"
+           style="max-width:100%;max-height:140px;border-radius:5px;border:1px solid #e2e8f0;display:block;">
+    </div>
   </div>
   <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
     <button class="btn btn-ghost" onclick="document.getElementById('newBugModal').close()">Cancel</button>
@@ -201,6 +251,19 @@
             <button class="btn btn-primary" onclick="saveBug()">Save Changes</button>
             <span id="bpSaveStatus" style="font-size:0.8rem;color:#64748b;"></span>
           </div>
+          <div style="margin-top:1.1rem;">
+            <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.4rem;">Screenshot</label>
+            <div id="bpScreenshotExisting" style="display:none;margin-bottom:0.5rem;">
+              <img id="bpScreenshotImg"
+                   style="max-width:100%;max-height:300px;border-radius:6px;border:1px solid #e2e8f0;display:block;cursor:pointer;"
+                   alt="Screenshot"
+                   onclick="openScreenshotLightbox(_bugId)">
+            </div>
+            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:0.35rem;" class="btn btn-ghost btn-sm">
+              <span id="bpScreenshotUploadText">+ Add Screenshot</span>
+              <input type="file" accept="image/*" style="display:none;" onchange="uploadPanelScreenshot(this)">
+            </label>
+          </div>
         </div>
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
           <div style="margin-bottom:0.75rem;">
@@ -231,19 +294,90 @@
   </div>
 </dialog>
 
+<!-- Screenshot lightbox -->
+<div id="screenshotLightbox" class="screenshot-lightbox" onclick="closeScreenshotLightbox()">
+  <img id="screenshotLightboxImg" onclick="event.stopPropagation()" alt="Screenshot">
+  <button onclick="closeScreenshotLightbox()"
+          style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.15);border:none;
+                 color:#fff;font-size:1.4rem;cursor:pointer;border-radius:50%;width:2.4rem;height:2.4rem;
+                 display:flex;align-items:center;justify-content:center;line-height:1;">✕</button>
+</div>
+
 <script>
 let _bugId = null;
+let _rpId  = null;
+
+function openResolvedPanel(id, title, resolvedIn, date) {
+  _rpId = id;
+  document.getElementById('rpId').textContent = '#' + id;
+  document.getElementById('rpTitle').textContent = title;
+  document.getElementById('rpResolvedIn').textContent = resolvedIn || '—';
+  document.getElementById('rpDate').textContent = date || '—';
+  const section = document.getElementById('rpScreenshotSection');
+  const img = document.getElementById('rpScreenshotImg');
+  section.style.display = 'none';
+  const probe = new Image();
+  probe.onload = () => { img.src = probe.src; section.style.display = 'block'; };
+  probe.src = _screenshotUrl(id);
+  document.getElementById('resolvedPanel').showModal();
+}
+
+function _screenshotUrl(bugId) {
+  const sid = sessionStorage.getItem('pac_session_id');
+  return '/api/bugs/' + bugId + '/screenshot' + (sid ? '?sid=' + encodeURIComponent(sid) : '');
+}
+
+function openScreenshotLightbox(bugId) {
+  document.getElementById('screenshotLightboxImg').src = _screenshotUrl(bugId) + (sessionStorage.getItem('pac_session_id') ? '&t=' : '?t=') + Date.now();
+  document.getElementById('screenshotLightbox').style.display = 'flex';
+}
+function closeScreenshotLightbox() {
+  document.getElementById('screenshotLightbox').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeScreenshotLightbox(); });
+
+// Load thumbnails for all bug cards after page renders
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.bug-card').forEach(card => {
+    const id = parseInt(card.dataset.id);
+    const wrap = document.getElementById('bthumb-' + id);
+    if (!wrap) return;
+    const img = wrap.querySelector('img');
+    img.onload = () => { wrap.style.display = 'block'; };
+    img.src = _screenshotUrl(id);
+  });
+});
+
+function previewNewBugScreenshot(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('bugScreenshotPreviewImg').src = e.target.result;
+    document.getElementById('bugScreenshotPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
 
 function submitBug() {
   const title = document.getElementById('bugTitle').value.trim();
   if (!title) return;
-  const severity   = document.getElementById('bugSeverity').value;
-  const notes      = document.getElementById('bugNotes').value.trim();
-  const wbs_ref    = document.getElementById('bugWbs').value || null;
+  const severity        = document.getElementById('bugSeverity').value;
+  const notes           = document.getElementById('bugNotes').value.trim();
+  const wbs_ref         = document.getElementById('bugWbs').value || null;
+  const screenshotFile  = document.getElementById('bugScreenshot').files[0];
   fetch('/api/bugs', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, severity, notes, wbs_ref }),
-  }).then(r => { if (r.ok) { document.getElementById('newBugModal').close(); location.reload(); } });
+  }).then(r => r.json()).then(async bug => {
+    if (screenshotFile && bug.id) {
+      const fd = new FormData();
+      fd.append('file', screenshotFile);
+      await fetch('/api/bugs/' + bug.id + '/screenshot', { method: 'POST', body: fd });
+    }
+    document.getElementById('newBugModal').close();
+    location.reload();
+  });
 }
 
 function openBugPanel(id, title, severity, status, notes, wbs) {
@@ -261,7 +395,37 @@ function openBugPanel(id, title, severity, status, notes, wbs) {
   if (wbs) meta += `<span style="font-family:monospace;font-size:0.68rem;color:#94a3b8;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:3px;">${wbs}</span>`;
   document.getElementById('bpMeta').innerHTML = meta;
   document.getElementById('bpResolvedIn').value = '';
+  // Load screenshot
+  const existing = document.getElementById('bpScreenshotExisting');
+  const img = document.getElementById('bpScreenshotImg');
+  const uploadText = document.getElementById('bpScreenshotUploadText');
+  existing.style.display = 'none';
+  uploadText.textContent = '+ Add Screenshot';
+  const probe = new Image();
+  probe.onload = () => {
+    img.src = probe.src;
+    existing.style.display = 'block';
+    uploadText.textContent = 'Replace Screenshot';
+  };
+  probe.src = _screenshotUrl(id) + (sessionStorage.getItem('pac_session_id') ? '&t=' : '?t=') + Date.now();
   document.getElementById('bugPanel').showModal();
+}
+
+function uploadPanelScreenshot(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fetch('/api/bugs/' + _bugId + '/screenshot', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        const img = document.getElementById('bpScreenshotImg');
+        img.src = _screenshotUrl(_bugId) + (sessionStorage.getItem('pac_session_id') ? '&t=' : '?t=') + Date.now();
+        document.getElementById('bpScreenshotExisting').style.display = 'block';
+        document.getElementById('bpScreenshotUploadText').textContent = 'Replace Screenshot';
+      }
+    });
 }
 
 function closeBugPanel() { document.getElementById('bugPanel').close(); }

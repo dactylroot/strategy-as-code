@@ -2,34 +2,60 @@
 {% block title %}Structure — {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
-.structure-section { background:#fff; border-radius:var(--radius); box-shadow:var(--card-shadow); margin-bottom:1.5rem; overflow:hidden; }
-.structure-header {
-  display:flex; justify-content:space-between; align-items:center;
-  padding:0.9rem 1.25rem; border-bottom:1px solid #f1f5f9; background:#f8fafc;
-}
-.structure-title { font-size:0.95rem; font-weight:700; color:#1e293b; margin:0; }
-.structure-subtitle { font-size:0.78rem; color:#64748b; margin:0.1rem 0 0; }
-.structure-body { display:grid; grid-template-columns:1fr 1fr; min-height:200px; }
-@media (max-width:900px) { .structure-body { grid-template-columns:1fr; } }
-.editor-pane { display:flex; flex-direction:column; border-right:1px solid #f1f5f9; }
-.preview-pane { padding:1rem 1.25rem; overflow-y:auto; }
-.editor-pane textarea {
-  flex:1; padding:1rem 1.25rem; border:none; outline:none; resize:none;
-  font-family:'SF Mono',Consolas,monospace; font-size:0.82rem; line-height:1.6;
-  color:#334155; background:#fafafa; min-height:200px;
-}
-.editor-pane textarea:focus { background:#fff; }
-.editor-toolbar { padding:0.5rem 1rem; border-top:1px solid #f1f5f9; background:#f8fafc; display:flex; align-items:center; gap:0.5rem; }
+.str-section { background:#fff; border-radius:var(--radius); box-shadow:var(--card-shadow); margin-bottom:1.5rem; overflow:hidden; }
+.str-header { display:flex; justify-content:space-between; align-items:center; padding:0.9rem 1.25rem; border-bottom:1px solid #f1f5f9; background:#f8fafc; flex-wrap:wrap; gap:0.5rem; }
+.str-title { font-size:0.95rem; font-weight:700; color:#1e293b; margin:0; }
+.str-subtitle { font-size:0.78rem; color:#64748b; margin:0.1rem 0 0; }
+.str-body { padding:1.25rem; }
+.item-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:0.75rem; }
 .save-status { font-size:0.75rem; color:#64748b; }
 
-/* Preview styles */
-.preview-pane h3 { font-size:0.95rem; font-weight:700; margin:0.75rem 0 0.3rem; color:#1e293b; }
-.preview-pane h4 { font-size:0.875rem; font-weight:600; margin:0.6rem 0 0.25rem; color:#374151; }
-.preview-pane p { font-size:0.875rem; line-height:1.6; color:#374151; margin:0 0 0.5rem; }
-.preview-pane ul, .preview-pane ol { font-size:0.875rem; line-height:1.7; padding-left:1.25rem; color:#374151; margin:0 0 0.5rem; }
-.preview-pane li { margin-bottom:0.1rem; }
-.preview-pane li s { color:#94a3b8; }
-.preview-pane hr { border:none; border-top:1px solid #f1f5f9; margin:0.75rem 0; }
+/* View cards */
+.item-card { border:1px solid #e2e8f0; border-radius:8px; padding:0.85rem; background:#fafafa; cursor:pointer; transition:border-color 0.12s, box-shadow 0.12s, background 0.12s; }
+.item-card:hover { border-color:#c7d2fe; background:#f5f7ff; box-shadow:0 2px 8px rgba(37,99,235,0.07); }
+.item-card.modal-active { border-color:#2563eb; background:#eff6ff; }
+.view-name { font-size:0.9rem; font-weight:600; color:#1e293b; margin:0 0 0.3rem; }
+.view-body { font-size:0.82rem; color:#374151; line-height:1.6; margin:0; white-space:pre-wrap; }
+.view-step { font-size:0.82rem; color:#374151; margin-bottom:0.18rem; }
+.view-scope-item { display:flex; align-items:baseline; gap:0.4rem; font-size:0.82rem; color:#374151; margin-bottom:0.15rem; }
+.view-scope-item.done { color:#94a3b8; text-decoration:line-through; }
+.edit-hint { font-size:0.68rem; color:#94a3b8; margin-top:0.5rem; }
+
+/* Workflow persona groups */
+.wf-persona-header { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#475569; margin:0.9rem 0 0.45rem; padding-bottom:0.35rem; border-bottom:1px solid #e2e8f0; }
+.wf-persona-header:first-child { margin-top:0; }
+.wf-persona-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:0.75rem; margin-bottom:0.25rem; }
+
+/* Modal overlay */
+.str-modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:900; align-items:center; justify-content:center; padding:1rem; }
+.str-modal-dialog { background:#fff; border-radius:12px; width:min(560px,100%); max-height:90vh; display:flex; flex-direction:column; box-shadow:0 24px 64px rgba(0,0,0,0.22); }
+.str-modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.4rem 0.9rem; border-bottom:1px solid #f1f5f9; flex-shrink:0; }
+.str-modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:#1e293b; }
+.str-modal-close { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:1.2rem; line-height:1; padding:0.2rem 0.35rem; border-radius:4px; }
+.str-modal-close:hover { background:#f1f5f9; color:#475569; }
+.str-modal-body { padding:1.3rem 1.4rem; overflow-y:auto; flex:1; }
+.str-modal-footer { display:flex; justify-content:space-between; align-items:center; padding:0.9rem 1.4rem; border-top:1px solid #f1f5f9; flex-shrink:0; }
+.btn-modal-remove { background:none; border:1px solid #fca5a5; color:#dc2626; border-radius:5px; padding:0.32rem 0.75rem; font-size:0.8rem; cursor:pointer; font-family:inherit; }
+.btn-modal-remove:hover { background:#fee2e2; }
+
+/* Modal form fields */
+.modal-field { margin-bottom:1rem; }
+.modal-field:last-child { margin-bottom:0; }
+.modal-field > label { display:block; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#94a3b8; margin-bottom:0.3rem; }
+.modal-input { width:100%; padding:0.5rem 0.65rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.9rem; font-family:inherit; color:#1e293b; background:#fff; outline:none; }
+.modal-input:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+.modal-textarea { width:100%; padding:0.5rem 0.65rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem; font-family:inherit; color:#1e293b; background:#fff; outline:none; resize:vertical; min-height:7rem; line-height:1.6; }
+.modal-textarea:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+
+/* Scope items inside modal */
+.scope-row { display:flex; align-items:center; gap:0.45rem; margin-bottom:0.3rem; }
+.scope-row input[type=checkbox] { flex-shrink:0; width:14px; height:14px; cursor:pointer; accent-color:#16a34a; }
+.scope-text { flex:1; padding:0.35rem 0.5rem; border:1px solid #e2e8f0; border-radius:4px; font-size:0.875rem; font-family:inherit; color:#1e293b; background:#fff; outline:none; }
+.scope-text:focus { border-color:#2563eb; }
+.row-del { background:none; border:none; cursor:pointer; color:#d1d5db; font-size:0.875rem; padding:0 0.15rem; line-height:1; flex-shrink:0; }
+.row-del:hover { color:#ef4444; }
+.btn-add-row { background:none; border:1px dashed #d1d5db; color:#94a3b8; border-radius:5px; padding:0.3rem 0.7rem; font-size:0.78rem; cursor:pointer; width:100%; margin-top:0.4rem; font-family:inherit; }
+.btn-add-row:hover { border-color:#2563eb; color:#2563eb; background:#eff6ff; }
 {% endblock %}
 
 {% block content %}
@@ -38,100 +64,327 @@
   <p class="subtitle">User personas, core workflows, and product scope — the strategic foundation of {{ product.title }}.</p>
 </div>
 
-{% macro editable_section(title, subtitle, section_id, endpoint, raw_content) %}
-<div class="structure-section" id="section-{{ section_id }}">
-  <div class="structure-header">
+<!-- User Personas -->
+<div class="str-section">
+  <div class="str-header">
     <div>
-      <p class="structure-title">{{ title }}</p>
-      <p class="structure-subtitle">{{ subtitle }}</p>
+      <p class="str-title">User Personas</p>
+      <p class="str-subtitle">Roles that interact with the product and their goals.</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <span id="users-status" class="save-status"></span>
+      <button class="btn btn-ghost btn-sm" onclick="addPersona()">+ Add</button>
+      <button class="btn btn-primary btn-sm" onclick="saveUsers()">Save</button>
     </div>
   </div>
-  <div class="structure-body">
-    <div class="editor-pane">
-      <textarea id="editor-{{ section_id }}"
-                oninput="previewSection('{{ section_id }}')"
-                placeholder="Markdown…">{{ raw_content }}</textarea>
-      <div class="editor-toolbar">
-        <button class="btn btn-primary btn-sm" onclick="saveSection('{{ section_id }}', '{{ endpoint }}')">Save</button>
-        <button class="btn btn-ghost btn-sm" onclick="resetSection('{{ section_id }}')">Reset</button>
-        <span id="status-{{ section_id }}" class="save-status"></span>
-      </div>
+  <div class="str-body"><div id="users-list" class="item-grid"></div></div>
+</div>
+
+<!-- Core Workflows -->
+<div class="str-section">
+  <div class="str-header">
+    <div>
+      <p class="str-title">Core Workflows</p>
+      <p class="str-subtitle">End-to-end processes per persona.</p>
     </div>
-    <div class="preview-pane" id="preview-{{ section_id }}">
-      {{ raw_content | markdown_to_html | safe }}
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <span id="workflows-status" class="save-status"></span>
+      <button class="btn btn-ghost btn-sm" onclick="addWorkflow()">+ Add</button>
+      <button class="btn btn-primary btn-sm" onclick="saveWorkflows()">Save</button>
+    </div>
+  </div>
+  <div class="str-body"><div id="workflows-list"></div></div>
+</div>
+
+<!-- Product Scope -->
+<div class="str-section">
+  <div class="str-header">
+    <div>
+      <p class="str-title">Product Scope</p>
+      <p class="str-subtitle">High-level scope areas and initiatives. Check off completed items.</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <span id="scope-status" class="save-status"></span>
+      <button class="btn btn-ghost btn-sm" onclick="addScopeGroup()">+ Add Group</button>
+      <button class="btn btn-primary btn-sm" onclick="saveScope()">Save</button>
+    </div>
+  </div>
+  <div class="str-body"><div id="scope-list" class="item-grid"></div></div>
+</div>
+
+<!-- Edit Modal -->
+<div id="str-modal" class="str-modal-overlay" onclick="closeModalOverlay(event)">
+  <div class="str-modal-dialog" onclick="event.stopPropagation()">
+    <div class="str-modal-header">
+      <h3 id="str-modal-title"></h3>
+      <button class="str-modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="str-modal-body" class="str-modal-body"></div>
+    <div class="str-modal-footer">
+      <button id="str-modal-remove" class="btn-modal-remove">✕ Remove</button>
+      <button class="btn btn-primary btn-sm" onclick="closeModal()">Done</button>
     </div>
   </div>
 </div>
-{% endmacro %}
-
-{{ editable_section(
-     "User Personas",
-     "Roles that interact with the product — their responsibilities and goals.",
-     "users",
-     "/api/structure/users",
-     product.users_md
-) }}
-
-{{ editable_section(
-     "Core Workflows",
-     "End-to-end step sequences per persona showing how the product is used.",
-     "workflows",
-     "/api/structure/workflows",
-     product.workflows_md
-) }}
-
-{{ editable_section(
-     "Product Scope",
-     "High-level scope areas and initiatives. Use ~~strikethrough~~ 🎆 for completed items.",
-     "scope",
-     "/api/structure/scope",
-     product.scope_md
-) }}
 
 <script>
-const _originals = {};
+let _users     = {{ users_json | safe }};
+let _workflows = {{ workflows_json | safe }};
+let _scope     = {{ scope_json | safe }};
 
-document.addEventListener('DOMContentLoaded', () => {
-  ['users','workflows','scope'].forEach(id => {
-    const ta = document.getElementById('editor-' + id);
-    if (ta) _originals[id] = ta.value;
-  });
-});
+let _modal = null; // {type:'u'|'w'|'s', index:number}
 
-function previewSection(id) {
-  const md = document.getElementById('editor-' + id)?.value || '';
-  fetch('/api/markdown/preview', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: md }),
-  }).then(r => r.json()).then(d => {
-    const pane = document.getElementById('preview-' + id);
-    if (pane && d.html) pane.innerHTML = d.html;
-  }).catch(() => {});
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function saveSection(id, endpoint) {
-  const content = document.getElementById('editor-' + id)?.value || '';
-  const status = document.getElementById('status-' + id);
-  status.textContent = 'Saving…';
-  fetch(endpoint, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-  }).then(r => r.json()).then(d => {
-    status.textContent = d.ok ? 'Saved ✓' : (d.detail || 'Error');
-    status.style.color = d.ok ? '#16a34a' : '#dc2626';
-    if (d.ok) { _originals[id] = content; setTimeout(() => { status.textContent = ''; }, 3000); }
-  }).catch(() => { status.textContent = 'Save failed'; status.style.color = '#dc2626'; });
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+function openModal(type, i) {
+  _modal = {type, index: i};
+  document.getElementById('str-modal').style.display = 'flex';
+  _renderModalBody();
+  // Focus first input after a tick (modal content just rendered)
+  setTimeout(() => document.querySelector('#str-modal-body input, #str-modal-body textarea, #str-modal-body select')?.focus(), 30);
 }
 
-function resetSection(id) {
-  const ta = document.getElementById('editor-' + id);
-  if (ta && _originals[id] !== undefined) {
-    ta.value = _originals[id];
-    previewSection(id);
-    document.getElementById('status-' + id).textContent = '';
+function closeModal() {
+  const prev = _modal;
+  _modal = null;
+  document.getElementById('str-modal').style.display = 'none';
+  if (prev) {
+    if (prev.type === 'u') renderUsers();
+    else if (prev.type === 'w') renderWorkflows();
+    else if (prev.type === 's') renderScope();
   }
 }
+
+function closeModalOverlay(e) {
+  if (e.target === document.getElementById('str-modal')) closeModal();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && _modal) closeModal(); });
+
+function _renderModalBody() {
+  const body  = document.getElementById('str-modal-body');
+  const title = document.getElementById('str-modal-title');
+  const rmBtn = document.getElementById('str-modal-remove');
+  const {type, index: i} = _modal;
+
+  if (type === 'u') {
+    const u = _users[i];
+    title.textContent = u.name || 'New Persona';
+    body.innerHTML = `
+      <div class="modal-field">
+        <label>Name</label>
+        <input class="modal-input" type="text" value="${esc(u.name)}" placeholder="Persona name"
+               oninput="_users[${i}].name=this.value;document.getElementById('str-modal-title').textContent=this.value||'New Persona'">
+      </div>
+      <div class="modal-field">
+        <label>Description</label>
+        <textarea class="modal-textarea" rows="6" placeholder="Role and responsibilities…"
+                  oninput="_users[${i}].description=this.value">${esc(u.description)}</textarea>
+      </div>`;
+    rmBtn.onclick = () => removePersona(i);
+
+  } else if (type === 'w') {
+    const w = _workflows[i];
+    title.textContent = w.name || 'New Workflow';
+    const opts = _users.filter(u=>u.name.trim())
+      .map(u=>`<option value="${esc(u.name)}" ${u.name===w.persona?'selected':''}>${esc(u.name)}</option>`).join('');
+    body.innerHTML = `
+      <div class="modal-field">
+        <label>Persona</label>
+        <select class="modal-input" onchange="_workflows[${i}].persona=this.value">
+          <option value="">— select persona —</option>
+          ${opts}
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Workflow Name</label>
+        <input class="modal-input" type="text" value="${esc(w.name)}" placeholder="Name this workflow…"
+               oninput="_workflows[${i}].name=this.value;document.getElementById('str-modal-title').textContent=this.value||'New Workflow'">
+      </div>
+      <div class="modal-field">
+        <label>Description</label>
+        <textarea class="modal-textarea" rows="6" placeholder="Describe the workflow…"
+                  oninput="_workflows[${i}].description=this.value">${esc(w.description)}</textarea>
+      </div>`;
+    rmBtn.onclick = () => removeWorkflow(i);
+
+  } else if (type === 's') {
+    const g = _scope[i];
+    title.textContent = g.title || 'New Scope Group';
+    body.innerHTML = `
+      <div class="modal-field">
+        <label>Group Title</label>
+        <input class="modal-input" type="text" value="${esc(g.title)}" placeholder="Scope area name…"
+               oninput="_scope[${i}].title=this.value;document.getElementById('str-modal-title').textContent=this.value||'New Scope Group'">
+      </div>
+      <div class="modal-field">
+        <label>Initiatives</label>
+        <div id="modal-scope-items">${_scopeItemsHtml(i)}</div>
+        <button class="btn-add-row" onclick="addScopeItem(${i})">+ Add initiative</button>
+      </div>`;
+    rmBtn.onclick = () => removeScopeGroup(i);
+  }
+}
+
+function _scopeItemsHtml(gi) {
+  return _scope[gi].items.map((item, ii) => `
+    <div class="scope-row">
+      <input type="checkbox" ${item.complete?'checked':''}
+             onchange="_scope[${gi}].items[${ii}].complete=this.checked">
+      <input class="scope-text" type="text" value="${esc(item.text)}" placeholder="Initiative…"
+             oninput="_scope[${gi}].items[${ii}].text=this.value">
+      <button class="row-del" onclick="removeScopeItem(${gi},${ii})">✕</button>
+    </div>`).join('');
+}
+
+// ── User Personas ─────────────────────────────────────────────────────────────
+
+function renderUsers() {
+  const list = document.getElementById('users-list');
+  list.innerHTML = '';
+  if (!_users.length) {
+    list.innerHTML = '<p class="text-muted">No personas yet. Click + Add to create one.</p>';
+    return;
+  }
+  _users.forEach((u, i) => {
+    const card = document.createElement('div');
+    const isActive = _modal && _modal.type === 'u' && _modal.index === i;
+    card.className = 'item-card' + (isActive ? ' modal-active' : '');
+    const nameHtml = u.name ? `<p class="view-name">${esc(u.name)}</p>` : `<p class="view-name" style="color:#94a3b8;font-style:italic;">Unnamed persona</p>`;
+    const descHtml = u.description ? `<p class="view-body">${esc(u.description)}</p>` : `<p class="view-body" style="color:#94a3b8;font-style:italic;">No description</p>`;
+    card.innerHTML = nameHtml + descHtml + `<p class="edit-hint">✎ click to edit</p>`;
+    card.onclick = () => openModal('u', i);
+    list.appendChild(card);
+  });
+}
+
+function addPersona()     { _users.push({name:'',description:''}); renderUsers(); openModal('u', _users.length-1); }
+function removePersona(i) { _users.splice(i,1); closeModal(); }
+
+// ── Core Workflows ────────────────────────────────────────────────────────────
+
+function renderWorkflows() {
+  const list = document.getElementById('workflows-list');
+  list.innerHTML = '';
+  if (!_workflows.length) {
+    list.innerHTML = '<p class="text-muted">No workflows yet. Click + Add to create one.</p>';
+    return;
+  }
+
+  const groupOrder = [];
+  const groups = {};
+  _workflows.forEach((w, wi) => {
+    const key = w.persona.trim() || '(No Persona)';
+    if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
+    groups[key].push(wi);
+  });
+
+  groupOrder.forEach(persona => {
+    const header = document.createElement('p');
+    header.className = 'wf-persona-header';
+    header.textContent = persona;
+    list.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.className = 'wf-persona-grid';
+
+    groups[persona].forEach(wi => {
+      const w = _workflows[wi];
+      const card = document.createElement('div');
+      const isActive = _modal && _modal.type === 'w' && _modal.index === wi;
+      card.className = 'item-card' + (isActive ? ' modal-active' : '');
+      const nameHtml = w.name ? `<p class="view-name">${esc(w.name)}</p>` : `<p class="view-name" style="color:#94a3b8;font-style:italic;">Unnamed workflow</p>`;
+      const descHtml = w.description ? `<p class="view-body">${esc(w.description)}</p>` : `<p class="view-body" style="color:#94a3b8;font-style:italic;">No description</p>`;
+      card.innerHTML = nameHtml + descHtml + `<p class="edit-hint">✎ click to edit</p>`;
+      card.onclick = () => openModal('w', wi);
+      grid.appendChild(card);
+    });
+
+    list.appendChild(grid);
+  });
+}
+
+function addWorkflow()     { _workflows.push({persona:'',name:'',description:''}); renderWorkflows(); openModal('w', _workflows.length-1); }
+function removeWorkflow(i) { _workflows.splice(i,1); closeModal(); }
+
+// ── Product Scope ─────────────────────────────────────────────────────────────
+
+function renderScope() {
+  const list = document.getElementById('scope-list');
+  list.innerHTML = '';
+  if (!_scope.length) {
+    list.innerHTML = '<p class="text-muted">No scope groups yet. Click + Add Group to create one.</p>';
+    return;
+  }
+  _scope.forEach((g, gi) => {
+    const card = document.createElement('div');
+    const isActive = _modal && _modal.type === 's' && _modal.index === gi;
+    card.className = 'item-card' + (isActive ? ' modal-active' : '');
+    const titleHtml = g.title ? `<p class="view-name">${esc(g.title)}</p>` : `<p class="view-name" style="color:#94a3b8;font-style:italic;">Untitled group</p>`;
+    const itemsHtml = g.items.filter(i=>i.text.trim()).map(item =>
+      `<p class="view-scope-item ${item.complete?'done':''}">${item.complete?'🎆':''} ${esc(item.text)}</p>`
+    ).join('') || `<p class="view-scope-item" style="color:#94a3b8;font-style:italic;">No initiatives</p>`;
+    card.innerHTML = titleHtml + itemsHtml + `<p class="edit-hint">✎ click to edit</p>`;
+    card.onclick = () => openModal('s', gi);
+    list.appendChild(card);
+  });
+}
+
+function addScopeGroup()      { _scope.push({title:'',items:[]}); renderScope(); openModal('s', _scope.length-1); }
+function removeScopeGroup(gi) { _scope.splice(gi,1); closeModal(); }
+
+function addScopeItem(gi) {
+  _scope[gi].items.push({text:'',complete:false});
+  const el = document.getElementById('modal-scope-items');
+  if (el) el.innerHTML = _scopeItemsHtml(gi);
+}
+function removeScopeItem(gi,ii) {
+  _scope[gi].items.splice(ii,1);
+  const el = document.getElementById('modal-scope-items');
+  if (el) el.innerHTML = _scopeItemsHtml(gi);
+}
+
+// ── Serializers ───────────────────────────────────────────────────────────────
+
+function serializeUsers() {
+  return _users.filter(u=>u.name.trim()).map(u=>`### ${u.name}\n${u.description}`).join('\n\n');
+}
+function serializeWorkflows() {
+  return _workflows.filter(w=>w.name.trim()).map(w=>{
+    let out = `### ${w.name}`;
+    if (w.persona.trim()) out += `\nPersona: ${w.persona}`;
+    if (w.description.trim()) out += `\n${w.description}`;
+    return out;
+  }).join('\n\n');
+}
+function serializeScope() {
+  return _scope.filter(g=>g.title.trim()).map(g=>{
+    const items = g.items.filter(i=>i.text.trim()).map(i=>i.complete?`- ~~${i.text}~~ 🎆`:`- ${i.text}`).join('\n');
+    return `### ${g.title}\n${items}`;
+  }).join('\n\n');
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+
+function _save(endpoint, content, statusId) {
+  const st = document.getElementById(statusId);
+  st.textContent = 'Saving…'; st.style.color = '#64748b';
+  fetch(endpoint, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content})})
+    .then(r=>r.json())
+    .then(d=>{ st.textContent=d.ok?'Saved ✓':(d.detail||'Error'); st.style.color=d.ok?'#16a34a':'#dc2626'; if(d.ok) setTimeout(()=>st.textContent='',3000); })
+    .catch(()=>{ st.textContent='Error'; st.style.color='#dc2626'; });
+}
+function saveUsers()     { _save('/api/structure/users',     serializeUsers(),     'users-status'); }
+function saveWorkflows() { _save('/api/structure/workflows', serializeWorkflows(), 'workflows-status'); }
+function saveScope()     { _save('/api/structure/scope',     serializeScope(),     'scope-status'); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderUsers();
+renderWorkflows();
+renderScope();
 </script>
 {% endblock %}

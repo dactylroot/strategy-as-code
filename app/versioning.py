@@ -18,13 +18,17 @@ def next_release_version(about: AboutDoc, product: ProductDoc | None = None) -> 
     """
     Compute the next version number given the current changelog and product state.
 
-    - If In Progress has any WBS sub-areas → MINOR + 1, RELEASE = 0
-    - If In Progress is empty → MINOR unchanged, RELEASE + 1  (bug-fix release)
-    - If all product scope is complete after this release → 1.0.0
+    - If there is an in-progress changelog entry, that version IS the pending release.
+    - Otherwise: if In Progress roadmap has sub-areas → MINOR + 1, RELEASE = 0
+    - Otherwise: MINOR unchanged, RELEASE + 1 (bug-fix release)
+    - If all product scope is complete → 1.0.0
     """
-    # Find the highest version across ALL changelog entries (including in-progress).
-    # An in-progress entry means that version number is already committed — the
-    # next cut must produce a higher version than anything already in the changelog.
+    # An in-progress entry means a version has been opened but not yet cut.
+    for entry in about.changelog:
+        if entry.in_progress:
+            return entry.version
+
+    # No open release: find the highest shipped version and compute the next one.
     latest_major = latest_minor = latest_release = 0
     for entry in about.changelog:
         m = re.match(r"^(\d+)\.(\d+)\.(\d+)", entry.version)
@@ -33,29 +37,34 @@ def next_release_version(about: AboutDoc, product: ProductDoc | None = None) -> 
             if (maj, min_, rel) > (latest_major, latest_minor, latest_release):
                 latest_major, latest_minor, latest_release = maj, min_, rel
 
-    # Count In Progress sub-area items
     ip_section = about.roadmap_section("In Progress")
     ip_items = ip_section.items if ip_section else []
     has_sub_areas = any(item.strip() for item in ip_items)
 
     if has_sub_areas:
-        next_minor   = latest_minor + 1
-        next_release = 0
+        next_minor, next_release = latest_minor + 1, 0
     else:
-        next_minor   = latest_minor
-        next_release = latest_release + 1
+        next_minor, next_release = latest_minor, latest_release + 1
 
-    next_major = latest_major
-
-    # Check if this would complete all product scope
     if product and product.overall_completion_pct >= 1.0:
         return "1.0.0"
 
-    return f"{next_major}.{next_minor}.{next_release}"
+    return f"{latest_major}.{next_minor}.{next_release}"
 
 
 def version_rationale(about: AboutDoc) -> str:
-    """Human-readable explanation of why the next version is what it is."""
+    """Human-readable explanation of what's going into the next release."""
+    # If there's an open in-progress entry, describe its groups.
+    for entry in about.changelog:
+        if entry.in_progress:
+            labels = [g.label for g in entry.groups if g.label.lower() != "bug fixes"]
+            if not labels:
+                return "Bug fixes only"
+            if len(labels) == 1:
+                return f"Shipping: {labels[0]}"
+            return f"Shipping: {', '.join(labels)}"
+
+    # No open release: describe roadmap In Progress.
     ip_section = about.roadmap_section("In Progress")
     ip_items   = [i for i in (ip_section.items if ip_section else []) if i.strip()]
     n = len(ip_items)

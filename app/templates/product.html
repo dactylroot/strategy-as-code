@@ -124,6 +124,8 @@ details[open] .chevron { transform: rotate(90deg); }
 .prose p { font-size:0.875rem; line-height:1.6; color:#374151; margin:0 0 0.75rem; }
 </style>
 
+{% include "partials/feature_panel.html" %}
+
 <script>
 function toggleAddForm(prefix) {
   const form = document.getElementById('add-form-' + prefix.replace(/\./g, '-'));

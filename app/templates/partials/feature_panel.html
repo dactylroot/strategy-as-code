@@ -36,14 +36,15 @@
                     onfocus="this.style.background='#fff';this.style.borderColor='#2563eb'"
                     onblur="this.style.background='#fafafa';this.style.borderColor='#e2e8f0'"
                     placeholder="What does this feature do? How will we know it's done?"></textarea>
-          <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;">
+          <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="saveFdp()">Save Changes</button>
+            <div id="fdp-status-actions" style="display:flex;gap:0.5rem;align-items:center;"></div>
             <span id="fdp-save-status" style="font-size:0.8rem;color:#64748b;"></span>
           </div>
         </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div id="fdp-score-card" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
           <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.75rem;">Scoring</label>
-          <span id="fdp-score-wbs-hint" style="display:block;font-size:0.72rem;color:#94a3b8;margin-bottom:0.75rem;line-height:1.4;"></span>
+          <span id="fdp-score-wbs-hint" style="display:block;font-size:0.72rem;color:#94a3b8;margin-bottom:0.75rem;line-height:1.4;">— set both value and effort to score</span>
           <div style="margin-bottom:0.65rem;">
             <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Value <span style="color:#94a3b8;font-size:0.65rem;">(10 = highest impact)</span></label>
             <select id="fdp-value" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:#1e293b;background:#fff;cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
@@ -60,6 +61,19 @@
           </div>
           <div id="fdp-score-display" style="margin-bottom:0.5rem;"></div>
           <div id="fdp-score-action"></div>
+        </div>
+
+        <div id="fdp-live-card" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:1.25rem;text-align:center;">
+          <div style="font-size:2rem;line-height:1;margin-bottom:0.5rem;">✓</div>
+          <div style="font-size:1rem;font-weight:700;color:#16a34a;margin-bottom:0.25rem;">Released</div>
+          <div style="font-size:0.78rem;color:#166534;margin-bottom:1rem;">Shipped and approved</div>
+          <div id="fdp-live-score"></div>
+        </div>
+        <div id="fdp-review-card" style="display:none;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:1.25rem;text-align:center;">
+          <div style="font-size:2rem;line-height:1;margin-bottom:0.5rem;">⏳</div>
+          <div style="font-size:1rem;font-weight:700;color:#c2410c;margin-bottom:0.25rem;">Awaiting Review</div>
+          <div style="font-size:0.78rem;color:#92400e;margin-bottom:1rem;">Verify this feature meets acceptance criteria</div>
+          <button class="btn btn-success" onclick="advanceFdpStatus('Released')" style="width:100%;">Approve → Released</button>
         </div>
       </div>
 
@@ -119,6 +133,7 @@ function openFeaturePanelFromEl(el) {
     wbs: d.wbs||null, name: d.name||'', notes: d.notes||'',
     stage: d.stage||'', value: d.value ? parseFloat(d.value) : null,
     effort: d.effort ? parseFloat(d.effort) : null,
+    reviewable: d.reviewable === 'true',
   });
 }
 
@@ -135,7 +150,19 @@ function openFeaturePanel(opts) {
   document.getElementById('fdp-value').value      = opts.value  ? String(opts.value)  : '';
   document.getElementById('fdp-effort').value     = opts.effort ? String(opts.effort) : '';
   document.getElementById('fdp-score-action').innerHTML = '';
-  onFdpScoreInput();
+  const isLive = opts.stage === 'Live' || opts.stage === 'Completed' || opts.stage === 'Released';
+  const isReview = opts.reviewable && (opts.stage === 'Live');
+  document.getElementById('fdp-score-card').style.display  = isLive ? 'none' : '';
+  document.getElementById('fdp-live-card').style.display   = (isLive && !isReview) ? '' : 'none';
+  document.getElementById('fdp-review-card').style.display = isReview ? '' : 'none';
+  if (isLive && !isReview) {
+    const v = opts.value, e = opts.effort;
+    document.getElementById('fdp-live-score').innerHTML = (v && e)
+      ? `<span style="background:#dcfce7;color:#166534;padding:0.3rem 0.8rem;border-radius:999px;font-size:0.9rem;font-weight:700;">${(v/e).toFixed(1)} priority score</span>`
+      : '';
+  }
+  _refreshScoreDisplay();
+  _renderStatusActions(opts.stage);
   document.querySelectorAll('.wbs-drop-target').forEach(el => el.classList.remove('current-wbs'));
   if (_fdp.subPrefix) {
     const cur = document.getElementById('wbs-drop-' + _fdp.subPrefix.replace(/\./g,'-'));
@@ -152,40 +179,104 @@ function openFeaturePanel(opts) {
 
 function closeFeaturePanel() { document.getElementById('featurePanel').close(); if (_fdpDirty) { _fdpDirty=false; location.reload(); } }
 
-function onFdpScoreInput() {
+let _scoreDebounce = null;
+
+function _refreshScoreDisplay() {
   const vRaw = document.getElementById('fdp-value').value;
   const eRaw = document.getElementById('fdp-effort').value;
   const v = parseInt(vRaw), e = parseInt(eRaw);
   const vValid = vRaw !== '' && !isNaN(v);
   const eValid = eRaw !== '' && !isNaN(e);
-  const scoreEl = document.getElementById('fdp-score-display');
-  scoreEl.innerHTML = (vValid && eValid)
+  document.getElementById('fdp-score-display').innerHTML = (vValid && eValid)
     ? `<span style="background:#d1fae5;color:#065f46;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.9rem;font-weight:700;">${(v/e).toFixed(1)} priority</span>`
     : '';
-  const hint = document.getElementById('fdp-score-wbs-hint');
-  const action = document.getElementById('fdp-score-action');
-  if (vValid && eValid) {
-    hint.textContent='';
-    action.innerHTML=`<button class="btn btn-success" style="font-size:0.875rem;width:100%;justify-content:center;" onclick="scoreFdp(${v},${e})">→ Save Score</button>`;
-  } else {
-    hint.textContent='— enter 1–10 for both fields to score'; hint.style.color='#94a3b8'; action.innerHTML='';
-  }
   document.getElementById('fdp-value').style.borderColor  = vValid ? '#16a34a' : '#e2e8f0';
   document.getElementById('fdp-effort').style.borderColor = eValid ? '#16a34a' : '#e2e8f0';
+  const hint = document.getElementById('fdp-score-wbs-hint');
+  hint.textContent = (vValid && eValid) ? '' : '— set both value and effort to score';
+  hint.style.color = '#94a3b8';
 }
 
-function scoreFdp(v, e) {
+function onFdpScoreInput() {
+  _refreshScoreDisplay();
+  const vRaw = document.getElementById('fdp-value').value;
+  const eRaw = document.getElementById('fdp-effort').value;
+  const v = parseInt(vRaw), e = parseInt(eRaw);
+  const vValid = vRaw !== '' && !isNaN(v);
+  const eValid = eRaw !== '' && !isNaN(e);
+  const action = document.getElementById('fdp-score-action');
+  action.innerHTML = '<span style="font-size:0.8rem;color:#64748b;">Saving…</span>';
+  clearTimeout(_scoreDebounce);
+  _scoreDebounce = setTimeout(() => {
+    if (!_fdp.wbs) return;
+    fetch('/api/features/'+encodeURIComponent(_fdp.wbs), {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({value: vValid ? v : null, effort: eValid ? e : null})
+    }).then(r => {
+      if (r.ok) {
+        if (vValid && eValid) {
+          action.innerHTML = '<span style="color:#16a34a;font-weight:600;font-size:0.875rem;">✓ Scored</span>';
+        } else {
+          const wasScored = _fdp.stage === 'Scored';
+          if (!vValid && !eValid) {
+            action.innerHTML = wasScored
+              ? '<span style="color:#7c3aed;font-size:0.8rem;">Score cleared — back to Scoped</span>'
+              : '<span style="color:#64748b;font-size:0.8rem;">✓ Score cleared</span>';
+          } else {
+            action.innerHTML = wasScored
+              ? '<span style="color:#7c3aed;font-size:0.8rem;">Partial score — back to Scoped</span>'
+              : '<span style="color:#64748b;font-size:0.8rem;">✓ Saved (partial score)</span>';
+          }
+          if (wasScored) {
+            _fdp.stage = 'Scoped';
+            _renderStatusActions('Scoped');
+            const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
+            if (metaSpan) { metaSpan.textContent = 'Scoped'; metaSpan.style.color = '#5b21b6'; }
+          }
+        }
+        _fdpDirty = true;
+      } else {
+        r.json().then(d => { action.innerHTML = `<span style="color:#dc2626;font-size:0.8rem;">${d.detail||'Save failed'}</span>`; }).catch(()=>{
+          action.innerHTML = '<span style="color:#dc2626;font-size:0.8rem;">Save failed</span>';
+        });
+      }
+    }).catch(() => {
+      action.innerHTML = '<span style="color:#dc2626;font-size:0.8rem;">Save failed</span>';
+    });
+  }, 400);
+}
+
+function _renderStatusActions(stage) {
+  const el = document.getElementById('fdp-status-actions');
+  if (!el) return;
+  if (stage === 'Gap' || stage === 'Idea') {
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="advanceFdpStatus('Scoped')" style="border-color:#7c3aed;color:#5b21b6;">→ Mark Scoped</button>`;
+  } else if (stage === 'Scoped') {
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="advanceFdpStatus('Gap')" style="color:#94a3b8;font-size:0.72rem;">← Back to Ideas</button>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+function advanceFdpStatus(newStatus) {
   if (!_fdp.wbs) return;
-  const actionEl = document.getElementById('fdp-score-action');
-  actionEl.innerHTML = '<span style="font-size:0.8rem;color:#64748b;">Scoring…</span>';
-  fetch('/api/features/'+encodeURIComponent(_fdp.wbs),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:v,effort:e})})
-  .then(r=>{
-    if(r.ok){
-      document.getElementById('fdp-score-display').innerHTML=`<span style="background:#d1fae5;color:#065f46;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.9rem;font-weight:700;">${(v/e).toFixed(1)} priority</span>`;
-      actionEl.innerHTML=`<span style="color:#16a34a;font-weight:600;font-size:0.875rem;">✓ Scored</span>`;
-      _fdpDirty=true;
-    } else { actionEl.innerHTML='<span style="color:#dc2626;">Failed</span>'; }
-  });
+  const statusEl = document.getElementById('fdp-save-status');
+  statusEl.textContent = 'Saving…';
+  fetch('/api/features/'+encodeURIComponent(_fdp.wbs), {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({status: newStatus})
+  }).then(r => {
+    if (r.ok) {
+      statusEl.textContent = newStatus === 'Scoped' ? '✓ Scoped' : newStatus === 'Released' ? '✓ Approved' : '✓ Done';
+      _fdp.stage = newStatus;
+      const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
+      if (metaSpan) { const c={'Gap':'#b45309','Idea':'#92400e','Scoped':'#5b21b6'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'#475569'; }
+      _renderStatusActions(newStatus);
+      _fdpDirty = true;
+    } else {
+      r.json().then(d => { statusEl.textContent = d.detail||'Error'; }).catch(()=>{ statusEl.textContent='Error'; });
+    }
+  }).catch(() => { statusEl.textContent = 'Error'; });
 }
 
 function saveFdp() {
@@ -194,10 +285,15 @@ function saveFdp() {
   const notes=document.getElementById('fdp-notes').value.trim();
   const status=document.getElementById('fdp-save-status');
   status.textContent='Saving…';
-  const body={notes};if(name)body.name=name;
+  const body={notes};
+  if(name)body.name=name;
   fetch('/api/features/'+encodeURIComponent(_fdp.wbs),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
   .then(r=>{
-    if(r.ok){status.textContent='Saved ✓';if(name){_fdp.name=name;document.getElementById('fdp-token-label').textContent=name;}_fdpDirty=true;}
+    if(r.ok){
+      status.textContent='Saved ✓';
+      if(name){_fdp.name=name;document.getElementById('fdp-token-label').textContent=name;}
+      _fdpDirty=true;
+    }
     else{status.textContent='Error';}
   })
   .catch(()=>{status.textContent='Error';});

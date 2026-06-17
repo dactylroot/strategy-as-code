@@ -60,15 +60,7 @@
 
   <div class="card" style="margin-bottom:1rem;">
     <p class="card-title">Current Project</p>
-    <p style="font-size:1rem;font-weight:700;color:#1e293b;margin:0 0 0.35rem;">{{ project_title }}</p>
-    {% if source_path %}
-    <p style="font-family:monospace;font-size:0.8rem;color:#64748b;background:#f1f5f9;
-              padding:0.4rem 0.65rem;border-radius:5px;word-break:break-all;margin:0 0 0.75rem;">
-      {{ source_path }}
-    </p>
-    {% else %}
-    <p style="font-size:0.8rem;color:#94a3b8;margin:0 0 0.75rem;">In-memory only (changes are not saved to disk)</p>
-    {% endif %}
+    <p style="font-size:1rem;font-weight:700;color:#1e293b;margin:0 0 0.75rem;">{{ project_title }}</p>
     <a href="/api/project/download" class="btn btn-ghost btn-sm" download>
       Download project files (.zip)
     </a>

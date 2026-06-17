@@ -5,14 +5,15 @@ import zipfile
 import tempfile
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, Response
+from watchfiles import awatch
 from pydantic import BaseModel
 
 from ..config import settings
 from .. import session_store
 from ..models import (
     FeatureUpdate, NewFeature, RoadmapUpdate, RoadmapFeaturesUpdate, NewRelease,
-    BugCreate, BugUpdate, FeatureStatus,
+    BugCreate, BugUpdate, FeatureStatus, VersionBucket,
 )
 from ..parsers import product as product_parser
 from ..parsers import about as about_parser
@@ -57,15 +58,21 @@ def patch_feature(wbs: str, body: FeatureUpdate, request: Request):
         not body.name.strip() or "|" in body.name or len(body.name.splitlines()) > 1
     ):
         raise HTTPException(status_code=400, detail="Feature name cannot be empty, contain '|', or span multiple lines")
+    score_explicit = 'value' in body.model_fields_set or 'effort' in body.model_fields_set
+
     def _apply(text: str) -> str:
         if body.name is not None:
             text = product_parser.transform_feature_name(text, wbs, body.name)
         if body.status is not None:
             text = product_parser.transform_feature_status(text, wbs, body.status)
-        if body.value is not None and body.effort is not None:
+        if score_explicit:
+            cur_status = product_parser.get_feature_status(text, wbs)
             text = product_parser.transform_feature_score(text, wbs, body.value, body.effort)
             if body.status is None:
-                text = product_parser.transform_feature_status(text, wbs, FeatureStatus.scored)
+                if body.value is not None and body.effort is not None:
+                    text = product_parser.transform_feature_status(text, wbs, FeatureStatus.scored)
+                elif cur_status == FeatureStatus.scored:
+                    text = product_parser.transform_feature_status(text, wbs, FeatureStatus.scoped)
         if body.notes is not None:
             text = product_parser.transform_feature_notes(text, wbs, body.notes)
         return text
@@ -165,6 +172,9 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
     from ..models import FeatureStatus
     s = _session(request)
 
+    all_planned_wbs = body.planned_wbs + [w for b in body.planned_buckets for w in b.wbs]
+    all_active = set(body.in_progress_wbs) | set(all_planned_wbs)
+
     if s:
         product_text = s.get_file("PRODUCT.MD")
         prod = product_parser._parse_text(product_text)
@@ -178,7 +188,6 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
                     product_text = product_parser.transform_feature_status(product_text, wbs, FeatureStatus.gap)
                 except Exception:
                     pass
-        all_active = set(body.in_progress_wbs) | set(body.planned_wbs)
         for wbs in all_active:
             f = wbs_to_feature.get(wbs)
             if f and f.status == FeatureStatus.gap:
@@ -191,12 +200,20 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
         prod2 = product_parser._parse_text(product_text)
         sa_label = {sa.wbs_prefix: f"{sa.wbs_prefix} {sa.title}" for area in prod2.wbs_areas for sa in area.sub_areas}
         ip_prefixes: set[str] = {wbs_to_prefix[w] for w in body.in_progress_wbs if w in wbs_to_prefix}
-        pl_prefixes: set[str] = {wbs_to_prefix[w] for w in body.planned_wbs if w in wbs_to_prefix} - ip_prefixes
+
+        labeled_buckets: list[VersionBucket] = []
+        bucket_sa_used: set[str] = set()
+        for bucket in body.planned_buckets:
+            sa_set = {wbs_to_prefix[w] for w in bucket.wbs if w in wbs_to_prefix} - ip_prefixes
+            bucket_sa_used |= sa_set
+            labeled_buckets.append(VersionBucket(label=bucket.label, items=[sa_label.get(p, p) for p in sorted(sa_set)]))
+        unassigned_pl: set[str] = {wbs_to_prefix[w] for w in body.planned_wbs if w in wbs_to_prefix} - ip_prefixes - bucket_sa_used
 
         about_text = s.get_file("ABOUT.MD")
         about_text = about_parser.transform_update_roadmap(about_text, RoadmapUpdate(
             in_progress=[sa_label.get(p, p) for p in sorted(ip_prefixes)],
-            planned=[sa_label.get(p, p) for p in sorted(pl_prefixes)],
+            planned=[sa_label.get(p, p) for p in sorted(unassigned_pl)],
+            planned_buckets=labeled_buckets,
             backlog=body.freeform_backlog,
         ))
         s.set_file("ABOUT.MD", about_text)
@@ -205,7 +222,6 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
         wbs_to_feature = {f.wbs: f for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
         wbs_to_prefix  = {f.wbs: sa.wbs_prefix for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
 
-        all_active = set(body.in_progress_wbs) | set(body.planned_wbs)
         for wbs in body.backlog_wbs:
             f = wbs_to_feature.get(wbs)
             if f and f.status == FeatureStatus.planned:
@@ -224,11 +240,19 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
         prod2 = product_parser.parse(settings.product_md)
         sa_label = {sa.wbs_prefix: f"{sa.wbs_prefix} {sa.title}" for area in prod2.wbs_areas for sa in area.sub_areas}
         ip_prefixes = {wbs_to_prefix[w] for w in body.in_progress_wbs if w in wbs_to_prefix}
-        pl_prefixes = {wbs_to_prefix[w] for w in body.planned_wbs if w in wbs_to_prefix} - ip_prefixes
+
+        labeled_buckets = []
+        bucket_sa_used = set()
+        for bucket in body.planned_buckets:
+            sa_set = {wbs_to_prefix[w] for w in bucket.wbs if w in wbs_to_prefix} - ip_prefixes
+            bucket_sa_used |= sa_set
+            labeled_buckets.append(VersionBucket(label=bucket.label, items=[sa_label.get(p, p) for p in sorted(sa_set)]))
+        unassigned_pl = {wbs_to_prefix[w] for w in body.planned_wbs if w in wbs_to_prefix} - ip_prefixes - bucket_sa_used
 
         about_parser.update_roadmap(settings.about_md, RoadmapUpdate(
             in_progress=[sa_label.get(p, p) for p in sorted(ip_prefixes)],
-            planned=[sa_label.get(p, p) for p in sorted(pl_prefixes)],
+            planned=[sa_label.get(p, p) for p in sorted(unassigned_pl)],
+            planned_buckets=labeled_buckets,
             backlog=body.freeform_backlog,
         ))
     return {"ok": True}
@@ -410,6 +434,63 @@ def put_scope(body: SectionUpdate, request: Request):
     return {"ok": True}
 
 
+# ── Bug screenshots ───────────────────────────────────────────────────────────
+
+# Session-mode screenshots (in-memory, keyed by session_id → bug_id)
+_session_screenshots: dict[str, dict[int, tuple[bytes, str]]] = {}
+
+_SCREENSHOT_MIME = {
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+    ".gif": "image/gif", ".webp": "image/webp",
+}
+
+
+def _screenshots_dir() -> Path:
+    d = settings.project_dir / ".screenshots"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+@router.post("/bugs/{bug_id}/screenshot")
+async def upload_bug_screenshot(bug_id: int, request: Request, file: UploadFile = File(...)):
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are accepted")
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Screenshot must be under 10 MB")
+    content_type = file.content_type or "image/png"
+    ext = Path(file.filename or "screenshot.png").suffix.lower() or ".png"
+    s = _session(request)
+    if s:
+        _session_screenshots.setdefault(s.session_id, {})[bug_id] = (data, content_type)
+    else:
+        d = _screenshots_dir()
+        for old in d.glob(f"bug_{bug_id}.*"):
+            old.unlink(missing_ok=True)
+        (d / f"bug_{bug_id}{ext}").write_bytes(data)
+    return {"ok": True}
+
+
+@router.get("/bugs/{bug_id}/screenshot")
+def get_bug_screenshot(bug_id: int, request: Request, sid: str | None = None):
+    # img tags can't send custom headers, so session_id is also accepted as a query param
+    s = _session(request) or (session_store.get(sid) if sid else None)
+    if s:
+        entry = _session_screenshots.get(s.session_id, {}).get(bug_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="No screenshot")
+        data, content_type = entry
+        return Response(content=data, media_type=content_type)
+    matches = list(_screenshots_dir().glob(f"bug_{bug_id}.*"))
+    if not matches:
+        raise HTTPException(status_code=404, detail="No screenshot")
+    path = matches[0]
+    return Response(
+        content=path.read_bytes(),
+        media_type=_SCREENSHOT_MIME.get(path.suffix.lower(), "image/png"),
+    )
+
+
 # ── Bug tracking ─────────────────────────────────────────────────────────────
 
 @router.get("/bugs")
@@ -457,55 +538,40 @@ def resolve_bug(bug_id: int, request: Request, body: dict = {}):
             bugs_parser.resolve_bug(settings.bugs_md, bug_id, resolved_in)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    # Delete screenshot now that the bug is resolved
+    if s:
+        _session_screenshots.get(s.session_id, {}).pop(bug_id, None)
+    else:
+        for old in _screenshots_dir().glob(f"bug_{bug_id}.*"):
+            old.unlink(missing_ok=True)
     return {"ok": True}
 
 
-# ── Markdown sync (health check) ──────────────────────────────────────────────
+# ── Live reload (SSE) ────────────────────────────────────────────────────────
 
-@router.get("/markdown/status")
-def markdown_status(request: Request):
+@router.get("/events")
+async def events(request: Request):
     s = _session(request)
-    if s:
-        required = ["PRODUCT.MD", "ABOUT.MD"]
-        missing = [f for f in required if not s.get_file(f)]
-        return {"ok": len(missing) == 0, "missing": missing, "files": len(s.files)}
-    files = {
-        "PRODUCT.MD": settings.product_md,
-        "ABOUT.MD":   settings.about_md,
-        "README.MD":  settings.readme_md,
-    }
-    missing = [name for name, path in files.items() if not path.exists()]
-    return {"ok": len(missing) == 0, "missing": missing, "files": len(files) - len(missing)}
 
+    async def stream():
+        if s:
+            return  # session files are in-memory; nothing to watch
+        watch_paths = [
+            str(p) for p in [
+                settings.product_md,
+                settings.about_md,
+                settings.readme_md,
+                settings.bugs_md,
+            ] if p.exists()
+        ]
+        if not watch_paths:
+            return
+        async for _ in awatch(*watch_paths):
+            yield "data: changed\n\n"
 
-@router.post("/markdown/sync")
-def markdown_sync(request: Request):
-    s = _session(request)
-    if s:
-        required = {"PRODUCT.MD": True, "ABOUT.MD": True}
-        results = {k: f"{len(s.get_file(k)):,} bytes" if s.get_file(k) else "missing" for k in required}
-        missing = [k for k, v in results.items() if v == "missing"]
-        if missing:
-            raise HTTPException(status_code=500, detail=f"Missing files: {', '.join(missing)}")
-        return {"ok": True, "message": "All markdown files in session.", "files": results}
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
-    files = {
-        "PRODUCT.MD": settings.product_md,
-        "ABOUT.MD":   settings.about_md,
-        "README.MD":  settings.readme_md,
-    }
-    results = {}
-    for name, path in files.items():
-        if not path.exists():
-            results[name] = "missing"
-        else:
-            try:
-                size = path.stat().st_size
-                results[name] = f"{size:,} bytes"
-            except Exception as e:
-                results[name] = f"error: {e}"
-
-    missing = [k for k, v in results.items() if v == "missing"]
-    if missing:
-        raise HTTPException(status_code=500, detail=f"Missing files: {', '.join(missing)}")
-    return {"ok": True, "message": "All markdown files saved.", "files": results}

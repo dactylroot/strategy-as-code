@@ -24,6 +24,7 @@
 .col-scoped     .lc-header { background: #f5f3ff; color: #5b21b6; border: 1px solid #ddd6fe; border-bottom: none; }
 .col-scored     .lc-header { background: #ede9fe; color: #4c1d95; border: 1px solid #c4b5fd; border-bottom: none; }
 .col-inprogress .lc-header { background: #fff7ed; color: #92400e; border: 1px solid #fed7aa; border-bottom: none; }
+.col-review     .lc-header { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; border-bottom: none; }
 .col-completed  .lc-header { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-bottom: none; }
 
 .lc-body {
@@ -75,28 +76,112 @@
 .col-scoped     .fc { border-left: 3px solid #7c3aed; }
 .col-scored     .fc { border-left: 3px solid #5b21b6; }
 .col-inprogress .fc { border-left: 3px solid #f59e0b; }
+.col-review     .fc { border-left: 3px solid #f97316; opacity: 0.9; }
 .col-completed  .fc { border-left: 3px solid #16a34a; opacity: 0.8; }
 
 .priority-badge { background: #d1fae5; color: #065f46; padding: 0.15rem 0.4rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
 .wbs-pill { background: #f1f5f9; color: #475569; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.65rem; font-family: monospace; }
 
+/* Completed groups */
+.fc-group { margin-bottom:0.5rem; }
+.fc-group > summary { list-style:none; cursor:pointer; }
+.fc-group > summary::-webkit-details-marker { display:none; }
+.fc-group > summary .fc { border-left:3px solid #16a34a; }
+.fc-group > summary .fc-title::before { content:'▸ '; font-size:0.7rem; color:#94a3b8; }
+.fc-group[open] > summary .fc-title::before { content:'▾ '; }
+.fc-live-item { cursor:pointer; opacity:0.8; margin-left:0.5rem; border-left:3px solid #bbf7d0 !important; }
+.fc-live-item:hover { opacity:1; }
+
 /* Priority matrix */
 .matrix-card { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; margin-bottom: 1.5rem; }
+
+/* Feature Explorer */
+.feature-explorer { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:2rem; align-items:start; }
+@media (max-width:900px) { .feature-explorer { grid-template-columns:1fr; } }
+.fe-card { background:#fff; border:1px solid #e2e8f0; border-radius:var(--radius); padding:1.25rem; }
+.fe-search-wrap { position:relative; }
+.fe-search-icon { position:absolute; left:0.7rem; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; }
+.fe-input { width:100%; padding:0.7rem 0.75rem 0.7rem 2.25rem; border:1.5px solid #e2e8f0; border-radius:6px; font-size:0.95rem; font-family:inherit; color:#1e293b; outline:none; transition:border-color 0.15s; background:#fafafa; }
+.fe-input:focus { border-color:#2563eb; background:#fff; box-shadow:0 0 0 3px rgba(37,99,235,0.08); }
+.fe-right { max-height:480px; overflow-y:auto; }
+.fe-wbs-area { margin-bottom:0.5rem; }
+.fe-wbs-header { font-size:0.67rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#fff; background:#1e293b; padding:0.3rem 0.65rem; border-radius:4px 4px 0 0; }
+.fe-wbs-sa { display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0.65rem; border:1px solid #e2e8f0; border-top:none; background:#fafafa; }
+.fe-wbs-sa:last-child { border-radius:0 0 4px 4px; }
+.fe-result { padding:0.6rem 0.75rem; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:0.45rem; cursor:pointer; transition:box-shadow 0.1s, border-color 0.1s; }
+.fe-result:last-child { margin-bottom:0; }
+.fe-result:hover { box-shadow:0 2px 6px rgba(0,0,0,0.07); border-color:#c7d2fe; }
+.fe-result-meta { display:flex; align-items:center; gap:0.4rem; margin-bottom:0.2rem; flex-wrap:wrap; }
+.fe-result-name { font-size:0.875rem; font-weight:500; color:#1e293b; line-height:1.3; }
+.fe-result-notes { font-size:0.75rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0.15rem; }
 {% endblock %}
 
 {% block content %}
-<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;">
-  <div class="page-header" style="margin-bottom:0;">
-    <h1>Features</h1>
-    <p class="subtitle">
-      {{ ideas|length }} to scope &middot;
-      {{ scoped|length }} scoped &middot;
-      {{ scored|length }} scored &middot;
-      {{ in_progress|length }} in progress &middot;
-      {{ completed|length }} completed
-    </p>
+<!-- Feature Explorer -->
+<div class="feature-explorer">
+
+  <!-- Left: search + request -->
+  <div class="fe-card">
+    <p class="card-title">Feature Explorer</p>
+    <div class="fe-search-wrap">
+      <svg class="fe-search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input class="fe-input" id="featureSearch" type="search"
+             placeholder="Search by name or description…"
+             oninput="onFeatureSearch(this.value)"
+             autocomplete="off">
+    </div>
+    <div id="fe-actions" style="display:none;margin-top:1rem;">
+      <p id="fe-match-count" style="font-size:0.78rem;color:#64748b;margin:0 0 0.6rem;"></p>
+      <button class="btn btn-ghost" style="width:100%;justify-content:center;border-style:dashed;color:#475569;"
+              onclick="feRequestIdea()">
+        + Request New Idea: &ldquo;<span id="fe-query-label"></span>&rdquo;
+      </button>
+    </div>
+    <div id="fe-empty-hint" style="margin-top:0.75rem;">
+      <p class="text-muted">{{ product.total_features }} features across {{ product.wbs_areas|length }} scope areas — search to find one or request a new idea.</p>
+    </div>
   </div>
-  <button class="btn btn-primary" onclick="document.getElementById('captureModal').showModal()">+ Capture Idea</button>
+
+  <!-- Right: WBS structure (default) or search results -->
+  <div class="fe-card fe-right">
+
+    <div id="fe-wbs-default">
+      <p class="card-title">WBS Structure</p>
+      {% for area in product.wbs_areas %}
+      <div class="fe-wbs-area">
+        <div class="fe-wbs-header">{{ area.number }}. {{ area.title }}</div>
+        {% for sa in area.sub_areas %}
+        <div class="fe-wbs-sa">
+          <div>
+            <span style="font-family:monospace;font-size:0.65rem;color:#94a3b8;">{{ sa.wbs_prefix }}</span>
+            <span style="color:#374151;font-weight:500;font-size:0.78rem;margin-left:0.4rem;">{{ sa.title }}</span>
+          </div>
+          <span style="font-family:monospace;font-size:0.65rem;color:#94a3b8;white-space:nowrap;margin-left:0.5rem;">{{ sa.live_count }}L · {{ sa.planned_count }}P · {{ sa.gap_count }}G</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div id="fe-results" style="display:none;">
+      <p class="card-title" id="fe-results-title">Results</p>
+      <div id="fe-results-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="page-header">
+  <h1>Features</h1>
+  <p class="subtitle">
+    {{ ideas|length }} to scope &middot;
+    {{ prioritized|length }} prioritized &middot;
+    {{ in_progress|length }} in progress &middot;
+    {{ review|length }} in review &middot;
+    {{ released|length }} released
+  </p>
 </div>
 
 <!-- 5-column lifecycle board -->
@@ -115,28 +200,19 @@
     </div>
   </div>
 
-  <!-- ── Scoped ── -->
-  <div class="lc-col col-scoped">
-    <div class="lc-header">Scoped <span class="lc-count">{{ scoped|length }}</span></div>
-    <div class="lc-body" id="col-scoped">
-      {% for item in scoped %}
-        {% include "partials/fc_scoped.html" %}
-      {% endfor %}
-      {% if not scoped %}
-      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Scope an idea to see it here.</p>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- ── Scored ── -->
+  <!-- ── Prioritized (Scoped + Scored, sorted by priority score) ── -->
   <div class="lc-col col-scored">
-    <div class="lc-header">Scored <span class="lc-count">{{ scored|length }}</span></div>
-    <div class="lc-body" id="col-scored">
-      {% for item in scored %}
-        {% include "partials/fc_scored.html" %}
+    <div class="lc-header">Prioritized <span class="lc-count">{{ prioritized|length }}</span></div>
+    <div class="lc-body" id="col-prioritized">
+      {% for item in prioritized %}
+        {% if item.status.value == 'Scored' %}
+          {% include "partials/fc_scored.html" %}
+        {% else %}
+          {% include "partials/fc_scoped.html" %}
+        {% endif %}
       {% endfor %}
-      {% if not scored %}
-      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Score a scoped item to see it here.</p>
+      {% if not prioritized %}
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Scope or score an idea to see it here.</p>
       {% endif %}
     </div>
   </div>
@@ -154,15 +230,101 @@
     </div>
   </div>
 
-  <!-- ── Completed ── -->
+  <!-- ── Review ── -->
+  <div class="lc-col col-review">
+    <div class="lc-header">Review <span class="lc-count">{{ review|length }}</span></div>
+    <div class="lc-body" id="col-review">
+      {% if not review %}
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Features completed in the current or most recent release appear here.</p>
+      {% else %}
+        {% for sa in sub_areas %}
+          {% set sa_review = [] %}
+          {% for item in review %}
+            {% if item.wbs.startswith(sa.wbs_prefix + '.') %}
+              {% if sa_review.append(item) %}{% endif %}
+            {% endif %}
+          {% endfor %}
+          {% if sa_review %}
+          <details class="fc-group" open>
+            <summary>
+              <div class="fc-head">
+                <div class="fc-meta">
+                  <span class="fc-wbs" style="background:#fff7ed;color:#92400e;">{{ sa.wbs_prefix }}</span>
+                  <span class="fc-stage-badge" style="color:#f59e0b;">{{ sa_review|length }} live</span>
+                </div>
+                <div class="fc-title">{{ sa.title }}</div>
+              </div>
+            </summary>
+            {% for item in sa_review %}
+            <div class="fc fc-live-item"
+                 data-wbs="{{ item.wbs }}"
+                 data-name="{{ item.name }}"
+                 data-notes="{{ item.notes }}"
+                 data-stage="{{ item.status.value }}"
+                 data-reviewable="true"
+                 {% if item.value %}data-value="{{ item.value }}"{% endif %}
+                 {% if item.effort %}data-effort="{{ item.effort }}"{% endif %}
+                 onclick="openFeaturePanelFromEl(this)">
+              <div class="fc-head" style="padding:0.4rem 0.65rem;">
+                <div class="fc-meta">
+                  <span class="fc-wbs" style="background:#fff7ed;color:#92400e;">{{ item.wbs }}</span>
+                </div>
+                <div class="fc-title" style="color:#94a3b8;font-size:0.8rem;">{{ item.name }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </details>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Released ── -->
   <div class="lc-col col-completed">
-    <div class="lc-header">Completed <span class="lc-count">{{ completed|length }}</span></div>
-    <div class="lc-body" id="col-completed">
-      {% for item in completed %}
-        {% include "partials/fc_completed.html" %}
-      {% endfor %}
-      {% if not completed %}
-      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Completed features appear here.</p>
+    <div class="lc-header">Released <span class="lc-count">{{ released|length }}</span></div>
+    <div class="lc-body" id="col-released">
+      {% if not released %}
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Approved features appear here.</p>
+      {% else %}
+        {% for sa in sub_areas %}
+          {% set sa_released = [] %}
+          {% for item in released %}
+            {% if item.wbs.startswith(sa.wbs_prefix + '.') %}
+              {% if sa_released.append(item) %}{% endif %}
+            {% endif %}
+          {% endfor %}
+          {% if sa_released %}
+          <details class="fc-group">
+            <summary>
+              <div class="fc-head">
+                <div class="fc-meta">
+                  <span class="fc-wbs" style="background:#f0fdf4;color:#166534;">{{ sa.wbs_prefix }}</span>
+                  <span class="fc-stage-badge" style="color:#16a34a;">{{ sa_released|length }} released</span>
+                </div>
+                <div class="fc-title">{{ sa.title }}</div>
+              </div>
+            </summary>
+            {% for item in sa_released %}
+            <div class="fc fc-live-item"
+                 data-wbs="{{ item.wbs }}"
+                 data-name="{{ item.name }}"
+                 data-notes="{{ item.notes }}"
+                 data-stage="{{ item.status.value }}"
+                 {% if item.value %}data-value="{{ item.value }}"{% endif %}
+                 {% if item.effort %}data-effort="{{ item.effort }}"{% endif %}
+                 onclick="openFeaturePanelFromEl(this)">
+              <div class="fc-head" style="padding:0.4rem 0.65rem;">
+                <div class="fc-meta">
+                  <span class="fc-wbs" style="background:#f0fdf4;color:#166534;">{{ item.wbs }}</span>
+                </div>
+                <div class="fc-title" style="color:#94a3b8;font-size:0.8rem;">{{ item.name }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </details>
+          {% endif %}
+        {% endfor %}
       {% endif %}
     </div>
   </div>
@@ -170,6 +332,7 @@
 </div>
 
 <!-- Priority matrix (scored items only) -->
+{% set scored = prioritized | selectattr('priority_score') | list %}
 {% if scored %}
 <div class="matrix-card">
   <p class="card-title">Priority Matrix — Scored Items</p>
@@ -235,6 +398,105 @@
 {% include "partials/feature_panel.html" %}
 
 <script>
+/* ── Feature Explorer ── */
+const FE_FEATURES = {{ features_json | safe }};
+
+const FE_STATUS_COLORS = {
+  'Gap':'#b45309','Idea':'#92400e','Scoped':'#7c3aed','Scored':'#4c1d95',
+  'In-Progress':'#ea580c','Planned':'#1d4ed8','Live':'#16a34a'
+};
+
+function _feEsc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _feScore(f, q) {
+  const name  = f.name.toLowerCase();
+  const notes = (f.notes||'').toLowerCase();
+  const tokens = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return 0;
+  const full = tokens.join(' ');
+  if (name.includes(full))  return 100;
+  if (notes.includes(full)) return 80;
+  const inName  = tokens.filter(t => name.includes(t)).length;
+  const inNotes = tokens.filter(t => notes.includes(t)).length;
+  return (inName * 10) + (inNotes * 5);
+}
+
+function onFeatureSearch(q) {
+  const actions   = document.getElementById('fe-actions');
+  const hint      = document.getElementById('fe-empty-hint');
+  const wbsPane   = document.getElementById('fe-wbs-default');
+  const resPane   = document.getElementById('fe-results');
+  const resList   = document.getElementById('fe-results-list');
+  const resTitle  = document.getElementById('fe-results-title');
+  const matchCount = document.getElementById('fe-match-count');
+
+  if (!q.trim()) {
+    actions.style.display  = 'none';
+    hint.style.display     = '';
+    wbsPane.style.display  = '';
+    resPane.style.display  = 'none';
+    return;
+  }
+
+  document.getElementById('fe-query-label').textContent = q;
+  hint.style.display    = 'none';
+  actions.style.display = '';
+
+  const matches = FE_FEATURES
+    .map(f => ({ f, score: _feScore(f, q) }))
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(x => x.f);
+
+  matchCount.textContent = matches.length
+    ? `${matches.length} match${matches.length === 1 ? '' : 'es'}`
+    : 'No matches found';
+
+  wbsPane.style.display = 'none';
+  resPane.style.display = '';
+  resTitle.textContent  = matches.length ? `${matches.length} Result${matches.length === 1 ? '' : 's'}` : 'No Results';
+
+  resList.innerHTML = '';
+  if (!matches.length) {
+    resList.innerHTML = '<p class="text-muted" style="padding:0.5rem 0;">No features match your search. Use the button to request a new idea.</p>';
+    return;
+  }
+  matches.forEach(f => {
+    const c     = FE_STATUS_COLORS[f.status] || '#64748b';
+    const notes = f.notes.length > 90 ? f.notes.slice(0, 90) + '…' : f.notes;
+    const score = f.value && f.effort ? `${(f.value / f.effort).toFixed(1)}` : '';
+
+    const el = document.createElement('div');
+    el.className = 'fe-result';
+    el.dataset.wbs   = f.wbs;
+    el.dataset.name  = f.name;
+    el.dataset.notes = f.notes;
+    el.dataset.stage = f.status;
+    if (f.value)  el.dataset.value  = f.value;
+    if (f.effort) el.dataset.effort = f.effort;
+    el.onclick = function() { openFeaturePanelFromEl(this); };
+    el.innerHTML = `
+      <div class="fe-result-meta">
+        <span style="font-family:monospace;font-size:0.65rem;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:3px;color:#475569;">${_feEsc(f.wbs)}</span>
+        <span style="font-size:0.68rem;font-weight:700;color:${c};">${_feEsc(f.status)}</span>
+        ${score ? `<span style="background:#d1fae5;color:#065f46;padding:0.1rem 0.35rem;border-radius:999px;font-size:0.65rem;font-weight:700;">${_feEsc(score)}</span>` : ''}
+      </div>
+      <div class="fe-result-name">${_feEsc(f.name)}</div>
+      ${notes ? `<div class="fe-result-notes">${_feEsc(notes)}</div>` : ''}`;
+    resList.appendChild(el);
+  });
+}
+
+function feRequestIdea() {
+  const q = document.getElementById('featureSearch').value.trim();
+  if (!q) return;
+  document.getElementById('captureIdea').value = q;
+  document.getElementById('captureModal').showModal();
+  document.getElementById('captureWbs').focus();
+}
+
 /* ── Capture idea ── */
 function submitCapture() {
   const name = document.getElementById('captureIdea').value.trim();

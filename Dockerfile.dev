@@ -12,12 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x entrypoint.sh
 
-COPY app ./app
-COPY scripts ./scripts
-
 ENV AUTH_CONFIG=/etc/strategy-as-code/auth.yml
 RUN mkdir -p /etc/strategy-as-code && \
-    printf 'enabled: true\nusername: admin\npassword: changeme\nsecret_key: ""\n' \
+    printf 'enabled: false\nusername: admin\npassword: changeme\nsecret_key: ""\n' \
     > /etc/strategy-as-code/auth.yml
 
 EXPOSE 8000

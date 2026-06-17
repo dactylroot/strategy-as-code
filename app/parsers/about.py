@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..models import (
     AboutDoc, ChangelogEntry, ChangelogGroup,
-    RoadmapSection, NewRelease, RoadmapUpdate,
+    RoadmapSection, NewRelease, RoadmapUpdate, VersionBucket,
 )
 
 _locks: dict[Path, threading.Lock] = {}
@@ -88,16 +88,21 @@ def _parse_text(text: str) -> AboutDoc:
     # Skip any preamble before first ## heading
     for sm in re.finditer(r"\n## ([^\n]+)\n(.*?)(?=\n## |\Z)", "\n" + roadmap_text, re.DOTALL):
         name = sm.group(1).strip()
-        items = [
-            m.group(1).strip()
-            for m in re.finditer(r"^[-*]\s+(.+)", sm.group(2), re.MULTILINE)
-        ]
-        # For "1.0.0" section the body is prose, not bullets
-        if not items:
-            body = sm.group(2).strip()
-            if body:
-                items = [body]
-        roadmap.append(RoadmapSection(name=name, items=items))
+        body = sm.group(2)
+        if name == "Planned":
+            unassigned, buckets = _parse_planned_buckets(body)
+            roadmap.append(RoadmapSection(name=name, items=unassigned, buckets=buckets))
+        else:
+            items = [
+                m.group(1).strip()
+                for m in re.finditer(r"^[-*]\s+(.+)", body, re.MULTILINE)
+            ]
+            # For "1.0.0" section the body is prose, not bullets
+            if not items:
+                plain = body.strip()
+                if plain:
+                    items = [plain]
+            roadmap.append(RoadmapSection(name=name, items=items))
 
     return AboutDoc(raw_text=text, changelog=changelog, roadmap=roadmap)
 
@@ -118,6 +123,42 @@ def add_changelog_entry(path: Path, release: NewRelease, in_progress_items: list
 
 # ── Pure transform functions (text-in / text-out, no I/O) ────────────────────
 
+def _parse_planned_buckets(body: str) -> tuple[list[str], list[VersionBucket]]:
+    """Parse the Planned section body, which may use ### version-bucket sub-sections."""
+    if not re.search(r"^### ", body, re.MULTILINE):
+        items = [m.group(1).strip() for m in re.finditer(r"^[-*]\s+(.+)", body, re.MULTILINE)]
+        return items, []
+
+    # Split on ### headers; captured group appears between parts
+    parts = re.split(r"^### ([^\n]+)\n", body, flags=re.MULTILINE)
+    # parts[0] = preamble (unassigned), then (label, body) pairs
+    preamble = parts[0]
+    unassigned = [m.group(1).strip() for m in re.finditer(r"^[-*]\s+(.+)", preamble, re.MULTILINE)]
+
+    buckets: list[VersionBucket] = []
+    for i in range(1, len(parts) - 1, 2):
+        label = parts[i].strip()
+        bucket_body = parts[i + 1]
+        bucket_items = [m.group(1).strip() for m in re.finditer(r"^[-*]\s+(.+)", bucket_body, re.MULTILINE)]
+        buckets.append(VersionBucket(label=label, items=bucket_items))
+
+    return unassigned, buckets
+
+
+def _format_planned_with_buckets(unassigned: list[str], buckets: list[VersionBucket]) -> str:
+    lines: list[str] = []
+    for bucket in buckets:
+        lines.append(f"### {bucket.label}")
+        lines.extend(f"- {item}" for item in bucket.items)
+        lines.append("")
+    if unassigned:
+        if buckets:
+            lines.append("### Unassigned")
+        lines.extend(f"- {item}" for item in unassigned)
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _replace_roadmap_section(src: str, section_name: str, new_items: list[str]) -> str:
     body = "\n".join(f"- {item}" for item in new_items) if new_items else ""
     pattern = rf"(## {re.escape(section_name)}\n)(.*?)(?=\n## |\n# |\Z)"
@@ -130,7 +171,12 @@ def _replace_roadmap_section(src: str, section_name: str, new_items: list[str]) 
 
 def transform_update_roadmap(text: str, update: RoadmapUpdate) -> str:
     text = _replace_roadmap_section(text, "In Progress", update.in_progress)
-    text = _replace_roadmap_section(text, "Planned", update.planned)
+    if update.planned_buckets or any(update.planned):
+        planned_content = _format_planned_with_buckets(update.planned, update.planned_buckets)
+        pattern = rf"(## {re.escape('Planned')}\n)(.*?)(?=\n## |\n# |\Z)"
+        text, _ = re.subn(pattern, rf"\g<1>{planned_content}", text, flags=re.DOTALL)
+    else:
+        text = _replace_roadmap_section(text, "Planned", update.planned)
     text = _replace_roadmap_section(text, "Backlog", update.backlog)
     return text
 

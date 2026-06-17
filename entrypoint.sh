@@ -18,8 +18,8 @@ git config --global user.email "${GIT_USER_EMAIL:-noreply@strategy-as-code}"
 if [ -n "${GIT_TOKEN}" ] && [ -n "${GIT_REPO_URL}" ]; then
     REPO_HOST=$(echo "${GIT_REPO_URL}" | sed 's|https://||;s|/.*||')
     git config --global credential.helper store
-    printf 'https://%s@%s\n' "${GIT_TOKEN}" "${REPO_HOST}" > /root/.git-credentials
-    chmod 600 /root/.git-credentials
+    printf 'https://%s@%s\n' "${GIT_TOKEN}" "${REPO_HOST}" > "${HOME}/.git-credentials"
+    chmod 600 "${HOME}/.git-credentials"
 fi
 
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --reload
