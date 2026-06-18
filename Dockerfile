@@ -2,6 +2,9 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+RUN groupadd --gid 1001 appuser && \
+    useradd --uid 1001 --gid 1001 --create-home --home-dir /home/appuser appuser
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6-dev libpng-dev pkg-config git \
     && rm -rf /var/lib/apt/lists/*
@@ -18,7 +21,12 @@ COPY scripts ./scripts
 ENV AUTH_CONFIG=/etc/strategy-as-code/auth.yml
 RUN mkdir -p /etc/strategy-as-code && \
     printf 'enabled: true\nusername: admin\npassword: changeme\nsecret_key: ""\n' \
-    > /etc/strategy-as-code/auth.yml
+    > /etc/strategy-as-code/auth.yml && \
+    chown -R appuser:appuser /etc/strategy-as-code
+
+ENV HOME=/home/appuser
+
+USER appuser
 
 EXPOSE 8000
 
