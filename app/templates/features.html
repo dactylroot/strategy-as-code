@@ -411,13 +411,16 @@ function _feEsc(s) {
 }
 
 function _feScore(f, q) {
+  const wbs   = (f.wbs||'').toLowerCase();
   const name  = f.name.toLowerCase();
-  const notes = (f.notes||'').toLowerCase();
+  const notes = (f.notes||'').replace(/<br\s*\/?>/gi, ' ').toLowerCase();
   const tokens = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (!tokens.length) return 0;
   const full = tokens.join(' ');
-  if (name.includes(full))  return 100;
-  if (notes.includes(full)) return 80;
+  if (wbs === full)          return 110;
+  if (wbs.startsWith(full))  return 105;
+  if (name.includes(full))   return 100;
+  if (notes.includes(full))  return 80;
   const inName  = tokens.filter(t => name.includes(t)).length;
   const inNotes = tokens.filter(t => notes.includes(t)).length;
   return (inName * 10) + (inNotes * 5);
@@ -465,7 +468,8 @@ function onFeatureSearch(q) {
   }
   matches.forEach(f => {
     const c     = FE_STATUS_COLORS[f.status] || '#64748b';
-    const notes = f.notes.length > 90 ? f.notes.slice(0, 90) + '…' : f.notes;
+    const plainNotes = (f.notes || '').replace(/<br\s*\/?>/gi, ' ');
+    const notes = plainNotes.length > 90 ? plainNotes.slice(0, 90) + '…' : plainNotes;
     const score = f.value && f.effort ? `${(f.value / f.effort).toFixed(1)}` : '';
 
     const el = document.createElement('div');

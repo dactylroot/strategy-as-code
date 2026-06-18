@@ -22,6 +22,7 @@ class Feature(BaseModel):
     value: int | None = None
     effort: int | None = None
     notes: str = ""
+    flagged: bool = False
 
     @computed_field
     @property
@@ -258,6 +259,7 @@ class FeatureUpdate(BaseModel):
     value: int | None = None
     effort: int | None = None
     notes: str | None = None
+    flagged: bool | None = None
 
 
 class NewFeature(BaseModel):

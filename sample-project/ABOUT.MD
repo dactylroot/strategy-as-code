@@ -77,10 +77,12 @@
 
 ## Planned
 ### v0.5.0
-- 2.1 Program Strategy Skill
+- 2.1.5
+- 2.1.6
 
 ### v0.6.0
-- 1.4 Bug Tracker
+- 1.2.6
+- 1.4.4
 
 ## Backlog
 - OKR alignment mapping

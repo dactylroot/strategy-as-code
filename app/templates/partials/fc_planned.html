@@ -5,6 +5,7 @@
      data-name="{{ item.name }}"
      data-notes="{{ item.notes }}"
      data-stage="Planned"
+     data-flagged="{{ item.flagged | lower }}"
      onclick="openFeaturePanelFromEl(this)">
   <div class="fc-head">
     <div class="fc-meta">
@@ -12,7 +13,7 @@
       <span class="fc-stage-badge" style="color:#1e40af;">Planned</span>
     </div>
     <div class="fc-title">{{ item.name }}</div>
-    {% if item.notes %}<div class="fc-notes">{{ item.notes }}</div>{% endif %}
+    {% if item.notes %}<div class="fc-notes">{{ item.notes | replace("<br>", " ") | truncate(120, true, "…") }}</div>{% endif %}
     <div class="fc-actions">
       <span class="text-muted" style="font-size:0.7rem;">Click to review →</span>
     </div>

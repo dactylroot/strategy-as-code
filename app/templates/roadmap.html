@@ -65,21 +65,16 @@
   background: #eff6ff; border: 1px solid #bfdbfe; border-bottom: none;
   font-size: 0.75rem; font-weight: 600; user-select: none;
 }
-.version-bucket-header.unassigned { background: #f8fafc; border-color: #e2e8f0; }
 .version-bucket-header:hover { filter: brightness(0.97); }
 .vb-chevron { font-size: 0.65rem; color: #93c5fd; flex-shrink: 0; }
-.version-bucket-header.unassigned .vb-chevron { color: #94a3b8; }
 .vb-label { color: #1e40af; font-weight: 700; letter-spacing: -0.01em; }
-.version-bucket-header.unassigned .vb-label { color: #64748b; font-weight: 500; font-style: italic; }
 .vb-count { margin-left: auto; font-weight: 400; font-size: 0.7rem; color: #93c5fd; }
-.version-bucket-header.unassigned .vb-count { color: #94a3b8; }
 .vb-remove { margin-left: 0.25rem; background: none; border: none; cursor: pointer; color: #93c5fd; font-size: 0.8rem; padding: 0; line-height: 1; border-radius: 3px; }
 .vb-remove:hover { color: #dc2626; }
 .version-bucket-list {
   background: #fff; border: 1px solid #bfdbfe; border-top: none;
   border-radius: 0 0 5px 5px; padding: 0.35rem; min-height: 2.5rem;
 }
-.version-bucket-header.unassigned + .version-bucket-list { border-color: #e2e8f0; }
 .version-bucket-list .rm-feat { border-left: 3px solid #3b82f6; }
 .vb-empty { color: #94a3b8; font-size: 0.72rem; padding: 0.35rem 0.25rem; margin: 0; text-align: center; }
 
@@ -129,6 +124,7 @@
      data-name="{{ entry.f.name }}"
      data-notes="{{ entry.f.notes }}"
      data-stage="{{ entry.f.status.value }}"
+     data-flagged="{{ entry.f.flagged | lower }}"
      onclick="openFeaturePanelFromEl(this)"
      title="Click to open · drag to move">
   <div class="rm-feat-wbs">{{ entry.f.wbs }}</div>
@@ -150,7 +146,7 @@
   <!-- Planned (version buckets) -->
   <div class="roadmap-col col-planned">
     <div class="roadmap-col-header">
-      <div>Planned <span class="roadmap-col-count">{{ version_buckets | map(attribute='features') | map('length') | sum + (unassigned_planned | length) }}</span></div>
+      <div>Planned <span class="roadmap-col-count">{{ version_buckets | map(attribute='features') | map('length') | sum }}</span></div>
       <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:rgba(37,99,235,0.1);color:#1e40af;border:1px solid #bfdbfe;"
               onclick="showAddVersion()" title="Add milestone">+ version</button>
     </div>
@@ -170,28 +166,36 @@
         <div class="version-bucket-header" onclick="toggleBucket(this)">
           <span class="vb-chevron">▾</span>
           <span class="vb-label">{{ bucket.label }}</span>
-          <span class="vb-count">{{ bucket.features | length }}</span>
+          {% if bucket.total > 0 %}
+          <span class="vb-count" title="{{ bucket.live_count }} live, {{ bucket.in_flight_count }} in progress, {{ bucket.total - bucket.live_count - bucket.in_flight_count }} remaining">
+            {{ bucket.live_count }}/{{ bucket.total }}
+            {% if bucket.all_live %}<span style="color:#16a34a;">✓</span>{% endif %}
+          </span>
+          {% else %}
+          <span class="vb-count">0</span>
+          {% endif %}
           <button class="vb-remove" onclick="removeBucket(event, this)" title="Remove">✕</button>
         </div>
+        {% if bucket.all_live %}
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-top:none;padding:0.35rem 0.65rem;font-size:0.7rem;color:#15803d;font-weight:600;">
+          All features live — ready to release
+        </div>
+        {% endif %}
         <div class="version-bucket-list">
           {% for entry in bucket.features %}{{ feat_card(entry) }}{% endfor %}
-          {% if not bucket.features %}<p class="vb-empty">Drop features here</p>{% endif %}
+          {% if not bucket.features %}
+          <p class="vb-empty">
+            {% if bucket.in_flight_count or bucket.live_count %}
+              {{ bucket.in_flight_count }} in progress · {{ bucket.live_count }} live
+            {% else %}
+              Drop features here
+            {% endif %}
+          </p>
+          {% endif %}
         </div>
       </div>
       {% endfor %}
 
-      <!-- Unassigned bucket (always last) -->
-      <div class="version-bucket" data-bucket-label="">
-        <div class="version-bucket-header unassigned" onclick="toggleBucket(this)">
-          <span class="vb-chevron">▾</span>
-          <span class="vb-label">Unassigned</span>
-          <span class="vb-count">{{ unassigned_planned | length }}</span>
-        </div>
-        <div class="version-bucket-list">
-          {% for entry in unassigned_planned %}{{ feat_card(entry) }}{% endfor %}
-          {% if not unassigned_planned %}<p class="vb-empty">No unassigned features</p>{% endif %}
-        </div>
-      </div>
     </div>
   </div>
 
@@ -209,6 +213,7 @@
            data-name="{{ entry.f.name }}"
            data-notes="{{ entry.f.notes }}"
            data-stage="{{ entry.f.status.value }}"
+           data-flagged="{{ entry.f.flagged | lower }}"
            onclick="openFeaturePanelFromEl(this)"
            title="Click to open · drag to move">
         <div class="rm-feat-wbs">{{ entry.f.wbs }}</div>
@@ -294,7 +299,11 @@
 <div class="backlog-section">
   <div class="backlog-section-header">
     Backlog
-    <span style="font-weight:400;">{{ backlog_sorted | length + (freeform_backlog | length) }} items</span>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <span style="font-weight:400;">{{ backlog_sorted | length + (freeform_backlog | length) }} items</span>
+      <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:rgba(124,58,237,0.08);color:#5b21b6;border:1px solid #ddd6fe;"
+              onclick="document.getElementById('captureModal').showModal()">+ Capture Idea</button>
+    </div>
   </div>
 
   {% if backlog_sorted or freeform_backlog %}
@@ -348,12 +357,39 @@
 
 {% include "partials/feature_panel.html" %}
 
+<!-- Capture modal (mirrors Features page) -->
+<dialog id="captureModal" style="border:1px solid #d1d5db;border-radius:8px;padding:1.5rem;min-width:26rem;max-width:36rem;">
+  <h3 style="margin:0 0 1rem;font-size:1rem;">Capture New Idea</h3>
+  <form id="captureForm" onsubmit="return false;">
+    <div class="form-group"><label>Name</label>
+      <input type="text" id="captureIdea" required placeholder="Describe the feature or improvement">
+    </div>
+    <div class="form-group"><label>WBS Area <span style="color:#dc2626;">*</span></label>
+      <select id="captureWbs" required style="width:100%;padding:0.4rem 0.5rem;border:1px solid #d1d5db;border-radius:4px;font-size:0.85rem;">
+        <option value="">— select a WBS area —</option>
+        {% for sa in sub_areas %}
+        <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} — {{ sa.title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group"><label>Notes <span class="text-muted">(optional)</span></label>
+      <textarea id="captureNotes" rows="2" placeholder="Context, source, or acceptance criteria"></textarea>
+    </div>
+    <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('captureModal').close()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="submitCapture()">Add to Ideas</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script>
 const DRAG_GROUP = 'roadmap-features';
 
 /* ── Save ── */
-function saveRoadmap() {
+function saveRoadmap(evt, forceReload) {
+  const crossList = forceReload || (evt && evt.from !== evt.to);
+
   // In Progress
   const ipEl = document.getElementById('col-in-progress');
   const ip_wbs    = ipEl ? [...ipEl.querySelectorAll('[data-type="feature"]')].map(c => c.dataset.wbs) : [];
@@ -388,7 +424,7 @@ function saveRoadmap() {
       backlog_wbs,
       freeform_backlog: [...backlog_free, ...ip_free],
     }),
-  });
+  }).then(() => { if (crossList) location.reload(); });
 }
 
 /* ── Sortable setup ── */
@@ -424,10 +460,11 @@ function handleVersionKey(e) {
 
 function addVersionBucket() {
   const input = document.getElementById('new-version-input');
-  const label = input.value.trim();
+  let label = input.value.trim();
   if (!label) return;
+  if (!label.startsWith('v')) label = 'v' + label;
 
-  const unassigned = document.querySelector('[data-bucket-label=""]');
+  const body = document.querySelector('.col-planned-body');
   const div = document.createElement('div');
   div.className = 'version-bucket';
   div.dataset.bucketLabel = label;
@@ -441,7 +478,7 @@ function addVersionBucket() {
     <div class="version-bucket-list">
       <p class="vb-empty">Drop features here</p>
     </div>`;
-  unassigned.parentElement.insertBefore(div, unassigned);
+  body.appendChild(div);
   makeSortable(div.querySelector('.version-bucket-list'));
   hideAddVersion();
   saveRoadmap();
@@ -450,15 +487,14 @@ function addVersionBucket() {
 function removeBucket(e, btn) {
   e.stopPropagation();
   const bucket = btn.closest('[data-bucket-label]');
-  const unassigned = document.querySelector('[data-bucket-label=""]');
-  const list = unassigned.querySelector('.version-bucket-list');
-  // Move features to unassigned before removing
-  bucket.querySelectorAll('[data-type="feature"]').forEach(card => {
-    list.querySelector('.vb-empty')?.remove();
-    list.appendChild(card);
-  });
+  const label = bucket.querySelector('.vb-label').textContent;
+  if (!confirm(`Delete version "${label}"? Its features will be returned to the backlog.`)) return;
+  const backlog = document.getElementById('col-backlog-wbs');
+  if (backlog) {
+    bucket.querySelectorAll('[data-type="feature"]').forEach(card => backlog.appendChild(card));
+  }
   bucket.remove();
-  saveRoadmap();
+  saveRoadmap(null, true);
 }
 
 function toggleBucket(header) {
@@ -470,6 +506,19 @@ function toggleBucket(header) {
 }
 
 /* ── Backlog sub-area toggle ── */
+
+/* ── Capture idea ── */
+function submitCapture() {
+  const name = document.getElementById('captureIdea').value.trim();
+  const wbs  = document.getElementById('captureWbs').value;
+  if (!name) return;
+  if (!wbs) { alert('Please select a WBS area.'); return; }
+  const notes = document.getElementById('captureNotes').value.trim();
+  fetch('/api/features', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, notes, wbs_prefix: wbs, status: 'Idea' }),
+  }).then(r => { if (r.ok) { document.getElementById('captureModal').close(); location.reload(); } });
+}
 
 </script>
 {% endblock %}

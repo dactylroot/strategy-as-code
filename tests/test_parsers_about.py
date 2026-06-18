@@ -196,3 +196,47 @@ class TestTransformAddChangelogEntry:
     def test_raises_without_changelog_heading(self):
         with pytest.raises(ValueError, match="Changelog"):
             parser.transform_add_changelog_entry("No changelog here", NewRelease(version="1.0.0"), [])
+
+
+class TestTransformClearVersionBuckets:
+    def test_removes_bucket_lte_released_version(self):
+        result = parser.transform_clear_version_buckets(BUCKETED_ABOUT, "v0.2.0")
+        doc = parser._parse_text(result)
+        sec = doc.roadmap_section("Planned")
+        labels = [b.label for b in sec.buckets] if sec else []
+        assert "v0.2.0" not in labels
+        assert "v0.3.0" in labels
+
+    def test_keeps_bucket_gt_released_version(self):
+        result = parser.transform_clear_version_buckets(BUCKETED_ABOUT, "v0.1.0")
+        doc = parser._parse_text(result)
+        sec = doc.roadmap_section("Planned")
+        labels = [b.label for b in sec.buckets] if sec else []
+        assert "v0.2.0" in labels
+        assert "v0.3.0" in labels
+
+    def test_removes_all_lte_buckets(self):
+        result = parser.transform_clear_version_buckets(BUCKETED_ABOUT, "v0.3.0")
+        doc = parser._parse_text(result)
+        sec = doc.roadmap_section("Planned")
+        assert not sec or not sec.buckets
+
+    def test_no_op_when_no_buckets(self):
+        result = parser.transform_clear_version_buckets(MINIMAL_ABOUT, "v1.0.0")
+        assert result == MINIMAL_ABOUT
+
+    def test_preserves_non_semver_buckets(self):
+        about_with_freeform = BUCKETED_ABOUT.replace("### v0.3.0", "### Q2 2026")
+        result = parser.transform_clear_version_buckets(about_with_freeform, "v0.5.0")
+        doc = parser._parse_text(result)
+        sec = doc.roadmap_section("Planned")
+        labels = [b.label for b in sec.buckets] if sec else []
+        assert "Q2 2026" in labels
+
+    def test_preserves_in_progress_and_backlog(self):
+        result = parser.transform_clear_version_buckets(BUCKETED_ABOUT, "v0.2.0")
+        doc = parser._parse_text(result)
+        ip = doc.roadmap_section("In Progress")
+        bl = doc.roadmap_section("Backlog")
+        assert ip and "1.1 Auth" in ip.items
+        assert bl and "Future items" in bl.items

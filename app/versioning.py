@@ -11,7 +11,14 @@ Rules (from the program-strategy skill):
 
 from __future__ import annotations
 import re
-from .models import AboutDoc, ProductDoc
+from .models import AboutDoc, FeatureStatus, ProductDoc
+
+
+def _ver(version: str) -> tuple[int, int, int]:
+    m = re.match(r"v?(\d+)[._-](\d+)(?:[._-](\d+))?", version.strip())
+    if m:
+        return int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+    return (0, 0, 0)
 
 
 def next_release_version(about: AboutDoc, product: ProductDoc | None = None) -> str:
@@ -22,6 +29,8 @@ def next_release_version(about: AboutDoc, product: ProductDoc | None = None) -> 
     - Otherwise: if In Progress roadmap has sub-areas → MINOR + 1, RELEASE = 0
     - Otherwise: MINOR unchanged, RELEASE + 1 (bug-fix release)
     - If all product scope is complete → 1.0.0
+    - Floor: if all features in a planned version bucket are Live/Released,
+      the next release must be at least that version.
     """
     # An in-progress entry means a version has been opened but not yet cut.
     for entry in about.changelog:
@@ -49,7 +58,32 @@ def next_release_version(about: AboutDoc, product: ProductDoc | None = None) -> 
     if product and product.overall_completion_pct >= 1.0:
         return "1.0.0"
 
-    return f"{latest_major}.{next_minor}.{next_release}"
+    computed = f"{latest_major}.{next_minor}.{next_release}"
+
+    # Floor: if every feature in a planned version bucket is Live or Released,
+    # the next release must be at least that planned version.
+    if product:
+        planned = about.roadmap_section("Planned")
+        if planned and planned.buckets:
+            all_features = {
+                f.wbs: f
+                for area in product.wbs_areas
+                for sa in area.sub_areas
+                for f in sa.features
+            }
+            live_or_released = {FeatureStatus.live, FeatureStatus.released}
+            for bucket in planned.buckets:
+                if not bucket.items:
+                    continue
+                if all(
+                    all_features.get(wbs) is not None
+                    and all_features[wbs].status in live_or_released
+                    for wbs in bucket.items
+                ):
+                    if _ver(bucket.label) > _ver(computed):
+                        computed = bucket.label.lstrip("v")
+
+    return computed
 
 
 def version_rationale(about: AboutDoc) -> str:

@@ -112,7 +112,8 @@
         {% endif %}
       </div>
       <button class="btn btn-ghost btn-sm" style="flex-shrink:0;"
-              onclick="openRecent({{ proj.path | tojson }})">Open</button>
+              data-path="{{ proj.path }}"
+              onclick="openRecent(this.dataset.path)">Open</button>
     </div>
     {% endfor %}
   </div>

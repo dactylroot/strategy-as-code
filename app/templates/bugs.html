@@ -122,7 +122,11 @@
       <tbody>
         {% for r in doc.resolved %}
         <tr style="cursor:pointer;"
-            onclick="openResolvedPanel({{ r.id }}, {{ r.title | tojson }}, {{ (r.resolved_in or '') | tojson }}, {{ (r.date or '') | tojson }})">
+            data-id="{{ r.id }}"
+            data-title="{{ r.title }}"
+            data-resolved-in="{{ r.resolved_in or '' }}"
+            data-date="{{ r.date or '' }}"
+            onclick="openResolvedPanel(this.dataset.id, this.dataset.title, this.dataset.resolvedIn, this.dataset.date)">
           <td class="wbs-code">{{ r.id }}</td>
           <td style="font-size:0.875rem;text-decoration:line-through;color:#94a3b8;">{{ r.title }}</td>
           <td class="text-muted">{{ r.resolved_in or '—' }}</td>
@@ -463,5 +467,16 @@ function resolveBug() {
     body: JSON.stringify({ resolved_in }),
   }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });
 }
+
+(function() {
+  const p = new URLSearchParams(location.search);
+  const title = p.get('title');
+  const wbs   = p.get('wbs');
+  if (title || wbs) {
+    if (title) document.getElementById('bugTitle').value = title;
+    if (wbs)   document.getElementById('bugWbs').value   = wbs;
+    document.getElementById('newBugModal').showModal();
+  }
+})();
 </script>
 {% endblock %}

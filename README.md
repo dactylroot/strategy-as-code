@@ -1,13 +1,19 @@
 # strategy-as-code
 
+Core information for communication and design on project planning.
+
+Each interface type is supported by a respective markdown file.
+
+Other workflows and reports for stakeholders, engineers, and end-users derive from these sources of truth.
+
 Interface with: 
 
-| Audience                      | Interface                        | Purpose                                   | File         |
-| ----------                    | -----------                      | ---------                                 | ------       |
-| Stakeholders                  | Web UI                           | Overview, WBS structure, feature registry | `PRODUCT.MD` |
-| Operational and Dev Engineers | Claude skill & Markdown          | Operational and dev documentation         | `README.MD`  |
-| Users                         | Markdown for app & documentation | Changelog and roadmap                     | `ABOUT.MD`   |
-| All                           | Markdown & Web UI                | Bug tracking and triage                   | `BUGS.MD`    |
+| File         | Purpose                                   | Audience                      | Interface                        |
+| ------       | ---------                                 | ----------                    | -----------                      |
+| `PRODUCT.MD` | Overview, WBS structure, feature registry | Stakeholders                  | Web UI                           |
+| `README.MD`  | Operational and dev documentation         | Operational and dev engineers | Claude skill & Markdown          |
+| `ABOUT.MD`   | Changelog and roadmap                     | Users                         | Markdown for app & documentation |
+| `BUGS.MD`    | Bug tracking and triage                   | All                           | Markdown & Web UI                |
 
 ## Screenshots
 
@@ -26,12 +32,6 @@ Interface with:
 **Bugs** — active bug board with severity badges and resolved history
 
 ![Bugs](sample-project/screenshots/bugs.png)
-
-## How & Why
-
-Each key interaction is captured in a respective markdown file. This enables AI-assisted and non-AI-human work directly from these files.
-
-Other workflows for stakeholders, engineers, and end-users can derive everything they need from these sources of truth.
 
 ## Install the Claude skill
 

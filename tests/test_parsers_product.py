@@ -50,6 +50,21 @@ Test admin.
 Need password reset.
 """
 
+FLAGGED_PRODUCT = """\
+# Flagged Product
+
+## Features
+
+### 1. Core
+
+#### 1.1 Auth
+
+| WBS | Feature | Status | Value | Effort | Notes | Flag |
+| --- | ------- | ------ | ----- | ------ | ----- | ---- |
+| 1.1.1 | Login | Live | 8 | 3 | Auth login | gap |
+| 1.1.2 | Logout | Scoped | | | | |
+"""
+
 LEGACY_PRODUCT = """\
 # Legacy Product
 
@@ -236,6 +251,68 @@ class TestTransformAddFeature:
         req = NewFeature(wbs_prefix="9.9", name="X")
         with pytest.raises(ValueError, match="9.9"):
             parser.transform_add_feature(MINIMAL_PRODUCT, req)
+
+
+class TestTransformFeatureFlagged:
+    def test_sets_flag_on_6col_row(self):
+        result = parser.transform_feature_flagged(MINIMAL_PRODUCT, "1.1.2", True)
+        doc = parser._parse_text(result)
+        f = next(x for x in doc.all_features if x.wbs == "1.1.2")
+        assert f.flagged is True
+
+    def test_clears_flag(self):
+        result = parser.transform_feature_flagged(FLAGGED_PRODUCT, "1.1.1", False)
+        doc = parser._parse_text(result)
+        f = next(x for x in doc.all_features if x.wbs == "1.1.1")
+        assert f.flagged is False
+
+    def test_flag_does_not_corrupt_notes(self):
+        result = parser.transform_feature_flagged(MINIMAL_PRODUCT, "1.1.1", True)
+        doc = parser._parse_text(result)
+        f = next(x for x in doc.all_features if x.wbs == "1.1.1")
+        assert f.notes == "Auth login"
+        assert f.flagged is True
+
+    def test_clear_flag_preserves_notes(self):
+        result = parser.transform_feature_flagged(FLAGGED_PRODUCT, "1.1.1", False)
+        doc = parser._parse_text(result)
+        f = next(x for x in doc.all_features if x.wbs == "1.1.1")
+        assert f.notes == "Auth login"
+
+    def test_idempotent_set(self):
+        r1 = parser.transform_feature_flagged(MINIMAL_PRODUCT, "1.1.1", True)
+        r2 = parser.transform_feature_flagged(r1, "1.1.1", True)
+        doc = parser._parse_text(r2)
+        f = next(x for x in doc.all_features if x.wbs == "1.1.1")
+        assert f.flagged is True
+
+    def test_upgrades_legacy_4col_when_flagging(self):
+        result = parser.transform_feature_flagged(LEGACY_PRODUCT, "1.1.1", True)
+        doc = parser._parse_text(result)
+        f = next(x for x in doc.all_features if x.wbs == "1.1.1")
+        assert f.flagged is True
+        assert f.notes == "Works"
+
+    def test_raises_on_missing_wbs(self):
+        with pytest.raises(ValueError):
+            parser.transform_feature_flagged(MINIMAL_PRODUCT, "9.9.9", True)
+
+
+class TestFlaggedParsing:
+    def test_flagged_true_parsed(self):
+        doc = parser._parse_text(FLAGGED_PRODUCT)
+        login = next(f for f in doc.all_features if f.wbs == "1.1.1")
+        assert login.flagged is True
+
+    def test_unflagged_parsed_as_false(self):
+        doc = parser._parse_text(FLAGGED_PRODUCT)
+        logout = next(f for f in doc.all_features if f.wbs == "1.1.2")
+        assert logout.flagged is False
+
+    def test_6col_defaults_to_unflagged(self):
+        doc = parser._parse_text(MINIMAL_PRODUCT)
+        for f in doc.all_features:
+            assert f.flagged is False
 
 
 class TestTransformMoveFeature:

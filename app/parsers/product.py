@@ -118,16 +118,20 @@ def _parse_text(text: str) -> ProductDoc:
                 except ValueError:
                     continue
                 # 6-column format: WBS | Name | Status | Value | Effort | Notes
+                # 7-column format: WBS | Name | Status | Value | Effort | Notes | Flag
                 # 4-column format: WBS | Name | Status | Notes (legacy)
                 if len(cells) >= 6:
-                    value  = int(cells[3]) if cells[3].isdigit() else None
-                    effort = int(cells[4]) if cells[4].isdigit() else None
-                    notes  = cells[5] if len(cells) > 5 else ""
+                    value   = int(cells[3]) if cells[3].isdigit() else None
+                    effort  = int(cells[4]) if cells[4].isdigit() else None
+                    notes   = cells[5] if len(cells) > 5 else ""
+                    flagged = len(cells) >= 7 and cells[6].strip().lower() in ("gap", "flagged", "true")
                 else:
                     value, effort = None, None
-                    notes = cells[3] if len(cells) > 3 else ""
+                    notes   = cells[3] if len(cells) > 3 else ""
+                    flagged = False
                 features.append(Feature(wbs=wbs_code, name=feat_name, status=status,
-                                        value=value, effort=effort, notes=notes))
+                                        value=value, effort=effort, notes=notes,
+                                        flagged=flagged))
 
             sub_areas.append(WBSSubArea(wbs_prefix=sub_prefix, title=sub_title, features=features))
 
@@ -223,7 +227,7 @@ def add_feature(path: Path, req: NewFeature) -> Feature:
 # ── Pure transform functions (text-in / text-out, no I/O) ────────────────────
 
 def transform_feature_status(text: str, wbs: str, new_status: FeatureStatus) -> str:
-    pattern = rf"^(\| {re.escape(wbs)} \| [^|]+ \|) {_STATUS_PAT} (\| .*)$"
+    pattern = rf"^(\| {re.escape(wbs)} \| [^|]+ \|)[ ]+{_STATUS_PAT}[ ]+(\| .*)$"
     new_text, n = re.subn(pattern, rf"\1 {new_status.value} \2", text, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
@@ -242,13 +246,13 @@ def transform_feature_name(text: str, wbs: str, new_name: str) -> str:
 
 
 def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
-    new_notes = new_notes.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
-    # Match 6-column rows (WBS|Name|Status|Value|Effort|Notes) and legacy 4-col (WBS|Name|Status|Notes)
+    new_notes = new_notes.replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
+    # Match 6-column rows; optional 7th column (flag) captured in group 3 and preserved
     pattern = re.compile(
-        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|[^|]*\|[^|]*\|)([^|]*\|)$",
+        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|[^|]*\|[^|]*\|)([^|]*)(\|(?:[^|]*\|)?)$",
         re.MULTILINE,
     )
-    new_text, n = pattern.subn(lambda m: f"{m.group(1)} {new_notes} |", text)
+    new_text, n = pattern.subn(lambda m: f"{m.group(1)} {new_notes} {m.group(3)}", text)
     if n == 1:
         return new_text
     # Fallback: legacy 4-col or missing notes column
@@ -257,6 +261,32 @@ def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
         re.MULTILINE,
     )
     new_text, n = pattern4.subn(lambda m: f"{m.group(1)}  |  | {new_notes} |", text)
+    if n != 1:
+        raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
+    return new_text
+
+
+def transform_feature_flagged(text: str, wbs: str, flagged: bool) -> str:
+    """Set or clear the gap flag (7th column) on a feature row."""
+    pattern = re.compile(
+        rf"^\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|.*\|$",
+        re.MULTILINE,
+    )
+
+    def _replace(m: re.Match) -> str:
+        cells = [c.strip() for c in m.group(0).split("|")[1:-1]]
+        # Normalise to 6 columns (WBS|Name|Status|Value|Effort|Notes)
+        if len(cells) == 4:
+            cells = [cells[0], cells[1], cells[2], "", "", cells[3]]
+        elif len(cells) == 5:
+            cells = [cells[0], cells[1], cells[2], cells[3], "", cells[4]]
+        base = cells[:6]
+        if flagged:
+            return "| " + " | ".join(base) + " | gap |"
+        else:
+            return "| " + " | ".join(base) + " |"
+
+    new_text, n = pattern.subn(_replace, text)
     if n != 1:
         raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
     return new_text
@@ -282,9 +312,9 @@ def transform_feature_score(text: str, wbs: str, value: int | None, effort: int 
     Normalises legacy 4-col rows to 6-col."""
     v_str = f" {value} " if value is not None else "  "
     e_str = f" {effort} " if effort is not None else " "
-    # 6-column row: replace value/effort columns
+    # 6-column row (optional 7th flag column preserved in group 2)
     pat6 = re.compile(
-        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|)[^|]*\|[^|]*(\|[^|]*\|)$",
+        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|)[^|]*\|[^|]*(\|[^|]*\|(?:[^|]*\|)?)$",
         re.MULTILINE,
     )
     new_text, n = pat6.subn(lambda m: f"{m.group(1)}{v_str}|{e_str}{m.group(2)}", text)
@@ -336,7 +366,8 @@ def transform_add_feature(text: str, req: NewFeature) -> tuple[str, Feature]:
 
     v_str = str(req.value) if req.value is not None else ""
     e_str = str(req.effort) if req.effort is not None else ""
-    new_row = f"| {new_wbs} | {req.name} | {req.status.value} | {v_str} | {e_str} | {req.notes} |"
+    encoded_notes = req.notes.replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
+    new_row = f"| {new_wbs} | {req.name} | {req.status.value} | {v_str} | {e_str} | {encoded_notes} |"
     insert_pos = sub_m.end() + last_row_m.end()
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
     return new_text, Feature(wbs=new_wbs, name=req.name, status=req.status, notes=req.notes)

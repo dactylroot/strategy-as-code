@@ -31,14 +31,22 @@
 
       <div style="display:grid;grid-template-columns:1fr 220px;gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
         <div>
-          <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.4rem;">Description / Acceptance Criteria</label>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+            <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">Description / Acceptance Criteria</label>
+            <div style="display:flex;">
+              <button type="button" id="fdp-tab-edit" class="fdp-tab active" onclick="fdpNotesMode('edit')">Edit</button>
+              <button type="button" id="fdp-tab-preview" class="fdp-tab" onclick="fdpNotesMode('preview')">Preview</button>
+            </div>
+          </div>
           <textarea id="fdp-notes" rows="6" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.9rem;font-family:inherit;color:#1e293b;resize:vertical;line-height:1.6;background:#fafafa;"
                     onfocus="this.style.background='#fff';this.style.borderColor='#2563eb'"
                     onblur="this.style.background='#fafafa';this.style.borderColor='#e2e8f0'"
-                    placeholder="What does this feature do? How will we know it's done?"></textarea>
+                    placeholder="What does this feature do? How will we know it's done?&#10;&#10;Markdown supported: **bold**, *italic*, `code`, - lists"></textarea>
+          <div id="fdp-notes-preview" class="fdp-md-preview" style="display:none;min-height:9rem;max-height:320px;overflow-y:auto;padding:0.6rem 0.75rem;border:1px solid #e2e8f0;border-radius:6px;background:#fafafa;"></div>
           <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="saveFdp()">Save Changes</button>
             <div id="fdp-status-actions" style="display:flex;gap:0.5rem;align-items:center;"></div>
+            <div id="fdp-gap-actions" style="display:flex;gap:0.5rem;align-items:center;"></div>
             <span id="fdp-save-status" style="font-size:0.8rem;color:#64748b;"></span>
           </div>
         </div>
@@ -67,13 +75,14 @@
           <div style="font-size:2rem;line-height:1;margin-bottom:0.5rem;">✓</div>
           <div style="font-size:1rem;font-weight:700;color:#16a34a;margin-bottom:0.25rem;">Released</div>
           <div style="font-size:0.78rem;color:#166534;margin-bottom:1rem;">Shipped and approved</div>
-          <div id="fdp-live-score"></div>
+          <button class="btn btn-ghost" onclick="reportBugFromFeature()" style="width:100%;font-size:0.82rem;color:#dc2626;border-color:#fecaca;">Report Bug</button>
         </div>
         <div id="fdp-review-card" style="display:none;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:1.25rem;text-align:center;">
           <div style="font-size:2rem;line-height:1;margin-bottom:0.5rem;">⏳</div>
           <div style="font-size:1rem;font-weight:700;color:#c2410c;margin-bottom:0.25rem;">Awaiting Review</div>
           <div style="font-size:0.78rem;color:#92400e;margin-bottom:1rem;">Verify this feature meets acceptance criteria</div>
           <button class="btn btn-success" onclick="advanceFdpStatus('Released')" style="width:100%;">Approve → Released</button>
+          <button class="btn btn-ghost" onclick="advanceFdpStatus('In-Progress')" style="width:100%;margin-top:0.5rem;color:#92400e;border-color:#fed7aa;">Reject → In-Progress</button>
         </div>
       </div>
 
@@ -121,11 +130,48 @@
 <style>
 .wbs-drop-target.drag-over   { background: #f5f3ff !important; }
 .wbs-drop-target.current-wbs { background: #ede9fe !important; border-left: 3px solid #7c3aed; }
+.fdp-md-preview { font-size: 0.9rem; color: #1e293b; line-height: 1.6; }
+.fdp-md-preview p { margin: 0 0 0.5rem; }
+.fdp-md-preview p:last-child { margin-bottom: 0; }
+.fdp-md-preview ul, .fdp-md-preview ol { margin: 0 0 0.5rem; padding-left: 1.4rem; }
+.fdp-md-preview li { margin-bottom: 0.15rem; }
+.fdp-md-preview code { background: #f1f5f9; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; font-family: monospace; }
+.fdp-md-preview pre { background: #f1f5f9; padding: 0.5rem 0.75rem; border-radius: 6px; overflow-x: auto; margin: 0 0 0.5rem; }
+.fdp-md-preview pre code { background: none; padding: 0; }
+.fdp-md-preview blockquote { border-left: 3px solid #e2e8f0; margin: 0 0 0.5rem; padding: 0.2rem 0.75rem; color: #64748b; }
+.fdp-md-preview h1, .fdp-md-preview h2, .fdp-md-preview h3 { font-size: 1em; font-weight: 700; margin: 0.5rem 0 0.25rem; }
+.fdp-md-preview a { color: #2563eb; }
+.fdp-tab { font-size: 0.68rem; padding: 0.18rem 0.55rem; border: 1px solid #e2e8f0; cursor: pointer; font-weight: 600; background: #f8fafc; color: #64748b; }
+.fdp-tab.active { background: #1e293b; color: #fff; border-color: #1e293b; }
+.fdp-tab:first-child { border-radius: 4px 0 0 4px; }
+.fdp-tab:last-child  { border-radius: 0 4px 4px 0; border-left: none; }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
+marked.use({ gfm: true, breaks: true });
+
 let _fdp = { wbs:null, subPrefix:null };
 let _fdpDirty = false;
+
+function fdpNotesMode(mode) {
+  const ta      = document.getElementById('fdp-notes');
+  const preview = document.getElementById('fdp-notes-preview');
+  const btnEdit = document.getElementById('fdp-tab-edit');
+  const btnPrev = document.getElementById('fdp-tab-preview');
+  if (mode === 'preview') {
+    preview.innerHTML = marked.parse(ta.value || '*No description yet.*');
+    ta.style.display      = 'none';
+    preview.style.display = '';
+    btnEdit.classList.remove('active');
+    btnPrev.classList.add('active');
+  } else {
+    ta.style.display      = '';
+    preview.style.display = 'none';
+    btnEdit.classList.add('active');
+    btnPrev.classList.remove('active');
+  }
+}
 
 function openFeaturePanelFromEl(el) {
   const d = el.dataset;
@@ -134,6 +180,7 @@ function openFeaturePanelFromEl(el) {
     stage: d.stage||'', value: d.value ? parseFloat(d.value) : null,
     effort: d.effort ? parseFloat(d.effort) : null,
     reviewable: d.reviewable === 'true',
+    flagged: d.flagged === 'true',
   });
 }
 
@@ -145,8 +192,9 @@ function openFeaturePanel(opts) {
   if (opts.wbs)   meta += `<span style="font-family:monospace;font-size:0.72rem;background:#f1f5f9;padding:0.15rem 0.45rem;border-radius:3px;color:#475569;">${opts.wbs}</span>`;
   if (opts.stage) meta += `<span style="font-size:0.72rem;font-weight:700;color:${colors[opts.stage]||'#475569'};">${opts.stage}</span>`;
   document.getElementById('fdp-meta').innerHTML  = meta;
-  document.getElementById('fdp-name').value       = opts.name  || '';
-  document.getElementById('fdp-notes').value      = opts.notes || '';
+  document.getElementById('fdp-name').value  = opts.name  || '';
+  document.getElementById('fdp-notes').value = (opts.notes || '').replace(/<br\s*\/?>/gi, '\n');
+  fdpNotesMode('edit');
   document.getElementById('fdp-value').value      = opts.value  ? String(opts.value)  : '';
   document.getElementById('fdp-effort').value     = opts.effort ? String(opts.effort) : '';
   document.getElementById('fdp-score-action').innerHTML = '';
@@ -155,14 +203,9 @@ function openFeaturePanel(opts) {
   document.getElementById('fdp-score-card').style.display  = isLive ? 'none' : '';
   document.getElementById('fdp-live-card').style.display   = (isLive && !isReview) ? '' : 'none';
   document.getElementById('fdp-review-card').style.display = isReview ? '' : 'none';
-  if (isLive && !isReview) {
-    const v = opts.value, e = opts.effort;
-    document.getElementById('fdp-live-score').innerHTML = (v && e)
-      ? `<span style="background:#dcfce7;color:#166534;padding:0.3rem 0.8rem;border-radius:999px;font-size:0.9rem;font-weight:700;">${(v/e).toFixed(1)} priority score</span>`
-      : '';
-  }
   _refreshScoreDisplay();
   _renderStatusActions(opts.stage);
+  _renderGapActions(opts.stage, opts.flagged || false);
   document.querySelectorAll('.wbs-drop-target').forEach(el => el.classList.remove('current-wbs'));
   if (_fdp.subPrefix) {
     const cur = document.getElementById('wbs-drop-' + _fdp.subPrefix.replace(/\./g,'-'));
@@ -178,6 +221,62 @@ function openFeaturePanel(opts) {
 }
 
 function closeFeaturePanel() { document.getElementById('featurePanel').close(); if (_fdpDirty) { _fdpDirty=false; location.reload(); } }
+
+function reportBugFromFeature() {
+  const params = new URLSearchParams({
+    title: 'Bug: ' + (_fdp.name || ''),
+    wbs: _fdp.subPrefix || '',
+  });
+  window.location.href = '/bugs?' + params.toString();
+}
+
+function _renderGapActions(stage, flagged) {
+  const el = document.getElementById('fdp-gap-actions');
+  if (!el) return;
+  const isTerminal = stage === 'Live' || stage === 'Released' || stage === 'Completed';
+  if (isTerminal) { el.innerHTML = ''; return; }
+  if (stage === 'Gap') {
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpDismissGap()" style="color:#b45309;border-color:#fde68a;font-size:0.72rem;">Dismiss Gap</button>`;
+  } else if (flagged) {
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpClearGapFlag()" style="color:#b45309;border-color:#fde68a;font-size:0.72rem;">Clear Gap Flag</button>`;
+  } else {
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpFlagAsGap()" style="color:#92400e;border-color:#fde68a;font-size:0.72rem;">Flag as Gap</button>`;
+  }
+}
+
+function fdpDismissGap() {
+  advanceFdpStatus('Idea');
+}
+
+function fdpFlagAsGap() {
+  if (!_fdp.wbs) return;
+  const el = document.getElementById('fdp-gap-actions');
+  if (el) el.innerHTML = `<span style="font-size:0.78rem;color:#92400e;">Flagging…</span>`;
+  fetch('/api/features/' + encodeURIComponent(_fdp.wbs), {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({flagged: true}),
+  }).then(r => {
+    if (!r.ok) { _renderGapActions(_fdp.stage, false); return; }
+    _fdp.flagged = true;
+    _renderGapActions(_fdp.stage, true);
+    _fdpDirty = true;
+  });
+}
+
+function fdpClearGapFlag() {
+  if (!_fdp.wbs) return;
+  const el = document.getElementById('fdp-gap-actions');
+  if (el) el.innerHTML = `<span style="font-size:0.78rem;color:#92400e;">Clearing…</span>`;
+  fetch('/api/features/' + encodeURIComponent(_fdp.wbs), {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({flagged: false}),
+  }).then(r => {
+    if (!r.ok) { _renderGapActions(_fdp.stage, true); return; }
+    _fdp.flagged = false;
+    _renderGapActions(_fdp.stage, false);
+    _fdpDirty = true;
+  });
+}
 
 let _scoreDebounce = null;
 
@@ -215,7 +314,15 @@ function onFdpScoreInput() {
     }).then(r => {
       if (r.ok) {
         if (vValid && eValid) {
-          action.innerHTML = '<span style="color:#16a34a;font-weight:600;font-size:0.875rem;">✓ Scored</span>';
+          if (_fdp.stage === 'Scoped') {
+            action.innerHTML = '<span style="color:#16a34a;font-weight:600;font-size:0.875rem;">✓ Scored</span>';
+            _fdp.stage = 'Scored';
+            _renderStatusActions('Scored');
+            const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
+            if (metaSpan) { metaSpan.textContent = 'Scored'; metaSpan.style.color = '#4c1d95'; }
+          } else {
+            action.innerHTML = '<span style="color:#16a34a;font-size:0.8rem;">✓ Score saved</span>';
+          }
         } else {
           const wasScored = _fdp.stage === 'Scored';
           if (!vValid && !eValid) {
@@ -267,10 +374,14 @@ function advanceFdpStatus(newStatus) {
     body: JSON.stringify({status: newStatus})
   }).then(r => {
     if (r.ok) {
-      statusEl.textContent = newStatus === 'Scoped' ? '✓ Scoped' : newStatus === 'Released' ? '✓ Approved' : '✓ Done';
+      statusEl.textContent = newStatus === 'Scoped' ? '✓ Scoped' : newStatus === 'Released' ? '✓ Approved' : newStatus === 'In-Progress' ? '✓ Rejected' : '✓ Done';
       _fdp.stage = newStatus;
       const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
-      if (metaSpan) { const c={'Gap':'#b45309','Idea':'#92400e','Scoped':'#5b21b6'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'#475569'; }
+      if (metaSpan) { const c={'Gap':'#b45309','Idea':'#92400e','Scoped':'#5b21b6','In-Progress':'#f59e0b'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'#475569'; }
+      const isLive = newStatus === 'Live' || newStatus === 'Released';
+      document.getElementById('fdp-score-card').style.display  = isLive ? 'none' : '';
+      document.getElementById('fdp-live-card').style.display   = isLive ? '' : 'none';
+      document.getElementById('fdp-review-card').style.display = 'none';
       _renderStatusActions(newStatus);
       _fdpDirty = true;
     } else {

@@ -8,6 +8,7 @@ from ..models import (
     AboutDoc, ChangelogEntry, ChangelogGroup,
     RoadmapSection, NewRelease, RoadmapUpdate, VersionBucket,
 )
+from ..versioning import _ver
 
 _locks: dict[Path, threading.Lock] = {}
 _locks_mutex = threading.Lock()
@@ -179,6 +180,32 @@ def transform_update_roadmap(text: str, update: RoadmapUpdate) -> str:
         text = _replace_roadmap_section(text, "Planned", update.planned)
     text = _replace_roadmap_section(text, "Backlog", update.backlog)
     return text
+
+
+def transform_clear_version_buckets(text: str, released_version: str) -> str:
+    """Remove planned version buckets whose version label is <= released_version.
+
+    Buckets whose labels are not parseable as semver are always preserved.
+    """
+    about = _parse_text(text)
+    planned = about.roadmap_section("Planned")
+    if not planned or not planned.buckets:
+        return text
+    rel_tuple = _ver(released_version)
+    remaining = [
+        b for b in planned.buckets
+        if _ver(b.label) == (0, 0, 0) or _ver(b.label) > rel_tuple
+    ]
+    if len(remaining) == len(planned.buckets):
+        return text
+    ip = about.roadmap_section("In Progress")
+    bl = about.roadmap_section("Backlog")
+    return transform_update_roadmap(text, RoadmapUpdate(
+        in_progress=ip.items if ip else [],
+        planned=planned.items,
+        planned_buckets=remaining,
+        backlog=bl.items if bl else [],
+    ))
 
 
 def transform_add_changelog_entry(text: str, release: NewRelease, in_progress_items: list[str]) -> str:

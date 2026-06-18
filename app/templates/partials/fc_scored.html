@@ -7,6 +7,7 @@
      data-stage="Scored"
      data-value="{{ item.value or '' }}"
      data-effort="{{ item.effort or '' }}"
+     data-flagged="{{ item.flagged | lower }}"
      onclick="openFeaturePanelFromEl(this)">
   <div class="fc-head">
     <div class="fc-meta">
@@ -14,14 +15,14 @@
       <span class="fc-stage-badge" style="color:#4c1d95;">Scored</span>
     </div>
     <div class="fc-title">{{ item.name }}</div>
-    {% if item.notes %}<div class="fc-notes">{{ item.notes }}</div>{% endif %}
+    {% if item.notes %}<div class="fc-notes">{{ item.notes | replace("<br>", " ") | truncate(120, true, "…") }}</div>{% endif %}
     <div class="fc-actions" onclick="event.stopPropagation()">
       {% if item.value and item.effort %}
       <span style="font-size:0.72rem;color:#64748b;">V:{{ item.value }} E:{{ item.effort }}</span>
       <span class="priority-badge">{{ '%.1f'|format(item.priority_score) }}</span>
       {% endif %}
       <button class="btn btn-primary btn-sm" style="margin-left:auto;"
-              onclick="event.stopPropagation();startWork('{{ item.wbs }}', {{ item.name | tojson }})">
+              onclick="event.stopPropagation();startWork('{{ item.wbs }}', this.closest('.fc').dataset.name)">
         → Start Work
       </button>
     </div>
