@@ -41,7 +41,7 @@ class WBSSubArea(BaseModel):
     def completion_pct(self) -> float:
         if not self.features:
             return 0.0
-        return sum(1 for f in self.features if f.status == FeatureStatus.live) / len(self.features)
+        return sum(1 for f in self.features if f.status in (FeatureStatus.live, FeatureStatus.released)) / len(self.features)
 
     @computed_field
     @property
@@ -77,7 +77,7 @@ class WBSArea(BaseModel):
         features = self.all_features
         if not features:
             return 0.0
-        return sum(1 for f in features if f.status == FeatureStatus.live) / len(features)
+        return sum(1 for f in features if f.status in (FeatureStatus.live, FeatureStatus.released)) / len(features)
 
     @computed_field
     @property
@@ -156,7 +156,7 @@ class ProductDoc(BaseModel):
     def overall_completion_pct(self) -> float:
         if self.total_features == 0:
             return 0.0
-        return self.live_count / self.total_features
+        return sum(1 for f in self.all_features if f.status in (FeatureStatus.live, FeatureStatus.released)) / self.total_features
 
 
 class ChangelogGroup(BaseModel):

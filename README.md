@@ -9,8 +9,6 @@ Interface with:
 | Users                         | Markdown for app & documentation | Changelog and roadmap                     | `ABOUT.MD`   |
 | All                           | Markdown & Web UI                | Bug tracking and triage                   | `BUGS.MD`    |
 
-
-
 ## Screenshots
 
 **Summary** — feature counts, completion progress, and recent changelog

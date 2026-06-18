@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x entrypoint.sh
+RUN chown appuser:appuser entrypoint.sh && chmod 500 entrypoint.sh
 
 ENV AUTH_CONFIG=/etc/strategy-as-code/auth.yml
 RUN mkdir -p /etc/strategy-as-code && \

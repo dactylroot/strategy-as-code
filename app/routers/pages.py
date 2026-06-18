@@ -36,9 +36,17 @@ def _parse_product_about(s: session_store.Session):
     return product, about
 
 
+def _redirect_if_no_project(s) -> RedirectResponse | None:
+    if s is None and not settings.product_md.exists():
+        return RedirectResponse(url="/switch-project")
+    return None
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     s = _get_session(request)
+    if (r := _redirect_if_no_project(s)):
+        return r
     if s:
         product, about = _parse_product_about(s)
     else:
@@ -50,6 +58,7 @@ def dashboard(request: Request):
     scoped      = [f for f in all_features if f.status == FeatureStatus.scoped]
     scored      = [f for f in all_features if f.status == FeatureStatus.scored]
     in_progress = [f for f in all_features if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)]
+    released    = [f for f in all_features if f.status == FeatureStatus.released]
 
     return templates.TemplateResponse(request, "dashboard.html", _ctx(
         request, "dashboard",
@@ -61,6 +70,7 @@ def dashboard(request: Request):
         scoped=scoped,
         scored=scored,
         in_progress_items=in_progress,
+        released=released,
         sub_areas=[sa for area in product.wbs_areas for sa in area.sub_areas],
     ))
 
@@ -69,6 +79,8 @@ def dashboard(request: Request):
 def structure_page(request: Request):
     import re as _re
     s = _get_session(request)
+    if (r := _redirect_if_no_project(s)):
+        return r
     if s:
         product = product_parser._parse_text(s.get_file("PRODUCT.MD"))
     else:
@@ -108,6 +120,8 @@ def structure_page(request: Request):
 @router.get("/registry", response_class=HTMLResponse)
 def registry_page(request: Request):
     s = _get_session(request)
+    if (r := _redirect_if_no_project(s)):
+        return r
     if s:
         product = product_parser._parse_text(s.get_file("PRODUCT.MD"))
     else:
@@ -123,6 +137,8 @@ def product_redirect(request: Request):
 @router.get("/features", response_class=HTMLResponse)
 def features_page(request: Request):
     s = _get_session(request)
+    if (r := _redirect_if_no_project(s)):
+        return r
     if s:
         product, about = _parse_product_about(s)
     else:
@@ -182,6 +198,8 @@ def backlog_redirect(request: Request):
 @router.get("/roadmap", response_class=HTMLResponse)
 def roadmap_page(request: Request):
     s = _get_session(request)
+    if (r := _redirect_if_no_project(s)):
+        return r
     if s:
         product, about = _parse_product_about(s)
     else:
@@ -295,6 +313,8 @@ def roadmap_page(request: Request):
 @router.get("/readme", response_class=HTMLResponse)
 def readme_page(request: Request):
     s = _get_session(request)
+    if (r := _redirect_if_no_project(s)):
+        return r
     if s:
         import markdown as md
         content = md.markdown(s.get_file("README.MD") or "", extensions=["tables", "fenced_code"])
@@ -318,6 +338,8 @@ def about_page(request: Request):
 @router.get("/bugs", response_class=HTMLResponse)
 def bugs_page(request: Request):
     s = _get_session(request)
+    if (r := _redirect_if_no_project(s)):
+        return r
     if s:
         doc     = bugs_parser._parse_text(s.get_file("BUGS.MD") or _EMPTY_BUGS)
         product = product_parser._parse_text(s.get_file("PRODUCT.MD"))
