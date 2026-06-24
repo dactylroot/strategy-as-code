@@ -1,4 +1,6 @@
+import os
 import re
+import figtion
 from pathlib import Path
 from pydantic_settings import BaseSettings
 
@@ -13,11 +15,52 @@ class Settings(BaseSettings):
     model_config = {"env_prefix": ""}
 
 
+# ── Deployment config (figtion YAML, same pattern as auth.py) ─────────────
+_SERVER_CONFIG_PATH = Path(os.environ.get(
+    "SERVER_CONFIG",
+    Path.home() / ".config" / "strategy-as-code" / "server.yml",
+))
+_SERVER_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+_deploy = figtion.Config(
+    filepath=str(_SERVER_CONFIG_PATH),
+    defaults={
+        "project_dir": "",      # absolute path; overrides PROJECT_DIR env var
+        "lock_project": False,  # disable Switch Project UI when True
+        "app_title": "",        # override title; empty = read from PRODUCT.MD
+    },
+    verbose=False,
+)
+
 _base = Settings()
 
+def _title_from_product_md(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8")
+        m = re.match(r"^# (.+)", text)
+        raw = m.group(1).strip() if m else ""
+        return re.sub(r"\s*[-–]\s*(Product\s+)?Overview\s*$", "", raw, flags=re.IGNORECASE).strip() or None
+    except Exception:
+        return None
+
+# Effective startup project dir: server.yml > PROJECT_DIR env var
+_startup_dir: Path = _base.project_dir
+if _deploy["project_dir"]:
+    _d = Path(str(_deploy["project_dir"])).expanduser().resolve()
+    if _d.exists():
+        _startup_dir = _d
+
 # Runtime-mutable state lives outside the frozen Settings model
-_runtime_project_dir: Path | None = None
-_runtime_app_title: str | None = None
+_runtime_project_dir: Path | None = _startup_dir if _startup_dir != _base.project_dir else None
+
+# Effective startup title: server.yml > APP_TITLE env var > PRODUCT.MD
+if _deploy["app_title"]:
+    _runtime_app_title: str | None = str(_deploy["app_title"])
+elif "APP_TITLE" in os.environ:
+    _runtime_app_title = None
+else:
+    _runtime_app_title = _title_from_product_md(_startup_dir / "PRODUCT.MD") or _startup_dir.name
+
 _recent_projects: list[dict] = []  # {"path": str, "title": str, "uploaded": bool}
 _is_uploaded: bool = False
 
@@ -39,13 +82,7 @@ def switch_project(new_dir: Path, *, uploaded: bool = False) -> None:
     old_title    = _effective_app_title()
     old_uploaded = _is_uploaded
     # Derive title from new PRODUCT.MD
-    try:
-        text = (resolved / "PRODUCT.MD").read_text(encoding="utf-8")
-        m = re.match(r"^# (.+)", text)
-        raw = m.group(1).strip() if m else resolved.name
-        _runtime_app_title = re.sub(r"\s*[-–]\s*(Product\s+)?Overview\s*$", "", raw, flags=re.IGNORECASE).strip()
-    except Exception:
-        _runtime_app_title = resolved.name
+    _runtime_app_title = _title_from_product_md(resolved / "PRODUCT.MD") or resolved.name
     # Update recent list: deduplicate by title (same title = same project)
     _recent_projects = [
         r for r in _recent_projects
@@ -109,6 +146,10 @@ class _SettingsProxy:
     @property
     def recent_projects(self) -> list[dict]:
         return _recent_projects
+
+    @property
+    def lock_project(self) -> bool:
+        return bool(_deploy["lock_project"])
 
 
 settings = _SettingsProxy()  # type: ignore[assignment]

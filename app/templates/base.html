@@ -117,7 +117,7 @@
 
 <aside class="sidebar">
   <a href="/switch-project" class="sidebar-brand" style="text-decoration:none;display:block;"
-     title="Switch project">
+     title="{% if lock_project %}Project files{% else %}Switch project{% endif %}">
     <small>strategy-as-code</small>
     {{ app_title }}
   </a>

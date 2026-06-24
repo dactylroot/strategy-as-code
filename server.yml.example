@@ -1,0 +1,7 @@
+# strategy-as-code server configuration
+# Default path: ~/.config/strategy-as-code/server.yml
+# Override with: SERVER_CONFIG=/path/to/server.yml
+
+project_dir: ""       # absolute path to open on startup; overrides PROJECT_DIR env var
+lock_project: false   # true = hide Switch Project UI and block /api/switch-project
+app_title: ""         # override sidebar title; empty = read from PRODUCT.MD

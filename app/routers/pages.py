@@ -30,7 +30,7 @@ def _get_session(request: Request) -> session_store.Session | None:
 
 def _ctx(request: Request, active_page: str, **kwargs) -> dict:
     s = _get_session(request)
-    base = {"active_page": active_page, "auth_enabled": auth_enabled()}
+    base = {"active_page": active_page, "auth_enabled": auth_enabled(), "lock_project": settings.lock_project}
     if s:
         return {**base, "app_title": s.title, "is_uploaded": True, **kwargs}
     return {**base, "app_title": settings.app_title, "is_uploaded": settings.is_uploaded, **kwargs}
@@ -409,9 +409,11 @@ def switch_project_page(request: Request):
             project_title = _re.sub(r"\s*[-–]\s*(Product\s+)?Overview\s*$", "", raw, flags=_re.IGNORECASE).strip()
     except Exception:
         pass
+    _src = settings.project_dir if not settings.is_uploaded else None
     return templates.TemplateResponse(request, "switch_project.html", _ctx(
         request, "switch",
         project_title=project_title,
-        source_path=settings.source_path if not settings.is_uploaded else None,
+        source_path=str(_src) if _src else None,
+        source_parent=str(_src.parent) if _src else None,
         recent_projects=settings.recent_projects,
     ))

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Switch Project — {{ app_title }}{% endblock %}
+{% block title %}{% if lock_project %}{{ app_title }} — Project Files{% else %}Switch Project — {{ app_title }}{% endif %}{% endblock %}
 
 {% block extra_styles %}
   .pac-upload-card {
@@ -17,7 +17,7 @@
   .pac-drop-icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
   .pac-drop-area p { margin: 0.2rem 0; color: #555; font-size: 0.9rem; }
   .pac-drop-area .hint { font-size: 0.78rem; color: #94a3b8; margin-top: 0.4rem; }
-  #uploadFiles, #dirPicker { display: none; }
+  #uploadFiles { display: none; }
 
   .pac-divider { border: none; border-top: 1px solid #e2e8f0; margin: 0.75rem 0 0.65rem; }
 
@@ -45,6 +45,14 @@
 
   .pac-warn { font-size: 0.78rem; color: #dc2626; margin-top: 0.5rem; min-height: 1rem; }
 
+  .dp-row { display:flex; align-items:center; gap:0.55rem; padding:0.45rem 1.1rem; cursor:pointer; font-size:0.875rem; color:#1e293b; transition:background 0.1s; }
+  .dp-row:hover { background:#f1f5f9; }
+  .dp-up { color:#64748b; }
+  .dp-project { color:#1e40af; }
+  .dp-icon { flex-shrink:0; font-size:0.9rem; width:1.1rem; text-align:center; }
+  .dp-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dp-badge { font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; background:#dbeafe; color:#1e40af; border-radius:3px; padding:0.1rem 0.35rem; flex-shrink:0; }
+
   .pac-actions {
     margin-top: 0.85rem; display: flex; gap: 0.65rem; align-items: center;
   }
@@ -53,6 +61,20 @@
 
 {% block content %}
 <div style="max-width:32rem;margin:2rem auto;">
+{% if lock_project %}
+
+  <div class="page-header">
+    <h1>{{ project_title }}</h1>
+    <p class="subtitle">Download the project files to use or share them.</p>
+  </div>
+  <div class="card">
+    <a href="/api/project/download" class="btn btn-ghost btn-sm" download>
+      Download project files (.zip)
+    </a>
+  </div>
+
+{% else %}
+
   <div class="page-header">
     <h1>Switch Project</h1>
     <p class="subtitle">Open a different project or download and share the current one.</p>
@@ -66,27 +88,30 @@
     </a>
   </div>
 
-  <div style="margin-bottom:1rem;">
-    <input type="file" id="dirPicker" multiple accept=".md,.MD" style="display:none;">
-    <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;"
-            onclick="openFolderPicker()">Open Project Folder…</button>
-    <span id="dir-status" class="text-muted" style="font-size:0.8rem;display:block;margin-top:0.4rem;text-align:center;"></span>
+  <div class="card" style="margin-bottom:1rem;">
+    <p class="card-title">Local Project</p>
+    <p class="text-muted" style="margin-bottom:0.75rem;">Points this server at a directory on your machine. Changes are saved directly to the markdown files.</p>
+    <div style="display:flex;gap:0.5rem;">
+      <input type="text" id="localPath" placeholder="/absolute/path  or  ../relative"
+             style="flex:1;font-family:ui-monospace,monospace;font-size:0.85rem;"
+             onkeydown="if(event.key==='Enter')switchByPath()">
+      <button type="button" class="btn btn-primary btn-sm" onclick="openDirPicker()">Browse…</button>
+    </div>
+    <span id="dir-status" style="font-size:0.8rem;display:block;margin-top:0.4rem;min-height:1.1rem;"></span>
   </div>
 
   <div class="card" style="margin-bottom:1rem;">
-    <p class="card-title">Open from Files</p>
-    <p class="text-muted" style="margin-bottom:0.75rem;">
-      Drop project files one at a time or all at once.
-    </p>
+    <p class="card-title">Import Files</p>
+    <p class="text-muted" style="margin-bottom:0.75rem;">Loads project files into a temporary session. Nothing is written back to disk — export when done.</p>
 
     <div class="pac-upload-card" id="uploadDropZone">
       <div class="pac-drop-area" onclick="document.getElementById('uploadFiles').click()">
         <div class="pac-drop-icon">📂</div>
         <p><strong>Drag &amp; drop files here</strong></p>
-        <p>or click to browse</p>
-        <p class="hint">Drop files one at a time, all at once, or as a .zip</p>
+        <p>or click to select files</p>
+        <p class="hint">Accepts individual .md files or a .zip export</p>
       </div>
-      <input type="file" id="uploadFiles" accept=".md,.MD,.zip" multiple>
+      <input type="file" id="uploadFiles" accept=".md,.MD,.zip" multiple style="display:none;">
 
       <hr class="pac-divider">
 
@@ -95,9 +120,12 @@
 
       <div class="pac-actions" id="uploadActions" style="display:none;">
         <button class="btn btn-primary btn-sm" onclick="openProject()">Open Project</button>
+        <button class="btn btn-ghost btn-sm" id="browseFolderBtn" onclick="browseFolderIntoSession()" style="display:none;">Browse folder…</button>
         <span class="pac-upload-status" id="upload-status"></span>
       </div>
     </div>
+    <button class="btn btn-ghost btn-sm" id="browseFolderBtnAlt" onclick="browseFolderIntoSession()"
+            style="margin-top:0.65rem;width:100%;justify-content:center;">Browse folder…</button>
   </div>
 
   {% if recent_projects %}
@@ -118,7 +146,23 @@
     {% endfor %}
   </div>
   {% endif %}
+
+{% endif %}{# lock_project #}
 </div>
+
+{% if not lock_project %}
+<dialog id="dirPickerModal" style="border:none;border-radius:10px;padding:0;width:min(92vw,28rem);box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:0.9rem 1.1rem 0.65rem;border-bottom:1px solid #f1f5f9;">
+    <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#64748b;">Select Project Folder</span>
+    <button onclick="document.getElementById('dirPickerModal').close()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.1rem;line-height:1;padding:0.2rem;">✕</button>
+  </div>
+  <div id="dpCrumb" style="padding:0.5rem 1.1rem;font-family:ui-monospace,monospace;font-size:0.72rem;color:#64748b;background:#f8fafc;border-bottom:1px solid #f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+  <div id="dpList" style="max-height:18rem;overflow-y:auto;padding:0.35rem 0;"></div>
+  <div style="padding:0.75rem 1.1rem;border-top:1px solid #f1f5f9;display:flex;gap:0.5rem;justify-content:flex-end;">
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dirPickerModal').close()">Cancel</button>
+    <button id="dpSelectBtn" class="btn btn-primary btn-sm" onclick="dpConfirm()" disabled>Use this Folder</button>
+  </div>
+</dialog>
 
 <script>
 const REQUIRED = ['PRODUCT.MD', 'ABOUT.MD', 'README.MD'];
@@ -271,62 +315,106 @@ uploadDropZone.addEventListener('drop', e => {
   if (e.dataTransfer.files.length) handleIncoming(e.dataTransfer.files);
 });
 
-/* ── Folder picker ── */
-const dirStatus = document.getElementById('dir-status');
-
-async function openFolderPicker() {
-  dirStatus.style.color = ''; dirStatus.textContent = '';
-  if ('showDirectoryPicker' in window) {
-    let handle;
-    try { handle = await window.showDirectoryPicker(); }
-    catch (e) { if (e.name !== 'AbortError') { dirStatus.style.color='#dc2626'; dirStatus.textContent='Could not open folder.'; } return; }
-    const files = [];
-    for await (const [name, entry] of handle.entries()) {
-      if (entry.kind !== 'file') continue;
-      const upper = name.toUpperCase();
-      if (!upper.endsWith('.MD')) continue;
-      const f = await entry.getFile();
-      files.push(new File([f], upper, { type: f.type }));
-    }
-    await _openFilesAsSession(files);
-  } else {
-    document.getElementById('dirPicker').click();
+/* ── Browse folder into import session ── */
+async function browseFolderIntoSession() {
+  if (!('showDirectoryPicker' in window)) {
+    showWarn('Folder browsing is not supported in this browser — drag the files in instead.');
+    return;
   }
+  let handle;
+  try { handle = await window.showDirectoryPicker(); }
+  catch (e) { return; } // AbortError = user cancelled
+  const files = [];
+  for await (const [name, entry] of handle.entries()) {
+    if (entry.kind !== 'file') continue;
+    const upper = name.toUpperCase();
+    if (!upper.endsWith('.MD') || !ALLOWED.has(upper)) continue;
+    const f = await entry.getFile();
+    files.push(new File([f], upper, { type: f.type }));
+  }
+  if (files.length) addFiles(files);
+  else showWarn('No recognised project files found in that folder.');
 }
 
-document.getElementById('dirPicker').addEventListener('change', async function() {
-  const files = Array.from(this.files)
-    .map(f => new File([f], f.name.toUpperCase(), { type: f.type }));
-  this.value = '';
-  await _openFilesAsSession(files);
-});
-
-async function _openFilesAsSession(files) {
-  if (!files.length) { dirStatus.style.color='#dc2626'; dirStatus.textContent='No .md files found in the selected folder.'; return; }
-  dirStatus.style.color = ''; dirStatus.textContent = 'Opening…';
-  const form = new FormData();
-  files.forEach(f => form.append('files', f));
-  try {
-    const resp = await fetch('/api/project/upload', { method: 'POST', body: form });
-    const d = await resp.json();
-    if (d.ok) { if (d.session_id) sessionStorage.setItem('pac_session_id', d.session_id); window.location = '/dashboard'; }
-    else { dirStatus.style.color='#dc2626'; dirStatus.textContent = d.detail || 'Failed to open.'; }
-  } catch { dirStatus.style.color='#dc2626'; dirStatus.textContent='Request failed.'; }
+function switchByPath() {
+  const path = document.getElementById('localPath').value.trim();
+  if (!path) return;
+  _switchDiskPath(path);
 }
 
-function openRecent(path) {
-  dirStatus.style.color = ''; dirStatus.textContent = 'Switching…';
+function openRecent(path) { _switchDiskPath(path); }
+
+function _switchDiskPath(path) {
+  const statusEl = document.getElementById('dir-status');
+  statusEl.style.color = '#64748b'; statusEl.textContent = 'Switching…';
+  sessionStorage.removeItem('pac_session_id');
   fetch('/api/switch-project', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project_dir: path }),
   }).then(r => r.json()).then(d => {
     if (d.ok) { window.location = '/dashboard'; }
-    else { dirStatus.style.color = '#dc2626'; dirStatus.textContent = d.detail || 'Failed.'; }
-  }).catch(() => { dirStatus.style.color = '#dc2626'; dirStatus.textContent = 'Request failed.'; });
+    else { statusEl.style.color = '#dc2626'; statusEl.textContent = d.detail || 'Failed.'; }
+  }).catch(() => { statusEl.style.color = '#dc2626'; statusEl.textContent = 'Request failed.'; });
 }
+
+/* ── Server-side directory picker ── */
+let _dpCurrent = '';
+const _PICKER_START = {{ source_parent | tojson }};
+
+async function openDirPicker() {
+  const seed = document.getElementById('localPath').value.trim() || _PICKER_START || '';
+  await dpNavigate(seed);
+  document.getElementById('dirPickerModal').showModal();
+}
+
+async function dpNavigate(path) {
+  const list = document.getElementById('dpList');
+  const crumb = document.getElementById('dpCrumb');
+  const selectBtn = document.getElementById('dpSelectBtn');
+  list.innerHTML = '<div style="padding:1rem 1.1rem;color:#94a3b8;font-size:0.85rem;">Loading…</div>';
+  selectBtn.disabled = true;
+  try {
+    const r = await fetch('/api/browse?path=' + encodeURIComponent(path));
+    if (!r.ok) { const d = await r.json(); list.innerHTML = `<div style="padding:1rem 1.1rem;color:#dc2626;font-size:0.85rem;">${d.detail||'Error'}</div>`; return; }
+    const data = await r.json();
+    _dpCurrent = data.path;
+    crumb.textContent = data.path;
+    selectBtn.disabled = false;
+
+    let html = '';
+    if (data.parent) {
+      html += `<div class="dp-row dp-up" data-nav="${_esc(data.parent)}">
+        <span class="dp-icon">↑</span><span class="dp-name">..</span>
+      </div>`;
+    }
+    if (!data.dirs.length) {
+      html += '<div style="padding:0.75rem 1.1rem;color:#94a3b8;font-size:0.85rem;">No subdirectories</div>';
+    }
+    data.dirs.forEach(d => {
+      const badge = d.is_project ? '<span class="dp-badge">project</span>' : '';
+      html += `<div class="dp-row${d.is_project ? ' dp-project' : ''}" data-nav="${_esc(d.path)}">
+        <span class="dp-icon">📁</span><span class="dp-name">${_esc(d.name)}</span>${badge}
+      </div>`;
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('.dp-row[data-nav]').forEach(row =>
+      row.addEventListener('click', () => dpNavigate(row.dataset.nav))
+    );
+  } catch {
+    list.innerHTML = '<div style="padding:1rem 1.1rem;color:#dc2626;font-size:0.85rem;">Request failed</div>';
+  }
+}
+
+function dpConfirm() {
+  document.getElementById('dirPickerModal').close();
+  _switchDiskPath(_dpCurrent);
+}
+
+function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ── Init ── */
 renderChecklist();
 </script>
+{% endif %}{# not lock_project #}
 {% endblock %}

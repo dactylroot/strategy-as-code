@@ -511,16 +511,16 @@ function submitCapture() {
   fetch('/api/features', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, notes, wbs_prefix: wbs, status: 'Idea' }),
-  }).then(r => { if (r.ok) { document.getElementById('captureModal').close(); location.reload(); } });
+  }).then(r => { if (r.ok) { document.getElementById('captureModal').close(); _fdpReload(); } });
 }
 
 /* ── Advance scored → In-Progress ── */
 function startWork(wbs, name) {
-  if (!confirm(`Start work on "${name}"?\nThis will mark it as In-Progress.`)) return;
+  if (!confirm(`Move "${name}" to In Progress?`)) return;
   fetch('/api/features/' + encodeURIComponent(wbs), {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: 'In-Progress' }),
-  }).then(r => { if (r.ok) location.reload();
+  }).then(r => { if (r.ok) _fdpReload();
     else r.json().then(d => alert(d.detail || 'Failed')); });
 }
 
@@ -530,8 +530,18 @@ function completeFeature(wbs, name) {
   fetch('/api/features/' + encodeURIComponent(wbs), {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: 'Live' }),
-  }).then(r => { if (r.ok) location.reload();
+  }).then(r => { if (r.ok) _fdpReload();
     else r.json().then(d => alert(d.detail || 'Failed')); });
 }
+
+/* ── Restore search after panel-triggered reload ── */
+(function() {
+  const q = sessionStorage.getItem('fdp_search_restore');
+  if (q) {
+    sessionStorage.removeItem('fdp_search_restore');
+    const inp = document.getElementById('featureSearch');
+    if (inp) { inp.value = q; onFeatureSearch(q); }
+  }
+})();
 </script>
 {% endblock %}

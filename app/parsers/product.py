@@ -373,6 +373,21 @@ def transform_add_feature(text: str, req: NewFeature) -> tuple[str, Feature]:
     return new_text, Feature(wbs=new_wbs, name=req.name, status=req.status, notes=req.notes)
 
 
+def transform_delete_feature(text: str, wbs: str) -> str:
+    row_pat = re.compile(rf"^\| {re.escape(wbs)} \|[^\n]+\|$\n?", re.MULTILINE)
+    new_text, n = row_pat.subn("", text)
+    if n == 0:
+        raise ValueError(f"Feature {wbs!r} not found")
+    return re.sub(r"\n{3,}", "\n\n", new_text)
+
+
+def delete_feature(path: Path, wbs: str) -> None:
+    lock = _lock_for(path)
+    with lock:
+        text = path.read_text(encoding="utf-8")
+        _atomic_write(path, transform_delete_feature(text, wbs))
+
+
 def transform_move_feature(text: str, wbs: str, target_prefix: str) -> tuple[str, Feature]:
     row_pat = re.compile(rf"^\| {re.escape(wbs)} \|[^\n]+\|$", re.MULTILINE)
     row_m = row_pat.search(text)

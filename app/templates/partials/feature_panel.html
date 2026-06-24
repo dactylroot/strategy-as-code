@@ -123,6 +123,25 @@
         <p class="text-muted" style="margin-top:0.5rem;font-size:0.72rem;">Drag the feature token above onto a WBS sub-area, or click a sub-area to reassign.</p>
       </div>
 
+      <div style="border-top:1px solid #f1f5f9;padding-top:1.25rem;margin-top:0.25rem;">
+        <div id="fdp-delete-section">
+          <button type="button" onclick="fdpShowDeleteConfirm()" style="background:none;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:0.35rem 0.85rem;font-size:0.78rem;font-weight:600;cursor:pointer;">Delete Feature</button>
+        </div>
+        <div id="fdp-delete-confirm" style="display:none;background:#fff5f5;border:1px solid #fecaca;border-radius:8px;padding:1rem;">
+          <p style="font-size:0.82rem;color:#dc2626;margin:0 0 0.6rem;font-weight:600;">This action cannot be undone.</p>
+          <p style="font-size:0.8rem;color:#7f1d1d;margin:0 0 0.6rem;">Type <strong id="fdp-delete-name-hint" style="font-family:monospace;"></strong> to confirm deletion.</p>
+          <input id="fdp-delete-input" type="text" oninput="fdpDeleteConfirmInput()" autocomplete="off"
+                 style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #fca5a5;border-radius:6px;font-size:0.875rem;outline:none;margin-bottom:0.65rem;"
+                 onfocus="this.style.borderColor='#dc2626'" onblur="this.style.borderColor='#fca5a5'"
+                 placeholder="Type the feature name exactly">
+          <div style="display:flex;gap:0.5rem;">
+            <button id="fdp-delete-confirm-btn" type="button" onclick="fdpConfirmDelete()" disabled
+                    style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:0.4rem 1rem;font-size:0.82rem;font-weight:700;cursor:pointer;opacity:0.4;transition:opacity 0.15s;">Permanently Delete</button>
+            <button type="button" onclick="fdpCancelDelete()" style="background:none;border:1px solid #e2e8f0;color:#64748b;border-radius:6px;padding:0.4rem 0.85rem;font-size:0.82rem;cursor:pointer;">Cancel</button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </dialog>
@@ -220,7 +239,13 @@ function openFeaturePanel(opts) {
   document.getElementById('featurePanel').showModal();
 }
 
-function closeFeaturePanel() { document.getElementById('featurePanel').close(); if (_fdpDirty) { _fdpDirty=false; location.reload(); } }
+function _fdpReload() {
+  const inp = document.getElementById('featureSearch');
+  if (inp && inp.value.trim()) sessionStorage.setItem('fdp_search_restore', inp.value);
+  location.reload();
+}
+
+function closeFeaturePanel() { document.getElementById('featurePanel').close(); if (_fdpDirty) { _fdpDirty=false; _fdpReload(); } }
 
 function reportBugFromFeature() {
   const params = new URLSearchParams({
@@ -359,7 +384,9 @@ function _renderStatusActions(stage) {
   if (stage === 'Gap' || stage === 'Idea') {
     el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="advanceFdpStatus('Scoped')" style="border-color:#7c3aed;color:#5b21b6;">→ Mark Scoped</button>`;
   } else if (stage === 'Scoped') {
-    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="advanceFdpStatus('Gap')" style="color:#94a3b8;font-size:0.72rem;">← Back to Ideas</button>`;
+    el.innerHTML = `<button class="btn btn-primary btn-sm" onclick="advanceFdpStatus('In-Progress')">→ In Progress</button><button class="btn btn-ghost btn-sm" onclick="advanceFdpStatus('Gap')" style="color:#94a3b8;font-size:0.72rem;margin-left:0.25rem;">← Back to Ideas</button>`;
+  } else if (stage === 'Scored') {
+    el.innerHTML = `<button class="btn btn-primary btn-sm" onclick="advanceFdpStatus('In-Progress')">→ In Progress</button>`;
   } else {
     el.innerHTML = '';
   }
@@ -424,6 +451,44 @@ function onWbsClick(targetPrefix) {
   if (!confirm(`Move this feature to ${targetPrefix}?`)) return;
   _reassignToPrefix(targetPrefix);
 }
+function fdpShowDeleteConfirm() {
+  document.getElementById('fdp-delete-section').style.display = 'none';
+  document.getElementById('fdp-delete-name-hint').textContent = _fdp.name || '';
+  document.getElementById('fdp-delete-input').value = '';
+  const btn = document.getElementById('fdp-delete-confirm-btn');
+  btn.disabled = true;
+  btn.style.opacity = '0.4';
+  btn.textContent = 'Permanently Delete';
+  document.getElementById('fdp-delete-confirm').style.display = '';
+  document.getElementById('fdp-delete-input').focus();
+}
+
+function fdpDeleteConfirmInput() {
+  const match = document.getElementById('fdp-delete-input').value === (_fdp.name || '');
+  const btn = document.getElementById('fdp-delete-confirm-btn');
+  btn.disabled = !match;
+  btn.style.opacity = match ? '1' : '0.4';
+  btn.style.cursor = match ? 'pointer' : 'default';
+}
+
+function fdpCancelDelete() {
+  document.getElementById('fdp-delete-confirm').style.display = 'none';
+  document.getElementById('fdp-delete-section').style.display = '';
+}
+
+function fdpConfirmDelete() {
+  if (!_fdp.wbs) return;
+  const btn = document.getElementById('fdp-delete-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  fetch('/api/features/' + encodeURIComponent(_fdp.wbs), {method: 'DELETE'})
+    .then(r => {
+      if (r.ok) { document.getElementById('featurePanel').close(); _fdpReload(); }
+      else { r.json().then(d => { btn.textContent = d.detail || 'Delete failed'; btn.disabled = false; btn.style.opacity = '1'; }).catch(() => { btn.textContent = 'Delete failed'; btn.disabled = false; btn.style.opacity = '1'; }); }
+    })
+    .catch(() => { btn.textContent = 'Delete failed'; btn.disabled = false; btn.style.opacity = '1'; });
+}
+
 function _reassignToPrefix(targetPrefix) {
   const moveStatus=document.getElementById('fdp-wbs-move-status');
   const _markMoved = (prefix) => {

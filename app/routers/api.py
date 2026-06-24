@@ -127,6 +127,27 @@ def move_feature(wbs: str, body: MoveFeatureBody, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.delete("/features/{wbs:path}")
+def delete_feature(wbs: str, request: Request):
+    s = _session(request)
+    try:
+        if s:
+            text = product_parser.transform_delete_feature(s.get_file("PRODUCT.MD"), wbs)
+            s.set_file("PRODUCT.MD", text)
+            updated = {"product_md": text}
+        else:
+            lock = product_parser._lock_for(settings.product_md)
+            with lock:
+                text = product_parser.transform_delete_feature(
+                    settings.product_md.read_text(encoding="utf-8"), wbs
+                )
+                product_parser._atomic_write(settings.product_md, text)
+            updated = {}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True, **updated}
+
+
 @router.post("/features")
 def post_feature(body: NewFeature, request: Request):
     s = _session(request)
@@ -357,8 +378,36 @@ def regenerate_wbs(request: Request):
 class SwitchProjectBody(BaseModel):
     project_dir: str
 
+@router.get("/browse")
+def browse_directory(path: str = ""):
+    import os
+    target = Path(path).expanduser().resolve() if path else Path.home()
+    try:
+        dirs = []
+        for entry in sorted(target.iterdir(), key=lambda e: e.name.lower()):
+            if entry.name.startswith(".") or not entry.is_dir():
+                continue
+            try:
+                entry.stat()
+            except PermissionError:
+                continue
+            dirs.append({
+                "name": entry.name,
+                "path": str(entry),
+                "is_project": (entry / "PRODUCT.MD").exists(),
+            })
+        parent = str(target.parent) if target != target.parent else None
+        return {"path": str(target), "parent": parent, "dirs": dirs}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Path not found")
+
+
 @router.post("/switch-project")
 def switch_project_api(body: SwitchProjectBody):
+    if settings.lock_project:
+        raise HTTPException(status_code=403, detail="Project switching is disabled on this instance.")
     from ..config import switch_project as _switch
     try:
         _switch(Path(body.project_dir))
