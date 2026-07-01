@@ -281,11 +281,15 @@
           </div>
           <div style="margin-bottom:0.75rem;">
             <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Status</label>
-            <select id="bpStatus" class="form-select" style="font-size:0.875rem;" onchange="saveBugField()">
+            <select id="bpStatus" class="form-select" style="font-size:0.875rem;" onchange="onStatusChange()">
               <option value="Open">Open</option>
               <option value="Investigating">Investigating</option>
               <option value="Fix In Progress">Fix In Progress</option>
             </select>
+          </div>
+          <div id="bpFixVersionSection" style="display:none;margin-bottom:0.75rem;">
+            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Fix Version</label>
+            <input type="text" id="bpFixVersion" placeholder="e.g. 0.2.2" style="font-size:0.82rem;">
           </div>
           <div id="bpResolveSection">
             <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Resolved In</label>
@@ -384,18 +388,21 @@ function submitBug() {
   });
 }
 
-function openBugPanel(id, title, severity, status, notes, wbs) {
+function openBugPanel(id, title, severity, status, notes, wbs, fixVersion) {
   _bugId = id;
   document.getElementById('bpTitle').value    = title;
   document.getElementById('bpNotes').value    = notes;
   document.getElementById('bpSeverity').value = severity;
   document.getElementById('bpStatus').value   = status;
   document.getElementById('bpSaveStatus').textContent = '';
+  document.getElementById('bpFixVersion').value = fixVersion || '';
+  document.getElementById('bpFixVersionSection').style.display = status === 'Fix In Progress' ? 'block' : 'none';
   // Meta badges
   const sevColors = { Critical:'#991b1b', High:'#9a3412', Medium:'#92400e', Low:'#475569' };
   const sevBgs    = { Critical:'#fee2e2', High:'#ffedd5', Medium:'#fef3c7', Low:'#f1f5f9' };
   let meta = `<span style="font-size:0.72rem;font-weight:700;background:${sevBgs[severity]};color:${sevColors[severity]};padding:0.15rem 0.45rem;border-radius:3px;">${severity}</span>`;
   meta += `<span style="font-size:0.72rem;color:#64748b;">${status}</span>`;
+  if (fixVersion) meta += `<span style="font-size:0.68rem;font-weight:700;color:#1e40af;background:#dbeafe;padding:0.1rem 0.35rem;border-radius:3px;">${fixVersion}</span>`;
   if (wbs) meta += `<span style="font-family:monospace;font-size:0.68rem;color:#94a3b8;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:3px;">${wbs}</span>`;
   document.getElementById('bpMeta').innerHTML = meta;
   document.getElementById('bpResolvedIn').value = '';
@@ -434,14 +441,22 @@ function uploadPanelScreenshot(input) {
 
 function closeBugPanel() { document.getElementById('bugPanel').close(); }
 
+function onStatusChange() {
+  const status = document.getElementById('bpStatus').value;
+  document.getElementById('bpFixVersionSection').style.display = status === 'Fix In Progress' ? 'block' : 'none';
+  saveBugField();
+}
+
 function saveBug() {
   const status = document.getElementById('bpSaveStatus');
   status.textContent = 'Saving…';
+  const fixVersion = document.getElementById('bpFixVersion').value.trim();
   fetch('/api/bugs/' + _bugId, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       title: document.getElementById('bpTitle').value.trim(),
       notes: document.getElementById('bpNotes').value.trim(),
+      fix_version: fixVersion || null,
     }),
   }).then(r => {
     status.textContent = r.ok ? 'Saved ✓' : 'Error';
@@ -450,11 +465,13 @@ function saveBug() {
 }
 
 function saveBugField() {
+  const fixVersion = document.getElementById('bpFixVersion').value.trim();
   fetch('/api/bugs/' + _bugId, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      severity: document.getElementById('bpSeverity').value,
-      status:   document.getElementById('bpStatus').value,
+      severity:    document.getElementById('bpSeverity').value,
+      status:      document.getElementById('bpStatus').value,
+      fix_version: fixVersion || null,
     }),
   }).then(r => { if (r.ok) setTimeout(() => location.reload(), 400); });
 }

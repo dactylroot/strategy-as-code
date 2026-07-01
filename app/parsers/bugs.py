@@ -15,8 +15,8 @@ _EMPTY_BUGS = """\
 
 ## Active
 
-| ID | Title | Severity | Status | Notes | WBS |
-|----|-------|----------|--------|-------|-----|
+| ID | Title | Severity | Status | Notes | WBS | Fix Version |
+|----|-------|----------|--------|-------|-----|-------------|
 
 ## Resolved
 
@@ -102,9 +102,10 @@ def _parse_text(text: str):
             except ValueError:
                 status = BugStatus.open
             wbs_ref = row[5].strip() if len(row) > 5 and row[5].strip() else None
+            fix_version = row[6].strip() if len(row) > 6 and row[6].strip() else None
             active.append(BugItem(
                 id=bug_id, title=row[1], severity=severity,
-                status=status, notes=row[4], wbs_ref=wbs_ref,
+                status=status, notes=row[4], wbs_ref=wbs_ref, fix_version=fix_version,
             ))
 
     resolved_m = re.search(r"\n## Resolved\n(.*?)(?=\n## |\Z)", "\n" + text, re.DOTALL)
@@ -162,7 +163,7 @@ def transform_add_bug(text: str, req: BugCreate) -> tuple[str, BugItem]:
     doc = _parse_text(text)
     new_id = _next_id(doc.active, doc.resolved)
     wbs_col = req.wbs_ref or ""
-    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {req.notes} | {wbs_col} |"
+    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {req.notes} | {wbs_col} |  |"
     insert_pos = _find_section_last_row(text, "## Active")
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
     return new_text, BugItem(id=new_id, title=req.title, severity=req.severity,
@@ -176,18 +177,21 @@ def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, B
     bug = next((b for b in doc.active if b.id == bug_id), None)
     if bug is None:
         raise ValueError(f"Bug {bug_id} not found")
-    new_title    = req.title    if req.title    is not None else bug.title
-    new_severity = req.severity if req.severity is not None else bug.severity
-    new_status   = req.status   if req.status   is not None else bug.status
-    new_notes    = req.notes    if req.notes    is not None else bug.notes
+    new_title    = req.title       if req.title       is not None else bug.title
+    new_severity = req.severity    if req.severity    is not None else bug.severity
+    new_status   = req.status      if req.status      is not None else bug.status
+    new_notes    = req.notes       if req.notes       is not None else bug.notes
+    new_fix_ver  = req.fix_version if req.fix_version is not None else bug.fix_version
     wbs_col      = bug.wbs_ref or ""
+    fix_ver_col  = new_fix_ver or ""
     pattern  = rf"^\| {bug_id} \|[^\n]+\|$"
-    new_row  = f"| {bug_id} | {new_title} | {new_severity.value} | {new_status.value} | {new_notes} | {wbs_col} |"
+    new_row  = f"| {bug_id} | {new_title} | {new_severity.value} | {new_status.value} | {new_notes} | {wbs_col} | {fix_ver_col} |"
     new_text, n = re.subn(pattern, new_row, text, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
     return new_text, BugItem(id=bug_id, title=new_title, severity=new_severity,
-                             status=new_status, notes=new_notes, wbs_ref=bug.wbs_ref)
+                             status=new_status, notes=new_notes, wbs_ref=bug.wbs_ref,
+                             fix_version=new_fix_ver)
 
 
 def transform_resolve_bug(text: str, bug_id: int, resolved_in: str = "", today: str | None = None) -> str:
@@ -199,8 +203,9 @@ def transform_resolve_bug(text: str, bug_id: int, resolved_in: str = "", today: 
         raise ValueError(f"Bug {bug_id} not found")
     date_str = today or str(date.today())
     wbs_col = bug.wbs_ref or ""
+    fix_ver_col = bug.fix_version or ""
     pattern = rf"^\| {bug_id} \|[^\n]+\|$"
-    resolved_row = f"| {bug_id} | {bug.title} | {bug.severity.value} | Resolved | {bug.notes} | {wbs_col} |"
+    resolved_row = f"| {bug_id} | {bug.title} | {bug.severity.value} | Resolved | {bug.notes} | {wbs_col} | {fix_ver_col} |"
     text, n = re.subn(pattern, resolved_row, text, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")

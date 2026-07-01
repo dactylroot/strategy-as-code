@@ -49,6 +49,13 @@ Gap / Idea → Scoped → Scored → In-Progress → Live → Released
 **Status transitions:**
 - Gap → Idea (captured to WBS area) → Scoped (defined) → Scored (value/effort set) → In-Progress (work started) → Live (shipped, awaiting UAT) → Released (UAT approved)
 
+**When implementation work finishes, advance the feature to `Live` immediately — do not wait to be asked.** If a code change (bug fix or new functionality) satisfies an `In-Progress` (or `Gap`/`Idea`) feature's described requirement, update PRODUCT.MD in the same pass as the code change:
+- Move its `Status` to `Live`. Never set `Released` from a code change alone — that status requires a human UAT sign-off and is a separate, later, human-triggered step.
+- Rewrite the `Notes` text if it was phrased as a pending requirement (e.g. "X should do Y"). Once shipped, describe the implemented behavior instead (e.g. "X does Y"), so a `Live` row doesn't read like an open TODO.
+- If the feature has no existing WBS row, don't fabricate one — ask which existing feature it belongs to, or whether it needs a new row first.
+
+**Regenerate the WBS chart after any status edit.** `docs/wbs.html`/`docs/wbs.png` are generated artifacts, not hand-maintained — a PRODUCT.MD status change alone leaves them stale. Re-run `gen_wbs.py` (see WBS Chart Generation below) as part of the same change.
+
 ---
 
 ## Internal Documents
@@ -147,14 +154,23 @@ Bug tracking. Two sections: `## Active` (open bugs) and `## Resolved` (closed bu
 ```markdown
 ## Active
 
-| ID | Title | Severity | Status | Notes | WBS |
-|----|-------|----------|--------|-------|-----|
-| 1 | Short title | Medium | Open | Optional notes | 1.2.3 |
+| ID | Title | Severity | Status | Notes | WBS | Fix Version |
+|----|-------|----------|--------|-------|-----|-------------|
+| 1 | Short title | Medium | Open | Optional notes | 1.2.3 |  |
 ```
 
 **Severity values:** `Critical`, `High`, `Medium`, `Low`
 
 **Status values:** `Open`, `Investigating`, `Fix In Progress`, `Resolved`
+
+**Bug status lifecycle:**
+- `Open` → `Investigating` (root cause being identified)
+- `Investigating` → `Fix In Progress` (fix is being implemented but not yet verified)
+- `Fix In Progress` → `Resolved` (fix verified — user confirms or tests pass in production)
+
+**When a fix is implemented but not yet verified by the user or in production, set status to `Fix In Progress`.** Do not advance to `Resolved` until the fix is confirmed.
+
+**Fix Version** is the planned build version in which the fix will ship (e.g. `0.2.2`). Set it when advancing a bug to `Fix In Progress`. Leave blank for `Open` and `Investigating` bugs. The UI displays it as a badge on Fix In Progress cards.
 
 **Resolved table format:**
 ```markdown

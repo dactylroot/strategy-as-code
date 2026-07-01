@@ -26,10 +26,14 @@ from matplotlib.colors import LinearSegmentedColormap
 from math import ceil
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
+# Resolved relative to the project root, i.e. the directory this script is run
+# from (SKILL.md instructs running it from the project root). Override with
+# PROJECT_DIR for callers that invoke it from elsewhere (e.g. run-ui.sh).
 FIG_W, FIG_H = 22, 12
 DPI          = 150
-OUT          = '/Users/cory/Workspace/renewals/docs/wbs.png'
-OUT_HTML     = '/Users/cory/Workspace/renewals/docs/wbs.html'
+PROJECT_DIR  = os.environ.get('PROJECT_DIR', os.getcwd())
+OUT          = os.path.join(PROJECT_DIR, 'docs', 'wbs.png')
+OUT_HTML     = os.path.join(PROJECT_DIR, 'docs', 'wbs.html')
 BG           = '#f8fafc'
 
 LABEL_X0, LABEL_X1     = 0.008, 0.098
@@ -63,7 +67,7 @@ EDGE_COLOR    = '#e2e8f0'
 CMAP = LinearSegmentedColormap.from_list('RdBl', ['#b91c1c', '#1e40af'])
 
 # ── DATA (parsed from PRODUCT.MD) ────────────────────────────────────────────
-PRODUCT_MD = os.path.join(os.path.dirname(os.path.dirname(OUT)), 'PRODUCT.MD')
+PRODUCT_MD = os.path.join(PROJECT_DIR, 'PRODUCT.MD')
 
 def make_lane_label(num, title):
     """Wrap title into short lines prefixed by the scope number."""
@@ -107,7 +111,7 @@ def parse_product_md(path):
             if lane:
                 lane['sections'].append(section)
             continue
-        m3 = re.match(r'^\| \S+ \| (.+?) \| (Live|Planned|Gap) \|', line)
+        m3 = re.match(r'^\| \S+ \| (.+?) \| (Gap|Idea|Scoped|Scored|In-Progress|Live|Released|Planned) \|', line)
         if m3 and section is not None:
             section['features'].append({'label': m3.group(1).strip(), 'status': m3.group(2).lower()})
     if lane:
@@ -117,9 +121,11 @@ def parse_product_md(path):
 SWIMLANES = parse_product_md(PRODUCT_MD)
 
 # ── HELPERS ──────────────────────────────────────────────────────────────────
+DONE_STATUSES = ('live', 'released')
+
 def completion(section):
     feats = section['features']
-    return sum(1 for item in feats if item['status'] == 'live') / len(feats)
+    return sum(1 for item in feats if item['status'] in DONE_STATUSES) / len(feats)
 
 def body_tint(ratio):
     r, g, b, _ = CMAP(ratio)
@@ -249,7 +255,7 @@ for lane_i, lane in enumerate(SWIMLANES):
             col_cx    = sx0 + (col_i + 0.5) * col_w
             for row_i, item in enumerate(col_items):
                 y     = body_cy + ((n_rows - 1) / 2 - row_i) * line_h_data
-                live  = item['status'] == 'live'
+                live  = item['status'] in DONE_STATUSES
                 label = strike(item['label']) if live else item['label']
                 color = '#94a3b8' if live else '#1e293b'
                 ax.text(col_cx, y, '• ' + label,
@@ -347,7 +353,7 @@ body {
             n_cols = 2 if n > 9 else 1
             items  = ''.join(
                 f'<li style="text-decoration:line-through;color:#94a3b8">{html_mod.escape(feat["label"])}</li>'
-                if feat['status'] == 'live' else
+                if feat['status'] in DONE_STATUSES else
                 f'<li>{html_mod.escape(feat["label"])}</li>'
                 for feat in sec['features']
             )

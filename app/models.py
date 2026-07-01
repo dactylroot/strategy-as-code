@@ -218,6 +218,7 @@ class BugItem(BaseModel):
     status: BugStatus = BugStatus.open
     notes: str = ""
     wbs_ref: str | None = None
+    fix_version: str | None = None
 
 
 class ResolvedBug(BaseModel):
@@ -245,6 +246,7 @@ class BugUpdate(BaseModel):
     severity: BugSeverity | None = None
     status: BugStatus | None = None
     notes: str | None = None
+    fix_version: str | None = None
 
 
 # API request/response models
