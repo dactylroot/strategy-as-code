@@ -1,10 +1,10 @@
 """
-gen_wbs.py — WBS swimlane chart generator for strategy-as-code.
+gen_wbs.py - WBS swimlane chart generator for strategy-as-code.
 
 Reads PROJECT_DIR env var to locate PRODUCT.MD and write output.
 Outputs:
-  $PROJECT_DIR/docs/wbs.png   — static PNG
-  $PROJECT_DIR/docs/wbs.html  — self-contained interactive HTML
+  $PROJECT_DIR/docs/wbs.png   - static PNG
+  $PROJECT_DIR/docs/wbs.html  - self-contained interactive HTML
 """
 
 import html as html_mod
@@ -72,6 +72,11 @@ def make_lane_label(num, title):
         lines.append(current)
     return '\n'.join(lines)
 
+# Scoped/Scored are display-derived (see Feature.stage in app/models.py),
+# never stored - normalize any legacy literal text from older files to Idea.
+_LEGACY_STATUS = {'scoped': 'idea', 'scored': 'idea'}
+
+
 def parse_product_md(path):
     with open(path, encoding='utf-8') as fh:
         text = fh.read()
@@ -99,9 +104,10 @@ def parse_product_md(path):
             if lane:
                 lane['sections'].append(section)
             continue
-        m3 = re.match(r'^\| \S+ \| (.+?) \| (Live|Planned|Gap) \|', line)
+        m3 = re.match(r'^\| \S+ \| (.+?) \| (Gap|Idea|Scoped|Scored|In-Progress|Live|Released|Planned) \|', line)
         if m3 and section is not None:
-            section['features'].append({'label': m3.group(1).strip(), 'status': m3.group(2).lower()})
+            status = _LEGACY_STATUS.get(m3.group(2).lower(), m3.group(2).lower())
+            section['features'].append({'label': m3.group(1).strip(), 'status': status})
     if lane:
         swimlanes.append(lane)
     return swimlanes
@@ -120,11 +126,14 @@ LANE_COUNT = len(SWIMLANES)
 LANE_H = (LANES_TOP - LANES_BOTTOM - LANE_GAP * max(LANE_COUNT - 1, 0)) / max(LANE_COUNT, 1)
 
 # ── HELPERS ──────────────────────────────────────────────────────────────────
+DONE_STATUSES = ('live', 'released')
+
+
 def completion(section):
     feats = section['features']
     if not feats:
         return 0.0
-    return sum(1 for item in feats if item['status'] == 'live') / len(feats)
+    return sum(1 for item in feats if item['status'] in DONE_STATUSES) / len(feats)
 
 def body_tint(ratio):
     r, g, b, _ = CMAP(ratio)
@@ -175,7 +184,7 @@ fig.patch.set_facecolor(BG)
 ax.set_facecolor(BG)
 
 ax.text(0.5, TITLE_TOP,
-        f'{PRODUCT_TITLE} — Work Breakdown Structure',
+        f'{PRODUCT_TITLE} - Work Breakdown Structure',
         ha='center', va='top', fontsize=TITLE_FONT,
         fontweight='bold', color='#0f172a')
 
@@ -237,7 +246,7 @@ for lane_i, lane in enumerate(SWIMLANES):
             col_cx    = sx0 + (col_i + 0.5) * col_w
             for row_i, item in enumerate(col_items):
                 y     = body_cy + ((n_rows - 1) / 2 - row_i) * line_h_data
-                live  = item['status'] == 'live'
+                live  = item['status'] in DONE_STATUSES
                 label = strike(item['label']) if live else item['label']
                 color = '#94a3b8' if live else '#1e293b'
                 ax.text(col_cx, y, '• ' + label,
@@ -288,7 +297,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             n_cols = 2 if n > 9 else 1
             items  = ''.join(
                 f'<li style="text-decoration:line-through;color:#94a3b8">{html_mod.escape(feat["label"])}</li>'
-                if feat['status'] == 'live' else
+                if feat['status'] in DONE_STATUSES else
                 f'<li>{html_mod.escape(feat["label"])}</li>'
                 for feat in sec['features']
             )
@@ -319,11 +328,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{html_mod.escape(PRODUCT_TITLE)} — Work Breakdown Structure</title>
+<title>{html_mod.escape(PRODUCT_TITLE)} - Work Breakdown Structure</title>
 <style>{CSS}</style>
 </head>
 <body>
-<p class="wbs-title">{html_mod.escape(PRODUCT_TITLE)} — Work Breakdown Structure</p>
+<p class="wbs-title">{html_mod.escape(PRODUCT_TITLE)} - Work Breakdown Structure</p>
 {"".join(lane_blocks)}
 <div class="legend">
   <span class="ld">

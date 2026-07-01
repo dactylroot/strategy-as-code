@@ -50,7 +50,7 @@ class TestAboutEndpoint:
 
 class TestPatchFeature:
     def test_patch_status(self, client):
-        r = client.patch("/api/features/1.1.2", json={"status": "Scored"})
+        r = client.patch("/api/features/1.1.2", json={"status": "In-Progress"})
         assert r.status_code == 200
         data = client.get("/api/product").json()
         all_features = [
@@ -59,7 +59,13 @@ class TestPatchFeature:
             for f in sa["features"]
         ]
         f = next(x for x in all_features if x["wbs"] == "1.1.2")
-        assert f["status"] == "Scored"
+        assert f["status"] == "In-Progress"
+
+    def test_patch_scored_status_rejected(self, client):
+        """Scored/Scoped are derived, not settable - PATCHing one directly
+        is a validation error, not a status transition."""
+        r = client.patch("/api/features/1.1.2", json={"status": "Scored"})
+        assert r.status_code == 422
 
     def test_patch_name(self, client):
         r = client.patch("/api/features/1.1.2", json={"name": "Sign Out"})
@@ -69,7 +75,9 @@ class TestPatchFeature:
         r = client.patch("/api/features/1.1.2", json={"notes": "Updated note"})
         assert r.status_code == 200
 
-    def test_patch_score_sets_scored_status(self, client):
+    def test_patch_score_sets_scored_stage(self, client):
+        # 1.1.2 already carries notes ("Logout flow") from the fixture, so
+        # adding both scores is enough to derive Scored - no status write.
         r = client.patch("/api/features/1.1.2", json={"value": 7, "effort": 3})
         assert r.status_code == 200
         data = client.get("/api/product").json()
@@ -79,9 +87,10 @@ class TestPatchFeature:
             for f in sa["features"]
         ]
         f = next(x for x in all_features if x["wbs"] == "1.1.2")
-        assert f["status"] == "Scored"
+        assert f["status"] == "Idea"
+        assert f["stage"] == "Scored"
 
-    def test_patch_clear_score_reverts_to_scoped(self, client):
+    def test_patch_clear_score_reverts_to_scoped_stage(self, client):
         client.patch("/api/features/1.1.2", json={"value": 7, "effort": 3})
         r = client.patch("/api/features/1.1.2", json={"value": None, "effort": None})
         assert r.status_code == 200
@@ -92,7 +101,8 @@ class TestPatchFeature:
             for f in sa["features"]
         ]
         f = next(x for x in all_features if x["wbs"] == "1.1.2")
-        assert f["status"] == "Scoped"
+        assert f["status"] == "Idea"
+        assert f["stage"] == "Scoped"  # notes are still present, just no scores
 
     def test_patch_unknown_wbs_returns_404(self, client):
         r = client.patch("/api/features/9.9.9", json={"status": "Live"})
@@ -115,12 +125,15 @@ class TestCreateFeature:
         r = client.post("/api/features", json={
             "wbs_prefix": "1.2",
             "name": "Charts",
-            "status": "Scored",
+            "status": "Idea",
             "value": 8,
             "effort": 3,
+            "notes": "A real description",
         })
         assert r.status_code == 200
-        assert r.json()["wbs"].startswith("1.2.")
+        data = r.json()
+        assert data["wbs"].startswith("1.2.")
+        assert data["stage"] == "Scored"
 
     def test_create_unknown_prefix_returns_error(self, client):
         r = client.post("/api/features", json={

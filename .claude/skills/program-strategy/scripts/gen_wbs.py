@@ -1,9 +1,9 @@
 """
-gen_wbs.py — Renewals Manager WBS swimlane chart generator.
+gen_wbs.py - Renewals Manager WBS swimlane chart generator.
 
 Outputs:
-  docs/wbs.png   — static PNG for embedding and sharing
-  docs/wbs.html  — self-contained interactive HTML (hover effects, responsive)
+  docs/wbs.png   - static PNG for embedding and sharing
+  docs/wbs.html  - self-contained interactive HTML (hover effects, responsive)
 
 Re-run any time PRODUCT.MD feature status changes.
 
@@ -84,6 +84,11 @@ def make_lane_label(num, title):
         lines.append(current)
     return '\n'.join(lines)
 
+# Scoped/Scored are display-derived (see Feature.stage in app/models.py),
+# never stored - normalize any legacy literal text from older files to Idea.
+_LEGACY_STATUS = {'scoped': 'idea', 'scored': 'idea'}
+
+
 def parse_product_md(path):
     with open(path, encoding='utf-8') as fh:
         text = fh.read()
@@ -113,7 +118,8 @@ def parse_product_md(path):
             continue
         m3 = re.match(r'^\| \S+ \| (.+?) \| (Gap|Idea|Scoped|Scored|In-Progress|Live|Released|Planned) \|', line)
         if m3 and section is not None:
-            section['features'].append({'label': m3.group(1).strip(), 'status': m3.group(2).lower()})
+            status = _LEGACY_STATUS.get(m3.group(2).lower(), m3.group(2).lower())
+            section['features'].append({'label': m3.group(1).strip(), 'status': status})
     if lane:
         swimlanes.append(lane)
     return swimlanes
@@ -142,7 +148,7 @@ def lane_bounds(i):
 def min_sec_width(label):
     """Minimum data-coord width so the header label and % sit inline.
 
-    Uses 0.72 char-width ratio (conservative — matplotlib renders slightly
+    Uses 0.72 char-width ratio (conservative - matplotlib renders slightly
     wider than naive estimates) and accounts for the left/right text margins.
     """
     char_w   = HDR_LBL_FONT * DPI / 72 * 0.72
@@ -188,7 +194,7 @@ fig.patch.set_facecolor(BG)
 ax.set_facecolor(BG)
 
 ax.text(0.5, TITLE_TOP,
-        'Renewals Manager — Work Breakdown Structure',
+        'Renewals Manager - Work Breakdown Structure',
         ha='center', va='top', fontsize=TITLE_FONT,
         fontweight='bold', color='#0f172a')
 
@@ -230,7 +236,7 @@ for lane_i, lane in enumerate(SWIMLANES):
         ax.plot([sx0, sx0 + sec_w], [y1 - header_h, y1 - header_h],
                 color='white', lw=0.6, zorder=4)
 
-        # Header: label left, % right — always inline now
+        # Header: label left, % right - always inline now
         ax.text(sx0 + HDR_MARGIN, y1 - header_h / 2,
                 sec['label'], ha='left', va='center',
                 fontsize=HDR_LBL_FONT, fontweight='bold',
@@ -240,7 +246,7 @@ for lane_i, lane in enumerate(SWIMLANES):
                 fontsize=HDR_PCT_FONT, fontweight='bold',
                 color='white', zorder=5)
 
-        # Feature text list — auto-column to fill body height
+        # Feature text list - auto-column to fill body height
         line_h_data  = (FEAT_FONT / 72) / FIG_H * LINE_SPACING
         max_rows     = max(1, int(body_h * 0.84 / line_h_data))
         n_cols       = max(1, ceil(n / max_rows))
@@ -385,11 +391,11 @@ body {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Renewals Manager — Work Breakdown Structure</title>
+<title>Renewals Manager - Work Breakdown Structure</title>
 <style>{CSS}</style>
 </head>
 <body>
-<p class="wbs-title">Renewals Manager — Work Breakdown Structure</p>
+<p class="wbs-title">Renewals Manager - Work Breakdown Structure</p>
 {"".join(lane_blocks)}
 <div class="legend">
   <span class="ld">

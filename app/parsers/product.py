@@ -9,7 +9,17 @@ from ..models import (
     ScopeItem, ScopeGroup, UserPersona, ProductDoc, NewFeature, FeatureUpdate,
 )
 
+# Scoped/Scored are matched here for backward compatibility with rows written
+# before those became derived (never stored) states - see _normalize_status_str.
 _STATUS_PAT = r"(?:Released|Live|Planned|Gap|Idea|Scoped|Scored|In-Progress)"
+
+_LEGACY_STATUS_ALIASES = {"Scoped": "Idea", "Scored": "Idea"}
+
+
+def _normalize_status_str(status_str: str) -> str:
+    """Map legacy literal Scoped/Scored text to Idea; Scoped/Scored are now
+    derived from WBS/Notes/Value/Effort rather than stored explicitly."""
+    return _LEGACY_STATUS_ALIASES.get(status_str, status_str)
 
 _locks: dict[Path, threading.Lock] = {}
 _locks_mutex = threading.Lock()
@@ -34,7 +44,7 @@ def parse(path: Path) -> ProductDoc:
 
 
 def _parse_text(text: str) -> ProductDoc:
-    # Title — strip common suffixes like " - Product Overview", " - Overview", etc.
+    # Title - strip common suffixes like " - Product Overview", " - Overview", etc.
     title_m = re.match(r"^# (.+)", text)
     raw_title = title_m.group(1).strip() if title_m else ""
     title = re.sub(r"\s*[-–]\s*(Product\s+)?Overview\s*$", "", raw_title, flags=re.IGNORECASE).strip()
@@ -114,7 +124,7 @@ def _parse_text(text: str) -> ProductDoc:
                 if not wbs_code or wbs_code.lower() == "wbs" or set(wbs_code) <= {"-", " "}:
                     continue
                 try:
-                    status = FeatureStatus(status_str)
+                    status = FeatureStatus(_normalize_status_str(status_str))
                 except ValueError:
                     continue
                 # 6-column format: WBS | Name | Status | Value | Effort | Notes
@@ -301,7 +311,7 @@ def get_feature_status(text: str, wbs: str) -> FeatureStatus | None:
     if not m:
         return None
     try:
-        return FeatureStatus(m.group(1).strip())
+        return FeatureStatus(_normalize_status_str(m.group(1).strip()))
     except ValueError:
         return None
 
@@ -370,7 +380,10 @@ def transform_add_feature(text: str, req: NewFeature) -> tuple[str, Feature]:
     new_row = f"| {new_wbs} | {req.name} | {req.status.value} | {v_str} | {e_str} | {encoded_notes} |"
     insert_pos = sub_m.end() + last_row_m.end()
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
-    return new_text, Feature(wbs=new_wbs, name=req.name, status=req.status, notes=req.notes)
+    return new_text, Feature(
+        wbs=new_wbs, name=req.name, status=req.status, notes=req.notes,
+        value=req.value, effort=req.effort,
+    )
 
 
 def transform_delete_feature(text: str, wbs: str) -> str:
@@ -401,7 +414,7 @@ def transform_move_feature(text: str, wbs: str, target_prefix: str) -> tuple[str
     feat_name  = cells[1]
     status_str = cells[2]
     try:
-        status = FeatureStatus(status_str)
+        status = FeatureStatus(_normalize_status_str(status_str))
     except ValueError:
         status = FeatureStatus.planned
 

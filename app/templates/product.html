@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Features — {{ app_title }}{% endblock %}
+{% block title %}Features - {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
 details > summary { cursor: pointer; list-style: none; }
@@ -15,13 +15,13 @@ details[open] .chevron { transform: rotate(90deg); }
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
   <div>
     <h1>Features</h1>
-    <p class="subtitle">WBS feature registry — {{ product.total_features }} total &middot;
+    <p class="subtitle">WBS feature registry - {{ product.total_features }} total &middot;
       <span style="color:var(--live);">{{ product.live_count }} live</span> &middot;
       <span style="color:var(--planned);">{{ product.planned_count }} planned</span> &middot;
       <span style="color:var(--gap);">{{ product.gap_count }} gaps</span>
     </p>
   </div>
-  <a href="/roadmap" class="btn btn-ghost btn-sm">Roadmap</a>
+  <a href="{{ base_path }}/roadmap" class="btn btn-ghost btn-sm">Roadmap</a>
 </div>
 
 {% for area in product.wbs_areas %}
@@ -79,7 +79,7 @@ details[open] .chevron { transform: rotate(90deg); }
 
     <!-- Add feature form -->
     <div id="add-form-{{ sa.wbs_prefix | replace('.', '-') }}" class="add-form">
-      <form hx-post="/api/features"
+      <form hx-post="{{ base_path }}/api/features"
             hx-target="#tbody-{{ sa.wbs_prefix | replace('.', '-') }}"
             hx-swap="beforeend"
             hx-ext="json-enc"
@@ -143,7 +143,7 @@ function updateFeatureStatus(wbs, select) {
   const rowId = 'feature-' + wbs.replace(/\./g, '-');
   const row = document.getElementById(rowId);
   if (!row) return;
-  fetch('/api/features/' + encodeURIComponent(wbs), {
+  fetch('{{ base_path }}/api/features/' + encodeURIComponent(wbs), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'HX-Request': 'true' },
     body: JSON.stringify({ status: select.value }),

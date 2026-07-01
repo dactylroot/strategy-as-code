@@ -28,7 +28,7 @@ docker run -p 8765:8000 \
 
 ## Architecture
 
-FastAPI backend + Jinja2 templates + HTMX. File changes trigger SSE live-reload. No database — all state lives in the four markdown files.
+FastAPI backend + Jinja2 templates + HTMX. File changes trigger SSE live-reload. No database - all state lives in the four markdown files.
 
 ## Authentication
 

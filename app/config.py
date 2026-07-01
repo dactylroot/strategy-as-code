@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     git_user_name: str = "strategy-as-code"
     git_user_email: str = "noreply@strategy-as-code"
     source_path: str = ""  # Optional human-readable host path shown in the UI
+    base_path: str = ""  # URL prefix this app is served under, e.g. "/strategy"
+    auth_introspect_url: str = ""  # Host session-introspection endpoint; enables auth passthrough
+    host_login_url: str = ""  # Host's login entry point; redirect target in passthrough mode
 
     model_config = {"env_prefix": ""}
 
@@ -151,5 +154,23 @@ class _SettingsProxy:
     def lock_project(self) -> bool:
         return bool(_deploy["lock_project"])
 
+    @property
+    def base_path(self) -> str:
+        v = _base.base_path.strip("/")
+        return f"/{v}" if v else ""
+
+    @property
+    def auth_introspect_url(self) -> str:
+        return _base.auth_introspect_url
+
+    @property
+    def host_login_url(self) -> str:
+        return _base.host_login_url
+
 
 settings = _SettingsProxy()  # type: ignore[assignment]
+
+
+def full(path: str) -> str:
+    """Prefix a root-relative path (e.g. "/dashboard") with the configured base_path."""
+    return f"{settings.base_path}{path}"

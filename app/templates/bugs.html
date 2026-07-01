@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Bugs — {{ app_title }}{% endblock %}
+{% block title %}Bugs - {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
 .bug-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 2rem; align-items: start; }
@@ -108,7 +108,7 @@
 <!-- Resolved -->
 {% if doc.resolved %}
 <div class="resolved-section">
-  <p class="card-title">Resolved <span style="font-weight:400;text-transform:none;letter-spacing:0;">— {{ doc.resolved|length }} total</span></p>
+  <p class="card-title">Resolved <span style="font-weight:400;text-transform:none;letter-spacing:0;">- {{ doc.resolved|length }} total</span></p>
   <div class="table-wrap">
     <table>
       <thead>
@@ -129,7 +129,7 @@
             onclick="openResolvedPanel(this.dataset.id, this.dataset.title, this.dataset.resolvedIn, this.dataset.date)">
           <td class="wbs-code">{{ r.id }}</td>
           <td style="font-size:0.875rem;text-decoration:line-through;color:#94a3b8;">{{ r.title }}</td>
-          <td class="text-muted">{{ r.resolved_in or '—' }}</td>
+          <td class="text-muted">{{ r.resolved_in or '-' }}</td>
           <td class="text-muted">{{ r.date }}</td>
         </tr>
         {% endfor %}
@@ -197,9 +197,9 @@
   <div class="form-group">
     <label>Affected WBS Area <span class="text-muted">(optional)</span></label>
     <select id="bugWbs" class="form-select">
-      <option value="">— None —</option>
+      <option value="">- None -</option>
       {% for sa in sub_areas %}
-      <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} — {{ sa.title }}</option>
+      <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} - {{ sa.title }}</option>
       {% endfor %}
     </select>
   </div>
@@ -319,8 +319,8 @@ function openResolvedPanel(id, title, resolvedIn, date) {
   _rpId = id;
   document.getElementById('rpId').textContent = '#' + id;
   document.getElementById('rpTitle').textContent = title;
-  document.getElementById('rpResolvedIn').textContent = resolvedIn || '—';
-  document.getElementById('rpDate').textContent = date || '—';
+  document.getElementById('rpResolvedIn').textContent = resolvedIn || '-';
+  document.getElementById('rpDate').textContent = date || '-';
   const section = document.getElementById('rpScreenshotSection');
   const img = document.getElementById('rpScreenshotImg');
   section.style.display = 'none';
@@ -332,7 +332,7 @@ function openResolvedPanel(id, title, resolvedIn, date) {
 
 function _screenshotUrl(bugId) {
   const sid = sessionStorage.getItem('pac_session_id');
-  return '/api/bugs/' + bugId + '/screenshot' + (sid ? '?sid=' + encodeURIComponent(sid) : '');
+  return '{{ base_path }}/api/bugs/' + bugId + '/screenshot' + (sid ? '?sid=' + encodeURIComponent(sid) : '');
 }
 
 function openScreenshotLightbox(bugId) {
@@ -374,14 +374,14 @@ function submitBug() {
   const notes           = document.getElementById('bugNotes').value.trim();
   const wbs_ref         = document.getElementById('bugWbs').value || null;
   const screenshotFile  = document.getElementById('bugScreenshot').files[0];
-  fetch('/api/bugs', {
+  fetch('{{ base_path }}/api/bugs', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, severity, notes, wbs_ref }),
   }).then(r => r.json()).then(async bug => {
     if (screenshotFile && bug.id) {
       const fd = new FormData();
       fd.append('file', screenshotFile);
-      await fetch('/api/bugs/' + bug.id + '/screenshot', { method: 'POST', body: fd });
+      await fetch('{{ base_path }}/api/bugs/' + bug.id + '/screenshot', { method: 'POST', body: fd });
     }
     document.getElementById('newBugModal').close();
     location.reload();
@@ -427,7 +427,7 @@ function uploadPanelScreenshot(input) {
   if (!file) return;
   const fd = new FormData();
   fd.append('file', file);
-  fetch('/api/bugs/' + _bugId + '/screenshot', { method: 'POST', body: fd })
+  fetch('{{ base_path }}/api/bugs/' + _bugId + '/screenshot', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(d => {
       if (d.ok) {
@@ -451,7 +451,7 @@ function saveBug() {
   const status = document.getElementById('bpSaveStatus');
   status.textContent = 'Saving…';
   const fixVersion = document.getElementById('bpFixVersion').value.trim();
-  fetch('/api/bugs/' + _bugId, {
+  fetch('{{ base_path }}/api/bugs/' + _bugId, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       title: document.getElementById('bpTitle').value.trim(),
@@ -466,7 +466,7 @@ function saveBug() {
 
 function saveBugField() {
   const fixVersion = document.getElementById('bpFixVersion').value.trim();
-  fetch('/api/bugs/' + _bugId, {
+  fetch('{{ base_path }}/api/bugs/' + _bugId, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       severity:    document.getElementById('bpSeverity').value,
@@ -479,7 +479,7 @@ function saveBugField() {
 function resolveBug() {
   const resolved_in = document.getElementById('bpResolvedIn').value.trim();
   if (!confirm('Mark this bug as Resolved?')) return;
-  fetch('/api/bugs/' + _bugId + '/resolve', {
+  fetch('{{ base_path }}/api/bugs/' + _bugId + '/resolve', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ resolved_in }),
   }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });

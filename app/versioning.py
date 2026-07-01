@@ -103,7 +103,7 @@ def version_rationale(about: AboutDoc) -> str:
     ip_items   = [i for i in (ip_section.items if ip_section else []) if i.strip()]
     n = len(ip_items)
     if n == 0:
-        return "No sub-areas in progress — this would be a bug-fix release."
+        return "No sub-areas in progress - this would be a bug-fix release."
     if n == 1:
         return f"1 sub-area shipping: {ip_items[0]}"
     return f"{n} sub-areas shipping: {', '.join(ip_items)}"

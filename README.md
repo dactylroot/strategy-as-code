@@ -17,19 +17,19 @@ Interface with:
 
 ## Screenshots
 
-**Summary** — feature counts, completion progress, and recent changelog
+**Summary** - feature counts, completion progress, and recent changelog
 
 ![Summary](sample-project/screenshots/dashboard.png)
 
-**Features** — five-column Kanban with WBS structure sidebar
+**Features** - five-column Kanban with WBS structure sidebar
 
 ![Features](sample-project/screenshots/features.png)
 
-**Roadmap** — Next Release, In Progress, Planned buckets, and Backlog
+**Roadmap** - Next Release, In Progress, Planned buckets, and Backlog
 
 ![Roadmap](sample-project/screenshots/roadmap.png)
 
-**Bugs** — active bug board with severity badges and resolved history
+**Bugs** - active bug board with severity badges and resolved history
 
 ![Bugs](sample-project/screenshots/bugs.png)
 
@@ -57,7 +57,7 @@ The script symlinks `.claude/skills/program-strategy/` into the target skill dir
 /program-strategy
 ```
 
-The skill manages the four markdown files directly — reading and editing them in whichever directory the Claude Code session is open in.
+The skill manages the four markdown files directly - reading and editing them in whichever directory the Claude Code session is open in.
 
 To launch the web UI from within a skill session, tell Claude to run the UI:
 
@@ -122,3 +122,44 @@ Supports `linux/amd64` and `linux/arm64`.
 | `GIT_TOKEN` | | HTTPS token for push/sync |
 | `GIT_USER_NAME` | | Git commit author name |
 | `GIT_USER_EMAIL` | | Git commit author email |
+| `AUTH_CONFIG` | `~/.config/strategy-as-code/auth.yml` | Path to local-login config (`enabled`, `username`, `password`, `secret_key`) |
+| `SERVER_CONFIG` | `~/.config/strategy-as-code/server.yml` | Path to deployment config (`project_dir`, `lock_project`, `app_title`) |
+| `BASE_PATH` | (empty) | URL prefix to serve under, e.g. `/strategy` - see [Embedded](#embedded) below |
+| `AUTH_INTROSPECT_URL` | (empty) | Host session-introspection endpoint - see [Embedded](#embedded) below |
+| `HOST_LOGIN_URL` | (empty) | Host's login page, used as the redirect target in embedded mode |
+
+### Deployment modes
+
+The app runs in one of three modes, chosen by which of the variables above are set.
+
+#### Standalone
+
+The default. The app owns its own domain/port and handles its own login against `auth.yml`.
+
+```bash
+PROJECT_DIR=/path/to/your/project ./run.sh
+```
+
+#### Locked
+
+Pins the UI to a single project directory and hides the "Switch Project" screen. Combine with either standalone or embedded mode. Set `lock_project: true` in `server.yml` (path from `SERVER_CONFIG`):
+
+```yaml
+project_dir: /path/to/your/project
+lock_project: true
+```
+
+#### Embedded
+
+Serves the app inline under a host project's own domain at a path prefix, trusting the host's session instead of showing a second login screen.
+
+```bash
+BASE_PATH=/strategy \
+AUTH_INTROSPECT_URL=http://host-app:8080/internal/whoami \
+HOST_LOGIN_URL=/login \
+PROJECT_DIR=/path/to/your/project ./run.sh
+```
+
+- `BASE_PATH` prefixes every route, redirect, and link so the app resolves correctly behind a reverse proxy forwarding `host.com/strategy/*` to it.
+- `AUTH_INTROSPECT_URL` points at an endpoint on the host that validates its own session cookie, however the host authenticates its users (Okta or otherwise), and returns `200` or `401`. Setting this replaces local login entirely, and access fails closed if the host is unreachable.
+- `HOST_LOGIN_URL` is where unauthenticated visitors get redirected, so there's exactly one login screen for the combined experience.

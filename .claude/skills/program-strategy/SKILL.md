@@ -6,7 +6,7 @@
 # SKILL: Program Strategy Manager
 
 ## Purpose
-Manage product roadmaps, write PRDs, prioritize features, and track releases using four plain-text markdown files as the long-term store. All product state lives in these files — no external tools required.
+Manage product roadmaps, write PRDs, prioritize features, and track releases using four plain-text markdown files as the long-term store. All product state lives in these files - no external tools required.
 
 ## Capabilities
 - Generate product roadmaps from vision statements
@@ -29,32 +29,36 @@ I will organize, prioritize, and document everything.
 All features live in PRODUCT.MD. There is no separate backlog file.
 
 ```
-Gap / Idea → Scoped → Scored → In-Progress → Live → Released
+Gap / Idea → [Scoped] → [Scored] → In-Progress → Live → Released
 ```
 
-| Stage | Meaning |
-|-------|---------|
-| **Gap** | Identified need in the WBS — not yet defined or prioritized |
-| **Idea** | Captured idea assigned to a WBS area — raw, unstructured |
-| **Scoped** | Defined and reviewed — ready for scoring |
-| **Scored** | Value & Effort assigned — ready to start work |
-| **In-Progress** | Work has started |
-| **Live** | Shipped and in production; awaiting UAT sign-off |
-| **Released** | Approved after UAT; final state |
+`Scoped` and `Scored` are **derived, not stored** - never write them into the Status column. A Gap or Idea *displays* as Scoped once it has real Notes, and as Scored once Value and Effort are also both set. This is computed at read time from the row's own Notes/Value/Effort - there's nothing to keep in sync, which eliminates the drift that used to happen between the stored status and the actual score/notes data.
+
+| Stage | Stored? | Meaning |
+|-------|---------|---------|
+| **Gap** | Yes | Identified need in the WBS - not yet defined or prioritized |
+| **Idea** | Yes | Captured idea assigned to a WBS area - raw, unstructured |
+| **Scoped** | Derived | Gap/Idea with non-empty Notes - defined and ready for scoring |
+| **Scored** | Derived | Scoped, with Value & Effort also both set - ready to start work |
+| **In-Progress** | Yes | Work has started |
+| **Live** | Yes | Shipped and in production; awaiting UAT sign-off |
+| **Released** | Yes | Approved after UAT; final state |
 
 **All features require a WBS code.** When capturing a new idea, assign it to a WBS sub-area immediately. It gets a full WBS code (e.g. 1.3.4) and status `Idea`.
 
-**Scoring uses Value and Effort (1–10 each).** Priority score = Value ÷ Effort. Score only after an idea is Scoped. Setting both scores advances the feature to `Scored` status automatically. Clearing either score while the feature is `Scored` reverts it to `Scoped`.
+**Scoring uses Value and Effort (1–10 each).** Priority score = Value ÷ Effort. Writing Notes on a Gap/Idea feature is what makes it read as Scoped; adding both scores on top of that is what makes it read as Scored. Clearing the scores (or the Notes) reverts the display automatically - there is no separate status to set or revert.
 
-**Status transitions:**
-- Gap → Idea (captured to WBS area) → Scoped (defined) → Scored (value/effort set) → In-Progress (work started) → Live (shipped, awaiting UAT) → Released (UAT approved)
+**Status transitions actually written to the Status column:**
+- Gap → Idea (captured to WBS area) → In-Progress (work started) → Live (shipped, awaiting UAT) → Released (UAT approved)
 
-**When implementation work finishes, advance the feature to `Live` immediately — do not wait to be asked.** If a code change (bug fix or new functionality) satisfies an `In-Progress` (or `Gap`/`Idea`) feature's described requirement, update PRODUCT.MD in the same pass as the code change:
-- Move its `Status` to `Live`. Never set `Released` from a code change alone — that status requires a human UAT sign-off and is a separate, later, human-triggered step.
+Scoped and Scored never appear as literal transitions - they just happen to be how a Gap/Idea row currently reads based on its Notes/Value/Effort.
+
+**When implementation work finishes, advance the feature to `Live` immediately - do not wait to be asked.** If a code change (bug fix or new functionality) satisfies an `In-Progress` (or `Gap`/`Idea`) feature's described requirement, update PRODUCT.MD in the same pass as the code change:
+- Move its `Status` to `Live`. Never set `Released` from a code change alone - that status requires a human UAT sign-off and is a separate, later, human-triggered step.
 - Rewrite the `Notes` text if it was phrased as a pending requirement (e.g. "X should do Y"). Once shipped, describe the implemented behavior instead (e.g. "X does Y"), so a `Live` row doesn't read like an open TODO.
-- If the feature has no existing WBS row, don't fabricate one — ask which existing feature it belongs to, or whether it needs a new row first.
+- If the feature has no existing WBS row, don't fabricate one - ask which existing feature it belongs to, or whether it needs a new row first.
 
-**Regenerate the WBS chart after any status edit.** `docs/wbs.html`/`docs/wbs.png` are generated artifacts, not hand-maintained — a PRODUCT.MD status change alone leaves them stale. Re-run `gen_wbs.py` (see WBS Chart Generation below) as part of the same change.
+**Regenerate the WBS chart after any status edit.** `docs/wbs.html`/`docs/wbs.png` are generated artifacts, not hand-maintained - a PRODUCT.MD status change alone leaves them stale. Re-run `gen_wbs.py` (see WBS Chart Generation below) as part of the same change.
 
 ---
 
@@ -66,24 +70,24 @@ Stakeholder and leadership-facing product overview. The canonical registry for a
 
 **Section order:**
 
-1. **Summary** — One paragraph describing what the product is and who it serves.
-2. **Users** — One subsection per user persona. Each persona gets a short paragraph describing their role and what they do with the product.
-3. **Product Scope** — Bulleted list of scope areas and their initiatives. Use strikethrough + 🎆 for completed items. Example:
+1. **Summary** - One paragraph describing what the product is and who it serves.
+2. **Users** - One subsection per user persona. Each persona gets a short paragraph describing their role and what they do with the product.
+3. **Product Scope** - Bulleted list of scope areas and their initiatives. Use strikethrough + 🎆 for completed items. Example:
    ```
    ### Core Functionality
    - ~~IBR Ingestion Automation and Data Centralization~~ 🎆
    - UIUX design to enable the LCR team to manage data mappings themselves
    ```
-4. **WBS Chart** — Embed the chart as a text link to the interactive HTML + a Markdown image for the PNG:
+4. **WBS Chart** - Embed the chart as a text link to the interactive HTML + a Markdown image for the PNG:
    ```markdown
    [Interactive version](docs/wbs.html)
 
    ![Product Work Breakdown Structure](docs/wbs.png)
    ```
    Do NOT use `<iframe>` or `<style>` tags. GitHub strips them and outputs their content as raw text.
-5. **Core Workflows** — Numbered subsection per user persona. Each workflow is a numbered step list showing the end-to-end flow.
-6. **Features** — WBS-coded tables grouped by scope area and sub-area. Columns: `WBS | Feature | Status | Value | Effort | Notes`. See status values below.
-7. **Known Gaps for Team Discussion** — One subsection per gap. Written as a short paragraph explaining the problem, what's missing, and why it matters. Gaps listed here should have a corresponding `Gap` status row in the Features table above.
+5. **Core Workflows** - Numbered subsection per user persona. Each workflow is a numbered step list showing the end-to-end flow.
+6. **Features** - WBS-coded tables grouped by scope area and sub-area. Columns: `WBS | Feature | Status | Value | Effort | Notes`. See status values below.
+7. **Known Gaps for Team Discussion** - One subsection per gap. Written as a short paragraph explaining the problem, what's missing, and why it matters. Gaps listed here should have a corresponding `Gap` status row in the Features table above.
 
 **WBS code format:** `{scope}.{area}.{feature}` (e.g. 1.1.3, 2.2.1)
 
@@ -92,21 +96,21 @@ Stakeholder and leadership-facing product overview. The canonical registry for a
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
 | 1.1.1 | Feature name | Gap | | | Optional notes |
-| 1.1.2 | Scored feature | Scored | 8 | 3 | Notes |
+| 1.1.2 | Idea with real notes and both scores set | Idea | 8 | 3 | A real description, not just a bare title |
 ```
-Value and Effort columns are optional — leave blank until the feature is scored.
+The second row above displays as **Scored** in the UI and skill output, even though the Status column literally says `Idea` - see Feature Lifecycle. Value and Effort columns are optional - leave both blank on a bare, undescribed idea.
 
 **Strikethrough convention:** Use `~~text~~ 🎆` for completed Product Scope items. Apply at the scope initiative level, not at the individual feature level.
 
-**Status values:**
-- `Gap` — identified need; not yet scoped or prioritized
-- `Idea` — captured to a WBS area; not yet fully defined
-- `Scoped` — defined and reviewed; ready for scoring
-- `Scored` — Value & Effort assigned; ready to start
-- `In-Progress` — work has started
-- `Live` — shipped and in production; awaiting UAT sign-off
-- `Released` — UAT approved; final state
-- `Planned` — legacy alias for In-Progress (backward compatible; do not use for new features)
+**Status values written to the Status column:**
+- `Gap` - identified need; not yet scoped or prioritized
+- `Idea` - captured to a WBS area; not yet fully defined
+- `In-Progress` - work has started
+- `Live` - shipped and in production; awaiting UAT sign-off
+- `Released` - UAT approved; final state
+- `Planned` - legacy alias for In-Progress (backward compatible; do not use for new features)
+
+**`Scoped` and `Scored` are never written** - they're derived from a Gap/Idea row's Notes/Value/Effort at display time (see Feature Lifecycle above). If you encounter either literal text in an older file's Status column, treat it as `Idea` - the app normalizes it automatically on read.
 
 ### ABOUT.MD
 
@@ -116,7 +120,7 @@ User-facing changelog and high-level roadmap. Should be plaintext and friendly f
 - MINOR increments each time a WBS Level 2 sub-area ships.
 - RELEASE increments for builds and bug fixes within a minor version (e.g. hotfixes after 0.2.0 ships become 0.2.1, 0.2.2).
 - MAJOR stays at 0 until all product scope is complete, then becomes 1.0.0.
-- Version numbers are assigned at release time in completion order — do not pre-assign version numbers to WBS sub-areas, since milestones may ship out of order.
+- Version numbers are assigned at release time in completion order - do not pre-assign version numbers to WBS sub-areas, since milestones may ship out of order.
 
 **Changelog format:** One entry per version. Group changes under their WBS sub-area label (e.g. `**1.2 Self-Service Mapping UX**`). Bug fixes get their own unlabeled section. Most recent version first.
 
@@ -166,7 +170,7 @@ Bug tracking. Two sections: `## Active` (open bugs) and `## Resolved` (closed bu
 **Bug status lifecycle:**
 - `Open` → `Investigating` (root cause being identified)
 - `Investigating` → `Fix In Progress` (fix is being implemented but not yet verified)
-- `Fix In Progress` → `Resolved` (fix verified — user confirms or tests pass in production)
+- `Fix In Progress` → `Resolved` (fix verified - user confirms or tests pass in production)
 
 **When a fix is implemented but not yet verified by the user or in production, set status to `Fix In Progress`.** Do not advance to `Resolved` until the fix is confirmed.
 
@@ -181,7 +185,7 @@ Bug tracking. Two sections: `## Active` (open bugs) and `## Resolved` (closed bu
 | 3 | Short title | 0.2.0 | 2025-04-10 |
 ```
 
-When resolving a bug, the row in `## Active` changes status to `Resolved` in-place and a new row is appended to `## Resolved` with the version and date. Do not delete the Active row — the parser keeps it in place with `Resolved` status.
+When resolving a bug, the row in `## Active` changes status to `Resolved` in-place and a new row is appended to `## Resolved` with the version and date. Do not delete the Active row - the parser keeps it in place with `Resolved` status.
 
 The `WBS` column in Active is optional; leave blank if the bug has no feature association.
 
@@ -203,19 +207,19 @@ python ~/.claude/skills/program-strategy/scripts/gen_wbs.py
 ```
 
 Outputs:
-- `docs/wbs.png` — static PNG (150 DPI, 30×12 in)
-- `docs/wbs.html` — self-contained interactive HTML with hover effects
+- `docs/wbs.png` - static PNG (150 DPI, 30×12 in)
+- `docs/wbs.html` - self-contained interactive HTML with hover effects
 
 ### Updating the chart
 
-PRODUCT.MD is the single source of truth. The script parses the `## Features` section directly — no separate data structure to maintain. Edit PRODUCT.MD and re-run the script.
+PRODUCT.MD is the single source of truth. The script parses the `## Features` section directly - no separate data structure to maintain. Edit PRODUCT.MD and re-run the script.
 
 The parser reads:
 - `### N. Title` → swimlane (Level 1 scope area)
 - `#### N.N Title` → section (Level 2 sub-area)
 - `| WBS | Feature | Status |` table rows → features (Level 3)
 
-Status values in PRODUCT.MD: `Gap`, `Idea`, `Scoped`, `Scored`, `In-Progress`, `Live`, `Planned` (legacy). The chart treats Gap/Idea/Scoped/Scored as unstarted, In-Progress/Planned as active, and Live as complete.
+Status values in PRODUCT.MD: `Gap`, `Idea`, `In-Progress`, `Live`, `Released`, `Planned` (legacy). Legacy `Scoped`/`Scored` text from older files is normalized to `Idea`. The chart only distinguishes done (`Live`/`Released`, shown struck through) from everything else - it doesn't need the Scoped/Scored derivation, since Gap/Idea/In-Progress/Planned are all "not done" either way.
 
 ### Chart design notes
 
@@ -232,7 +236,7 @@ Status values in PRODUCT.MD: `Gap`, `Idea`, `Scoped`, `Scored`, `In-Progress`, `
 
 When asked to run, open, start, or launch the UI, find the skill's launcher script and run it in the background with `PROJECT_DIR` set to the current working directory.
 
-**Locate the script** — check in order until one exists:
+**Locate the script** - check in order until one exists:
 1. `~/.claude/skills/program-strategy/scripts/run-ui.sh` (global install)
 2. `.claude/skills/program-strategy/scripts/run-ui.sh` relative to the project root (per-project install)
 
@@ -252,7 +256,7 @@ PORT=8766 PROJECT_DIR=$(pwd) bash /path/to/run-ui.sh &
 open http://localhost:8766
 ```
 
-The UI reads the markdown files from `PROJECT_DIR` on each page load — no restart needed after editing files.
+The UI reads the markdown files from `PROJECT_DIR` on each page load - no restart needed after editing files.
 
 ---
 

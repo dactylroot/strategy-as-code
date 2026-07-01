@@ -1,4 +1,4 @@
-{# ── Feature Detail Panel — include on any page that needs feature click-through ── #}
+{# ── Feature Detail Panel - include on any page that needs feature click-through ── #}
 <dialog id="featurePanel" style="
   position:fixed; inset:0; margin:0; padding:0;
   width:100vw; max-width:100vw; height:100vh; max-height:100vh;
@@ -52,18 +52,18 @@
         </div>
         <div id="fdp-score-card" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
           <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.75rem;">Scoring</label>
-          <span id="fdp-score-wbs-hint" style="display:block;font-size:0.72rem;color:#94a3b8;margin-bottom:0.75rem;line-height:1.4;">— set both value and effort to score</span>
+          <span id="fdp-score-wbs-hint" style="display:block;font-size:0.72rem;color:#94a3b8;margin-bottom:0.75rem;line-height:1.4;">- set both value and effort to score</span>
           <div style="margin-bottom:0.65rem;">
             <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Value <span style="color:#94a3b8;font-size:0.65rem;">(10 = highest impact)</span></label>
             <select id="fdp-value" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:#1e293b;background:#fff;cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
-              <option value="">—</option>
+              <option value="">-</option>
               {% for n in range(10, 0, -1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
             </select>
           </div>
           <div style="margin-bottom:0.75rem;">
             <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Effort <span style="color:#94a3b8;font-size:0.65rem;">(1 = easy, 10 = very hard)</span></label>
             <select id="fdp-effort" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:#1e293b;background:#fff;cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
-              <option value="">—</option>
+              <option value="">-</option>
               {% for n in range(10, 0, -1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
             </select>
           </div>
@@ -88,7 +88,7 @@
 
       <div style="border-top:1px solid #f1f5f9;padding-top:1.25rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-          <label style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">Position in WBS — drag to reassign</label>
+          <label style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">Position in WBS - drag to reassign</label>
           <span id="fdp-wbs-move-status" style="font-size:0.75rem;color:#16a34a;"></span>
         </div>
         <div id="fdp-wbs-tree" style="display:flex;gap:0.75rem;overflow-x:auto;padding-bottom:0.5rem;">
@@ -196,11 +196,37 @@ function openFeaturePanelFromEl(el) {
   const d = el.dataset;
   openFeaturePanel({
     wbs: d.wbs||null, name: d.name||'', notes: d.notes||'',
-    stage: d.stage||'', value: d.value ? parseFloat(d.value) : null,
+    stage: d.stage||'', rawStatus: d.rawStatus || d.stage || '',
+    value: d.value ? parseFloat(d.value) : null,
     effort: d.effort ? parseFloat(d.effort) : null,
     reviewable: d.reviewable === 'true',
     flagged: d.flagged === 'true',
   });
+}
+
+// Mirrors Feature.stage (app/models.py): Scoped/Scored are derived from
+// notes/scores on top of a Gap or Idea, never stored explicitly.
+function _deriveStage(rawStatus, hasNotes, hasScores) {
+  if (rawStatus !== 'Gap' && rawStatus !== 'Idea') return rawStatus;
+  if (!hasNotes) return rawStatus;
+  return hasScores ? 'Scored' : 'Scoped';
+}
+
+// Recompute _fdp.stage from the current form state and re-render anything
+// that depends on it. Returns true if the stage actually changed.
+function _refreshFdpStage() {
+  const notes = document.getElementById('fdp-notes').value.trim();
+  const vRaw = document.getElementById('fdp-value').value;
+  const eRaw = document.getElementById('fdp-effort').value;
+  const hasScores = vRaw !== '' && eRaw !== '' && !isNaN(parseInt(vRaw)) && !isNaN(parseInt(eRaw));
+  const newStage = _deriveStage(_fdp.rawStatus, !!notes, hasScores);
+  if (newStage === _fdp.stage) return false;
+  _fdp.stage = newStage;
+  _renderStatusActions(newStage);
+  const colors = {'Gap':'#b45309','Idea':'#92400e','Scoped':'#5b21b6','Scored':'#4c1d95','In-Progress':'#f59e0b','Live':'#16a34a','Released':'#16a34a','Planned':'#1e40af'};
+  const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
+  if (metaSpan) { metaSpan.textContent = newStage; metaSpan.style.color = colors[newStage] || '#475569'; }
+  return true;
 }
 
 function openFeaturePanel(opts) {
@@ -224,7 +250,7 @@ function openFeaturePanel(opts) {
   document.getElementById('fdp-review-card').style.display = isReview ? '' : 'none';
   _refreshScoreDisplay();
   _renderStatusActions(opts.stage);
-  _renderGapActions(opts.stage, opts.flagged || false);
+  _renderGapActions(opts.rawStatus || opts.stage, opts.flagged || false);
   document.querySelectorAll('.wbs-drop-target').forEach(el => el.classList.remove('current-wbs'));
   if (_fdp.subPrefix) {
     const cur = document.getElementById('wbs-drop-' + _fdp.subPrefix.replace(/\./g,'-'));
@@ -252,7 +278,7 @@ function reportBugFromFeature() {
     title: 'Bug: ' + (_fdp.name || ''),
     wbs: _fdp.subPrefix || '',
   });
-  window.location.href = '/bugs?' + params.toString();
+  window.location.href = '{{ base_path }}/bugs?' + params.toString();
 }
 
 function _renderGapActions(stage, flagged) {
@@ -277,13 +303,13 @@ function fdpFlagAsGap() {
   if (!_fdp.wbs) return;
   const el = document.getElementById('fdp-gap-actions');
   if (el) el.innerHTML = `<span style="font-size:0.78rem;color:#92400e;">Flagging…</span>`;
-  fetch('/api/features/' + encodeURIComponent(_fdp.wbs), {
+  fetch('{{ base_path }}/api/features/' + encodeURIComponent(_fdp.wbs), {
     method: 'PATCH', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({flagged: true}),
   }).then(r => {
-    if (!r.ok) { _renderGapActions(_fdp.stage, false); return; }
+    if (!r.ok) { _renderGapActions(_fdp.rawStatus || _fdp.stage, false); return; }
     _fdp.flagged = true;
-    _renderGapActions(_fdp.stage, true);
+    _renderGapActions(_fdp.rawStatus || _fdp.stage, true);
     _fdpDirty = true;
   });
 }
@@ -292,13 +318,13 @@ function fdpClearGapFlag() {
   if (!_fdp.wbs) return;
   const el = document.getElementById('fdp-gap-actions');
   if (el) el.innerHTML = `<span style="font-size:0.78rem;color:#92400e;">Clearing…</span>`;
-  fetch('/api/features/' + encodeURIComponent(_fdp.wbs), {
+  fetch('{{ base_path }}/api/features/' + encodeURIComponent(_fdp.wbs), {
     method: 'PATCH', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({flagged: false}),
   }).then(r => {
-    if (!r.ok) { _renderGapActions(_fdp.stage, true); return; }
+    if (!r.ok) { _renderGapActions(_fdp.rawStatus || _fdp.stage, true); return; }
     _fdp.flagged = false;
-    _renderGapActions(_fdp.stage, false);
+    _renderGapActions(_fdp.rawStatus || _fdp.stage, false);
     _fdpDirty = true;
   });
 }
@@ -317,7 +343,7 @@ function _refreshScoreDisplay() {
   document.getElementById('fdp-value').style.borderColor  = vValid ? '#16a34a' : '#e2e8f0';
   document.getElementById('fdp-effort').style.borderColor = eValid ? '#16a34a' : '#e2e8f0';
   const hint = document.getElementById('fdp-score-wbs-hint');
-  hint.textContent = (vValid && eValid) ? '' : '— set both value and effort to score';
+  hint.textContent = (vValid && eValid) ? '' : '- set both value and effort to score';
   hint.style.color = '#94a3b8';
 }
 
@@ -333,38 +359,25 @@ function onFdpScoreInput() {
   clearTimeout(_scoreDebounce);
   _scoreDebounce = setTimeout(() => {
     if (!_fdp.wbs) return;
-    fetch('/api/features/'+encodeURIComponent(_fdp.wbs), {
+    fetch('{{ base_path }}/api/features/'+encodeURIComponent(_fdp.wbs), {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({value: vValid ? v : null, effort: eValid ? e : null})
     }).then(r => {
       if (r.ok) {
+        const wasScored = _fdp.stage === 'Scored';
+        const changed = _refreshFdpStage();
         if (vValid && eValid) {
-          if (_fdp.stage === 'Scoped') {
-            action.innerHTML = '<span style="color:#16a34a;font-weight:600;font-size:0.875rem;">✓ Scored</span>';
-            _fdp.stage = 'Scored';
-            _renderStatusActions('Scored');
-            const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
-            if (metaSpan) { metaSpan.textContent = 'Scored'; metaSpan.style.color = '#4c1d95'; }
-          } else {
-            action.innerHTML = '<span style="color:#16a34a;font-size:0.8rem;">✓ Score saved</span>';
-          }
+          action.innerHTML = changed
+            ? '<span style="color:#16a34a;font-weight:600;font-size:0.875rem;">✓ Scored</span>'
+            : '<span style="color:#16a34a;font-size:0.8rem;">✓ Score saved</span>';
+        } else if (!vValid && !eValid) {
+          action.innerHTML = wasScored
+            ? `<span style="color:#7c3aed;font-size:0.8rem;">Score cleared - back to ${_fdp.stage}</span>`
+            : '<span style="color:#64748b;font-size:0.8rem;">✓ Score cleared</span>';
         } else {
-          const wasScored = _fdp.stage === 'Scored';
-          if (!vValid && !eValid) {
-            action.innerHTML = wasScored
-              ? '<span style="color:#7c3aed;font-size:0.8rem;">Score cleared — back to Scoped</span>'
-              : '<span style="color:#64748b;font-size:0.8rem;">✓ Score cleared</span>';
-          } else {
-            action.innerHTML = wasScored
-              ? '<span style="color:#7c3aed;font-size:0.8rem;">Partial score — back to Scoped</span>'
-              : '<span style="color:#64748b;font-size:0.8rem;">✓ Saved (partial score)</span>';
-          }
-          if (wasScored) {
-            _fdp.stage = 'Scoped';
-            _renderStatusActions('Scoped');
-            const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
-            if (metaSpan) { metaSpan.textContent = 'Scoped'; metaSpan.style.color = '#5b21b6'; }
-          }
+          action.innerHTML = wasScored
+            ? `<span style="color:#7c3aed;font-size:0.8rem;">Partial score - back to ${_fdp.stage}</span>`
+            : '<span style="color:#64748b;font-size:0.8rem;">✓ Saved (partial score)</span>';
         }
         _fdpDirty = true;
       } else {
@@ -382,10 +395,8 @@ function _renderStatusActions(stage) {
   const el = document.getElementById('fdp-status-actions');
   if (!el) return;
   if (stage === 'Gap' || stage === 'Idea') {
-    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="advanceFdpStatus('Scoped')" style="border-color:#7c3aed;color:#5b21b6;">→ Mark Scoped</button>`;
-  } else if (stage === 'Scoped') {
-    el.innerHTML = `<button class="btn btn-primary btn-sm" onclick="advanceFdpStatus('In-Progress')">→ In Progress</button><button class="btn btn-ghost btn-sm" onclick="advanceFdpStatus('Gap')" style="color:#94a3b8;font-size:0.72rem;margin-left:0.25rem;">← Back to Ideas</button>`;
-  } else if (stage === 'Scored') {
+    el.innerHTML = '<span class="text-muted" style="font-size:0.72rem;">Add notes above and save to mark as Scoped</span>';
+  } else if (stage === 'Scoped' || stage === 'Scored') {
     el.innerHTML = `<button class="btn btn-primary btn-sm" onclick="advanceFdpStatus('In-Progress')">→ In Progress</button>`;
   } else {
     el.innerHTML = '';
@@ -396,15 +407,16 @@ function advanceFdpStatus(newStatus) {
   if (!_fdp.wbs) return;
   const statusEl = document.getElementById('fdp-save-status');
   statusEl.textContent = 'Saving…';
-  fetch('/api/features/'+encodeURIComponent(_fdp.wbs), {
+  fetch('{{ base_path }}/api/features/'+encodeURIComponent(_fdp.wbs), {
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({status: newStatus})
   }).then(r => {
     if (r.ok) {
-      statusEl.textContent = newStatus === 'Scoped' ? '✓ Scoped' : newStatus === 'Released' ? '✓ Approved' : newStatus === 'In-Progress' ? '✓ Rejected' : '✓ Done';
+      statusEl.textContent = newStatus === 'Released' ? '✓ Approved' : newStatus === 'In-Progress' ? '✓ Rejected' : '✓ Done';
       _fdp.stage = newStatus;
+      _fdp.rawStatus = newStatus;
       const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
-      if (metaSpan) { const c={'Gap':'#b45309','Idea':'#92400e','Scoped':'#5b21b6','In-Progress':'#f59e0b'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'#475569'; }
+      if (metaSpan) { const c={'Gap':'#b45309','Idea':'#92400e','In-Progress':'#f59e0b'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'#475569'; }
       const isLive = newStatus === 'Live' || newStatus === 'Released';
       document.getElementById('fdp-score-card').style.display  = isLive ? 'none' : '';
       document.getElementById('fdp-live-card').style.display   = isLive ? '' : 'none';
@@ -425,11 +437,12 @@ function saveFdp() {
   status.textContent='Saving…';
   const body={notes};
   if(name)body.name=name;
-  fetch('/api/features/'+encodeURIComponent(_fdp.wbs),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  fetch('{{ base_path }}/api/features/'+encodeURIComponent(_fdp.wbs),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
   .then(r=>{
     if(r.ok){
       status.textContent='Saved ✓';
       if(name){_fdp.name=name;document.getElementById('fdp-token-label').textContent=name;}
+      _refreshFdpStage();
       _fdpDirty=true;
     }
     else{status.textContent='Error';}
@@ -481,7 +494,7 @@ function fdpConfirmDelete() {
   const btn = document.getElementById('fdp-delete-confirm-btn');
   btn.disabled = true;
   btn.textContent = 'Deleting…';
-  fetch('/api/features/' + encodeURIComponent(_fdp.wbs), {method: 'DELETE'})
+  fetch('{{ base_path }}/api/features/' + encodeURIComponent(_fdp.wbs), {method: 'DELETE'})
     .then(r => {
       if (r.ok) { document.getElementById('featurePanel').close(); _fdpReload(); }
       else { r.json().then(d => { btn.textContent = d.detail || 'Delete failed'; btn.disabled = false; btn.style.opacity = '1'; }).catch(() => { btn.textContent = 'Delete failed'; btn.disabled = false; btn.style.opacity = '1'; }); }
@@ -498,7 +511,7 @@ function _reassignToPrefix(targetPrefix) {
   };
   if (_fdp.wbs) {
     moveStatus.textContent='Moving…';moveStatus.style.color='#64748b';
-    fetch('/api/features/'+encodeURIComponent(_fdp.wbs)+'/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_prefix:targetPrefix})})
+    fetch('{{ base_path }}/api/features/'+encodeURIComponent(_fdp.wbs)+'/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_prefix:targetPrefix})})
     .then(r=>r.json()).then(d=>{
       if(d.ok){moveStatus.textContent=`Moved → ${d.new_wbs} ✓`;moveStatus.style.color='#16a34a';_fdp.wbs=d.new_wbs;_markMoved(targetPrefix);}
       else{moveStatus.textContent=d.detail||'Move failed';moveStatus.style.color='#dc2626';}

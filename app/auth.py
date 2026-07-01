@@ -17,6 +17,9 @@ import secrets
 from pathlib import Path
 
 import figtion
+import httpx
+
+from .config import settings
 
 COOKIE_NAME = "pac_auth"
 _CONFIG_PATH = Path(os.environ.get(
@@ -70,8 +73,28 @@ def verify_cookie(value: str) -> str | None:
     return None
 
 
-def is_authenticated(request) -> bool:
+async def is_authenticated(request) -> bool:
+    if settings.auth_introspect_url:
+        return await _check_upstream_session(request)
     if not enabled():
         return True
     token = request.cookies.get(COOKIE_NAME)
     return bool(token and verify_cookie(token))
+
+
+async def _check_upstream_session(request) -> bool:
+    """Validate the request's session against the host project's own auth,
+    by forwarding its cookies to the host's introspection endpoint.
+
+    Fails closed: any network error, timeout, or non-200 response is treated
+    as unauthenticated so a host outage never grants access.
+    """
+    cookie_header = request.headers.get("cookie")
+    if not cookie_header:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get(settings.auth_introspect_url, headers={"cookie": cookie_header})
+        return resp.status_code == 200
+    except httpx.HTTPError:
+        return False

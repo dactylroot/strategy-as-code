@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from ..config import settings
+from ..config import settings, full
 from .. import session_store
 from ..models import FeatureStatus, BugStatus
 from ..parsers import product as product_parser
@@ -44,7 +44,7 @@ def _parse_product_about(s: session_store.Session):
 
 def _redirect_if_no_project(s) -> RedirectResponse | None:
     if s is None and not settings.product_md.exists():
-        return RedirectResponse(url="/switch-project")
+        return RedirectResponse(url=full("/switch-project"))
     return None
 
 
@@ -60,9 +60,9 @@ def dashboard(request: Request):
         about   = about_parser.parse(settings.about_md)
 
     all_features = product.all_features
-    ideas       = [f for f in all_features if f.status in (FeatureStatus.gap, FeatureStatus.idea)]
-    scoped      = [f for f in all_features if f.status == FeatureStatus.scoped]
-    scored      = [f for f in all_features if f.status == FeatureStatus.scored]
+    ideas       = [f for f in all_features if f.stage in ("Gap", "Idea")]
+    scoped      = [f for f in all_features if f.stage == "Scoped"]
+    scored      = [f for f in all_features if f.stage == "Scored"]
     in_progress = [f for f in all_features if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)]
     released    = [f for f in all_features if f.status == FeatureStatus.released]
 
@@ -150,7 +150,7 @@ def registry_page(request: Request):
 
 @router.get("/product", response_class=HTMLResponse)
 def product_redirect(request: Request):
-    return RedirectResponse(url="/registry")
+    return RedirectResponse(url=full("/registry"))
 
 
 @router.get("/features", response_class=HTMLResponse)
@@ -177,10 +177,10 @@ def features_page(request: Request):
             if not entry.in_progress:
                 found_completed = True
 
-    ideas       = [f for f in all_features if f.status in (FeatureStatus.gap, FeatureStatus.idea)]
+    ideas       = [f for f in all_features if f.stage in ("Gap", "Idea")]
     prioritized = sorted(
-        [f for f in all_features if f.status in (FeatureStatus.scoped, FeatureStatus.scored)],
-        key=lambda f: (-(f.priority_score or 0), 0 if f.status == FeatureStatus.scored else 1),
+        [f for f in all_features if f.stage in ("Scoped", "Scored")],
+        key=lambda f: (-(f.priority_score or 0), 0 if f.stage == "Scored" else 1),
     )
     in_progress = [f for f in all_features if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)]
     review      = [
@@ -191,7 +191,7 @@ def features_page(request: Request):
     released    = [f for f in all_features if f.status == FeatureStatus.released]
 
     features_json = json.dumps([
-        {"wbs": f.wbs, "name": f.name, "status": f.status.value,
+        {"wbs": f.wbs, "name": f.name, "status": f.stage,
          "notes": f.notes or "", "value": f.value, "effort": f.effort}
         for f in all_features
     ])
@@ -211,7 +211,7 @@ def features_page(request: Request):
 
 @router.get("/backlog", response_class=HTMLResponse)
 def backlog_redirect(request: Request):
-    return RedirectResponse(url="/features")
+    return RedirectResponse(url=full("/features"))
 
 
 @router.get("/roadmap", response_class=HTMLResponse)
@@ -243,7 +243,7 @@ def roadmap_page(request: Request):
     next_release_features: list[dict] = []
 
     _active    = (FeatureStatus.in_progress, FeatureStatus.planned)
-    _unstarted = (FeatureStatus.gap, FeatureStatus.idea, FeatureStatus.scoped, FeatureStatus.scored)
+    _unstarted = (FeatureStatus.gap, FeatureStatus.idea)
     _active_prefixes = ip_prefixes | pl_prefixes
 
     # Include Live features from any sub-area named in the in-progress changelog entry.
@@ -312,16 +312,11 @@ def roadmap_page(request: Request):
     # Features with 'planned' status but no bucket fall back to backlog (demoted on next save)
     backlog_features.extend(e for e in planned_features if e["f"].wbs not in wbs_to_bucket)
 
-    # Sort backlog: descending priority score, then by status (Scored > Scoped > Idea > Gap)
-    _status_rank = {
-        FeatureStatus.scored: 0,
-        FeatureStatus.scoped: 1,
-        FeatureStatus.idea:   2,
-        FeatureStatus.gap:    3,
-    }
+    # Sort backlog: descending priority score, then by stage (Scored > Scoped > Idea > Gap)
+    _stage_rank = {"Scored": 0, "Scoped": 1, "Idea": 2, "Gap": 3}
     backlog_sorted = sorted(
         backlog_features,
-        key=lambda e: (-(e["f"].priority_score or 0), _status_rank.get(e["f"].status, 99)),
+        key=lambda e: (-(e["f"].priority_score or 0), _stage_rank.get(e["f"].stage, 99)),
     )
 
     bl_section = about.roadmap_section("Backlog")

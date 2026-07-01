@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Features — {{ app_title }}{% endblock %}
+{% block title %}Features - {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
 .lifecycle-board {
@@ -140,7 +140,7 @@
       </button>
     </div>
     <div id="fe-empty-hint" style="margin-top:0.75rem;">
-      <p class="text-muted">{{ product.total_features }} features across {{ product.wbs_areas|length }} scope areas — search to find one or request a new idea.</p>
+      <p class="text-muted">{{ product.total_features }} features across {{ product.wbs_areas|length }} scope areas - search to find one or request a new idea.</p>
     </div>
   </div>
 
@@ -205,7 +205,7 @@
     <div class="lc-header">Prioritized <span class="lc-count">{{ prioritized|length }}</span></div>
     <div class="lc-body" id="col-prioritized">
       {% for item in prioritized %}
-        {% if item.status.value == 'Scored' %}
+        {% if item.stage == 'Scored' %}
           {% include "partials/fc_scored.html" %}
         {% else %}
           {% include "partials/fc_scoped.html" %}
@@ -335,7 +335,7 @@
 {% set scored = prioritized | selectattr('priority_score') | list %}
 {% if scored %}
 <div class="matrix-card">
-  <p class="card-title">Priority Matrix — Scored Items</p>
+  <p class="card-title">Priority Matrix - Scored Items</p>
   <svg style="width:100%;max-width:520px;display:block;overflow:visible;" viewBox="0 0 520 300" xmlns="http://www.w3.org/2000/svg">
     <rect x="50" y="10" width="220" height="130" fill="#fef3c7" opacity="0.5" rx="2"/>
     <rect x="270" y="10" width="220" height="130" fill="#d1fae5" opacity="0.6" rx="2"/>
@@ -379,9 +379,9 @@
     </div>
     <div class="form-group"><label>WBS Area <span style="color:#dc2626;">*</span></label>
       <select id="captureWbs" required style="width:100%;padding:0.4rem 0.5rem;border:1px solid #d1d5db;border-radius:4px;font-size:0.85rem;">
-        <option value="">— select a WBS area —</option>
+        <option value="">- select a WBS area -</option>
         {% for sa in sub_areas %}
-        <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} — {{ sa.title }}</option>
+        <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} - {{ sa.title }}</option>
         {% endfor %}
       </select>
     </div>
@@ -508,7 +508,7 @@ function submitCapture() {
   if (!name) return;
   if (!wbs) { alert('Please select a WBS area.'); return; }
   const notes = document.getElementById('captureNotes').value.trim();
-  fetch('/api/features', {
+  fetch('{{ base_path }}/api/features', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, notes, wbs_prefix: wbs, status: 'Idea' }),
   }).then(r => { if (r.ok) { document.getElementById('captureModal').close(); _fdpReload(); } });
@@ -517,7 +517,7 @@ function submitCapture() {
 /* ── Advance scored → In-Progress ── */
 function startWork(wbs, name) {
   if (!confirm(`Move "${name}" to In Progress?`)) return;
-  fetch('/api/features/' + encodeURIComponent(wbs), {
+  fetch('{{ base_path }}/api/features/' + encodeURIComponent(wbs), {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: 'In-Progress' }),
   }).then(r => { if (r.ok) _fdpReload();
@@ -527,7 +527,7 @@ function startWork(wbs, name) {
 /* ── Complete → Live ── */
 function completeFeature(wbs, name) {
   if (!confirm(`Mark "${name}" as Completed?\nThis will set it to Live in the feature registry.`)) return;
-  fetch('/api/features/' + encodeURIComponent(wbs), {
+  fetch('{{ base_path }}/api/features/' + encodeURIComponent(wbs), {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: 'Live' }),
   }).then(r => { if (r.ok) _fdpReload();

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if lock_project %}{{ app_title }} — Project Files{% else %}Switch Project — {{ app_title }}{% endif %}{% endblock %}
+{% block title %}{% if lock_project %}{{ app_title }} - Project Files{% else %}Switch Project - {{ app_title }}{% endif %}{% endblock %}
 
 {% block extra_styles %}
   .pac-upload-card {
@@ -68,7 +68,7 @@
     <p class="subtitle">Download the project files to use or share them.</p>
   </div>
   <div class="card">
-    <a href="/api/project/download" class="btn btn-ghost btn-sm" download>
+    <a href="{{ base_path }}/api/project/download" class="btn btn-ghost btn-sm" download>
       Download project files (.zip)
     </a>
   </div>
@@ -83,7 +83,7 @@
   <div class="card" style="margin-bottom:1rem;">
     <p class="card-title">Current Project</p>
     <p style="font-size:1rem;font-weight:700;color:#1e293b;margin:0 0 0.75rem;">{{ project_title }}</p>
-    <a href="/api/project/download" class="btn btn-ghost btn-sm" download>
+    <a href="{{ base_path }}/api/project/download" class="btn btn-ghost btn-sm" download>
       Download project files (.zip)
     </a>
   </div>
@@ -102,7 +102,7 @@
 
   <div class="card" style="margin-bottom:1rem;">
     <p class="card-title">Import Files</p>
-    <p class="text-muted" style="margin-bottom:0.75rem;">Loads project files into a temporary session. Nothing is written back to disk — export when done.</p>
+    <p class="text-muted" style="margin-bottom:0.75rem;">Loads project files into a temporary session. Nothing is written back to disk - export when done.</p>
 
     <div class="pac-upload-card" id="uploadDropZone">
       <div class="pac-drop-area" onclick="document.getElementById('uploadFiles').click()">
@@ -241,7 +241,7 @@ async function loadJSZip() {
 async function extractAndAddZip(zipFile) {
   let JSZip;
   try { JSZip = await loadJSZip(); }
-  catch { showWarn('Could not load zip reader — check your connection.'); return; }
+  catch { showWarn('Could not load zip reader - check your connection.'); return; }
   try {
     const zip = await JSZip.loadAsync(zipFile);
     const extracted = [];
@@ -277,9 +277,9 @@ async function openProject() {
   const form = new FormData();
   for (const [, file] of droppedFiles) form.append('files', file);
   try {
-    const resp = await fetch('/api/project/upload', { method: 'POST', body: form });
+    const resp = await fetch('{{ base_path }}/api/project/upload', { method: 'POST', body: form });
     const d = await resp.json();
-    if (d.ok) { if (d.session_id) sessionStorage.setItem('pac_session_id', d.session_id); window.location = '/dashboard'; }
+    if (d.ok) { if (d.session_id) sessionStorage.setItem('pac_session_id', d.session_id); window.location = '{{ base_path }}/dashboard'; }
     else { statusEl.style.color = '#dc2626'; statusEl.textContent = d.detail || 'Failed to open.'; }
   } catch {
     statusEl.style.color = '#dc2626';
@@ -318,7 +318,7 @@ uploadDropZone.addEventListener('drop', e => {
 /* ── Browse folder into import session ── */
 async function browseFolderIntoSession() {
   if (!('showDirectoryPicker' in window)) {
-    showWarn('Folder browsing is not supported in this browser — drag the files in instead.');
+    showWarn('Folder browsing is not supported in this browser - drag the files in instead.');
     return;
   }
   let handle;
@@ -348,12 +348,12 @@ function _switchDiskPath(path) {
   const statusEl = document.getElementById('dir-status');
   statusEl.style.color = '#64748b'; statusEl.textContent = 'Switching…';
   sessionStorage.removeItem('pac_session_id');
-  fetch('/api/switch-project', {
+  fetch('{{ base_path }}/api/switch-project', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project_dir: path }),
   }).then(r => r.json()).then(d => {
-    if (d.ok) { window.location = '/dashboard'; }
+    if (d.ok) { window.location = '{{ base_path }}/dashboard'; }
     else { statusEl.style.color = '#dc2626'; statusEl.textContent = d.detail || 'Failed.'; }
   }).catch(() => { statusEl.style.color = '#dc2626'; statusEl.textContent = 'Request failed.'; });
 }
@@ -375,7 +375,7 @@ async function dpNavigate(path) {
   list.innerHTML = '<div style="padding:1rem 1.1rem;color:#94a3b8;font-size:0.85rem;">Loading…</div>';
   selectBtn.disabled = true;
   try {
-    const r = await fetch('/api/browse?path=' + encodeURIComponent(path));
+    const r = await fetch('{{ base_path }}/api/browse?path=' + encodeURIComponent(path));
     if (!r.ok) { const d = await r.json(); list.innerHTML = `<div style="padding:1rem 1.1rem;color:#dc2626;font-size:0.85rem;">${d.detail||'Error'}</div>`; return; }
     const data = await r.json();
     _dpCurrent = data.path;

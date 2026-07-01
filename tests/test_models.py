@@ -7,15 +7,15 @@ from app.models import (
 
 class TestFeaturePriorityScore:
     def test_both_values(self):
-        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.scored, value=8, effort=4)
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, value=8, effort=4)
         assert f.priority_score == 2.0
 
     def test_value_none(self):
-        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.scoped, value=None, effort=3)
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, value=None, effort=3)
         assert f.priority_score is None
 
     def test_effort_none(self):
-        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.scoped, value=8, effort=None)
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, value=8, effort=None)
         assert f.priority_score is None
 
     def test_both_none(self):
@@ -23,12 +23,53 @@ class TestFeaturePriorityScore:
         assert f.priority_score is None
 
     def test_zero_effort_returns_none(self):
-        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.scored, value=5, effort=0)
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, value=5, effort=0)
         assert f.priority_score is None
 
     def test_fractional_score(self):
-        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.scored, value=7, effort=2)
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, value=7, effort=2)
         assert f.priority_score == 3.5
+
+
+class TestFeatureStage:
+    """Scoped/Scored are derived from Notes/Value/Effort, never stored - see
+    the Feature Lifecycle section of the program-strategy SKILL.md."""
+
+    def test_idea_without_notes_stays_idea(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea)
+        assert f.stage == "Idea"
+
+    def test_idea_with_notes_becomes_scoped(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, notes="A real description")
+        assert f.stage == "Scoped"
+
+    def test_idea_with_notes_and_scores_becomes_scored(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, notes="desc", value=8, effort=4)
+        assert f.stage == "Scored"
+
+    def test_idea_with_only_one_score_stays_scoped(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, notes="desc", value=8, effort=None)
+        assert f.stage == "Scoped"
+
+    def test_gap_with_notes_and_scores_becomes_scored(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.gap, notes="desc", value=8, effort=4)
+        assert f.stage == "Scored"
+
+    def test_gap_without_notes_stays_gap(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.gap)
+        assert f.stage == "Gap"
+
+    def test_whitespace_only_notes_do_not_count(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, notes="   ")
+        assert f.stage == "Idea"
+
+    def test_in_progress_passthrough(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.in_progress, notes="desc", value=8, effort=4)
+        assert f.stage == "In-Progress"
+
+    def test_live_passthrough(self):
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.live)
+        assert f.stage == "Live"
 
 
 class TestWBSSubAreaMetrics:
@@ -55,7 +96,7 @@ class TestWBSSubAreaMetrics:
         sa = self._make_sa([
             FeatureStatus.live,
             FeatureStatus.in_progress,
-            FeatureStatus.scoped,
+            FeatureStatus.idea,
             FeatureStatus.gap,
         ])
         assert sa.live_count == 1
@@ -67,8 +108,12 @@ class TestWBSSubAreaMetrics:
         sa = self._make_sa([FeatureStatus.planned])
         assert sa.planned_count == 1
 
-    def test_scored_counted_as_gap(self):
-        sa = self._make_sa([FeatureStatus.scored])
+    def test_scored_idea_still_counted_as_gap(self):
+        """gap_count groups by raw status - a Gap/Idea that reads as Scored
+        via .stage is still an Idea underneath, so it still counts here."""
+        f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, notes="desc", value=8, effort=4)
+        assert f.stage == "Scored"
+        sa = WBSSubArea(wbs_prefix="1.1", title="Auth", features=[f])
         assert sa.gap_count == 1
         assert sa.planned_count == 0
 
@@ -93,7 +138,7 @@ class TestProductDocAggregates:
     def _make_doc(self):
         features = [
             Feature(wbs="1.1.1", name="Login", status=FeatureStatus.live, value=8, effort=3),
-            Feature(wbs="1.1.2", name="Logout", status=FeatureStatus.scoped),
+            Feature(wbs="1.1.2", name="Logout", status=FeatureStatus.idea),
             Feature(wbs="1.1.3", name="Reset", status=FeatureStatus.gap),
         ]
         sa = WBSSubArea(wbs_prefix="1.1", title="Auth", features=features)

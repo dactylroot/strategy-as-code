@@ -1,3 +1,6 @@
+import asyncio
+
+import httpx
 import pytest
 import app.auth as auth_mod
 
@@ -87,7 +90,7 @@ class TestIsAuthenticated:
         class FakeRequest:
             cookies = {}
 
-        assert auth_mod.is_authenticated(FakeRequest()) is True
+        assert asyncio.run(auth_mod.is_authenticated(FakeRequest())) is True
 
     def test_valid_cookie_passes(self):
         cookie = auth_mod.make_cookie("admin")
@@ -95,16 +98,75 @@ class TestIsAuthenticated:
         class FakeRequest:
             cookies = {auth_mod.COOKIE_NAME: cookie}
 
-        assert auth_mod.is_authenticated(FakeRequest()) is True
+        assert asyncio.run(auth_mod.is_authenticated(FakeRequest())) is True
 
     def test_missing_cookie_fails(self):
         class FakeRequest:
             cookies = {}
 
-        assert auth_mod.is_authenticated(FakeRequest()) is False
+        assert asyncio.run(auth_mod.is_authenticated(FakeRequest())) is False
 
     def test_bad_cookie_fails(self):
         class FakeRequest:
             cookies = {auth_mod.COOKIE_NAME: "garbage"}
 
-        assert auth_mod.is_authenticated(FakeRequest()) is False
+        assert asyncio.run(auth_mod.is_authenticated(FakeRequest())) is False
+
+
+class TestUpstreamSessionPassthrough:
+    """Auth-passthrough mode: strategy-as-code trusts the host project's own
+    session instead of checking the local pac_auth cookie."""
+
+    class FakeRequest:
+        def __init__(self, cookie_header=None):
+            self.headers = {"cookie": cookie_header} if cookie_header else {}
+
+    def _patch_introspect_url(self, monkeypatch, url):
+        monkeypatch.setattr(type(auth_mod.settings), "auth_introspect_url", property(lambda self: url))
+
+    def _patch_client(self, monkeypatch, handler):
+        class FakeAsyncClient:
+            def __init__(self, *a, **kw):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url, headers=None):
+                return handler(url, headers)
+
+        monkeypatch.setattr(auth_mod.httpx, "AsyncClient", FakeAsyncClient)
+
+    def test_no_cookie_header_fails_without_network_call(self, monkeypatch):
+        self._patch_introspect_url(monkeypatch, "http://host/whoami")
+        assert asyncio.run(auth_mod.is_authenticated(self.FakeRequest())) is False
+
+    def test_upstream_200_passes(self, monkeypatch):
+        self._patch_introspect_url(monkeypatch, "http://host/whoami")
+        self._patch_client(monkeypatch, lambda url, headers: httpx.Response(200))
+        assert asyncio.run(auth_mod.is_authenticated(self.FakeRequest("session=abc"))) is True
+
+    def test_upstream_401_fails(self, monkeypatch):
+        self._patch_introspect_url(monkeypatch, "http://host/whoami")
+        self._patch_client(monkeypatch, lambda url, headers: httpx.Response(401))
+        assert asyncio.run(auth_mod.is_authenticated(self.FakeRequest("session=abc"))) is False
+
+    def test_upstream_network_error_fails_closed(self, monkeypatch):
+        self._patch_introspect_url(monkeypatch, "http://host/whoami")
+
+        def _raise(url, headers):
+            raise httpx.ConnectError("boom")
+
+        self._patch_client(monkeypatch, _raise)
+        assert asyncio.run(auth_mod.is_authenticated(self.FakeRequest("session=abc"))) is False
+
+    def test_local_cookie_ignored_when_introspect_url_set(self, monkeypatch):
+        # Even a valid local cookie shouldn't pass once passthrough mode is on.
+        self._patch_introspect_url(monkeypatch, "http://host/whoami")
+        self._patch_client(monkeypatch, lambda url, headers: httpx.Response(401))
+        cookie = auth_mod.make_cookie("admin")
+        request = self.FakeRequest(f"{auth_mod.COOKIE_NAME}={cookie}")
+        assert asyncio.run(auth_mod.is_authenticated(request)) is False

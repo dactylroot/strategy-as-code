@@ -66,14 +66,7 @@ def patch_feature(wbs: str, body: FeatureUpdate, request: Request):
         if body.status is not None:
             text = product_parser.transform_feature_status(text, wbs, body.status)
         if score_explicit:
-            cur_status = product_parser.get_feature_status(text, wbs)
             text = product_parser.transform_feature_score(text, wbs, body.value, body.effort)
-            if body.status is None:
-                if body.value is not None and body.effort is not None:
-                    if cur_status == FeatureStatus.scoped:
-                        text = product_parser.transform_feature_status(text, wbs, FeatureStatus.scored)
-                elif cur_status == FeatureStatus.scored:
-                    text = product_parser.transform_feature_status(text, wbs, FeatureStatus.scoped)
         if body.notes is not None:
             text = product_parser.transform_feature_notes(text, wbs, body.notes)
         if body.flagged is not None:
@@ -207,12 +200,11 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
 
         for wbs, f in wbs_to_feature.items():
             if f.status == FeatureStatus.planned and wbs not in all_active:
-                demoted = FeatureStatus.scored if (f.value is not None and f.effort is not None) else FeatureStatus.gap
                 try:
-                    product_text = product_parser.transform_feature_status(product_text, wbs, demoted)
+                    product_text = product_parser.transform_feature_status(product_text, wbs, FeatureStatus.idea)
                 except Exception:
                     pass
-        _promotable = {FeatureStatus.gap, FeatureStatus.idea, FeatureStatus.scoped, FeatureStatus.scored}
+        _promotable = {FeatureStatus.gap, FeatureStatus.idea}
         for wbs in all_active:
             f = wbs_to_feature.get(wbs)
             if f and f.status in _promotable:
@@ -268,12 +260,11 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
 
         for wbs, f in wbs_to_feature.items():
             if f.status == FeatureStatus.planned and wbs not in all_active:
-                demoted = FeatureStatus.scored if (f.value is not None and f.effort is not None) else FeatureStatus.gap
                 try:
-                    product_parser.update_feature_status(settings.product_md, wbs, demoted)
+                    product_parser.update_feature_status(settings.product_md, wbs, FeatureStatus.idea)
                 except Exception:
                     pass
-        _promotable = {FeatureStatus.gap, FeatureStatus.idea, FeatureStatus.scoped, FeatureStatus.scored}
+        _promotable = {FeatureStatus.gap, FeatureStatus.idea}
         for wbs in all_active:
             f = wbs_to_feature.get(wbs)
             if f and f.status in _promotable:

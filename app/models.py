@@ -7,8 +7,6 @@ from pydantic import BaseModel, computed_field
 class FeatureStatus(str, Enum):
     gap        = "Gap"
     idea       = "Idea"
-    scoped     = "Scoped"
-    scored     = "Scored"
     planned    = "Planned"    # backward-compat alias for In-Progress
     in_progress = "In-Progress"
     live       = "Live"
@@ -30,6 +28,22 @@ class Feature(BaseModel):
         if self.value is None or self.effort is None or self.effort == 0:
             return None
         return self.value / self.effort
+
+    @computed_field
+    @property
+    def stage(self) -> str:
+        """Display-time lifecycle stage. Scoped and Scored are never stored -
+        a Gap or Idea reads as Scoped once it has a WBS assignment and real
+        notes, and as Scored once Value and Effort are also both set."""
+        if self.status not in (FeatureStatus.gap, FeatureStatus.idea):
+            return self.status.value
+        has_wbs = bool(self.wbs.strip())
+        has_notes = bool(self.notes.strip())
+        if not (has_wbs and has_notes):
+            return self.status.value
+        if self.value is not None and self.effort is not None:
+            return "Scored"
+        return "Scoped"
 
 
 class WBSSubArea(BaseModel):
@@ -57,9 +71,7 @@ class WBSSubArea(BaseModel):
     @computed_field
     @property
     def gap_count(self) -> int:
-        return sum(1 for f in self.features if f.status in (
-            FeatureStatus.gap, FeatureStatus.idea, FeatureStatus.scoped, FeatureStatus.scored
-        ))
+        return sum(1 for f in self.features if f.status in (FeatureStatus.gap, FeatureStatus.idea))
 
 
 class WBSArea(BaseModel):
@@ -93,9 +105,7 @@ class WBSArea(BaseModel):
     @computed_field
     @property
     def gap_count(self) -> int:
-        return sum(1 for f in self.all_features if f.status in (
-            FeatureStatus.gap, FeatureStatus.idea, FeatureStatus.scoped, FeatureStatus.scored
-        ))
+        return sum(1 for f in self.all_features if f.status in (FeatureStatus.gap, FeatureStatus.idea))
 
 
 class ScopeItem(BaseModel):
@@ -148,9 +158,7 @@ class ProductDoc(BaseModel):
     @computed_field
     @property
     def gap_count(self) -> int:
-        return sum(1 for f in self.all_features if f.status in (
-            FeatureStatus.gap, FeatureStatus.idea, FeatureStatus.scoped, FeatureStatus.scored
-        ))
+        return sum(1 for f in self.all_features if f.status in (FeatureStatus.gap, FeatureStatus.idea))
 
     @computed_field
     @property

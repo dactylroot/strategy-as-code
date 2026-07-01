@@ -39,7 +39,7 @@
 
 <script>
 function quickAdvance(id, newStatus) {
-  fetch('/api/bugs/' + id, {
+  fetch('{{ base_path }}/api/bugs/' + id, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: newStatus }),
   }).then(r => { if (r.ok) location.reload(); });

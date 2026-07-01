@@ -116,25 +116,25 @@
 <body>
 
 <aside class="sidebar">
-  <a href="/switch-project" class="sidebar-brand" style="text-decoration:none;display:block;"
+  <a href="{{ base_path }}/switch-project" class="sidebar-brand" style="text-decoration:none;display:block;"
      title="{% if lock_project %}Project files{% else %}Switch project{% endif %}">
     <small>strategy-as-code</small>
     {{ app_title }}
   </a>
   <nav>
     <span class="nav-section">Planning</span>
-    <a href="/dashboard" {% if active_page == 'dashboard' %}class="active"{% endif %}>Summary</a>
-    <a href="/features" {% if active_page == 'features' %}class="active"{% endif %}>Features</a>
-    <a href="/roadmap" {% if active_page == 'roadmap' %}class="active"{% endif %}>Roadmap</a>
-    <a href="/structure" {% if active_page == 'structure' %}class="active"{% endif %}>Structure</a>
-    <a href="/bugs" {% if active_page == 'bugs' %}class="active"{% endif %}>Bugs</a>
+    <a href="{{ base_path }}/dashboard" {% if active_page == 'dashboard' %}class="active"{% endif %}>Summary</a>
+    <a href="{{ base_path }}/features" {% if active_page == 'features' %}class="active"{% endif %}>Features</a>
+    <a href="{{ base_path }}/roadmap" {% if active_page == 'roadmap' %}class="active"{% endif %}>Roadmap</a>
+    <a href="{{ base_path }}/structure" {% if active_page == 'structure' %}class="active"{% endif %}>Structure</a>
+    <a href="{{ base_path }}/bugs" {% if active_page == 'bugs' %}class="active"{% endif %}>Bugs</a>
     <span class="nav-section">Reference</span>
-    <a href="/registry" {% if active_page == 'registry' %}class="active"{% endif %}>Registry</a>
-    <a href="/about" {% if active_page == 'about' %}class="active"{% endif %}>About</a>
-    <a href="/readme" {% if active_page == 'readme' %}class="active"{% endif %}>README</a>
+    <a href="{{ base_path }}/registry" {% if active_page == 'registry' %}class="active"{% endif %}>Registry</a>
+    <a href="{{ base_path }}/about" {% if active_page == 'about' %}class="active"{% endif %}>About</a>
+    <a href="{{ base_path }}/readme" {% if active_page == 'readme' %}class="active"{% endif %}>README</a>
     {% if auth_enabled %}
     <span class="nav-section">Account</span>
-    <a href="/logout">Sign Out</a>
+    <a href="{{ base_path }}/logout">Sign Out</a>
     {% endif %}
   </nav>
   {% if is_uploaded %}
@@ -165,7 +165,7 @@
   const _orig = window.fetch;
   window.fetch = function(url, opts = {}) {
     const sid = _sid();
-    if (sid && typeof url === 'string' && url.startsWith('/api/')) {
+    if (sid && typeof url === 'string' && url.startsWith('{{ base_path }}/api/')) {
       opts = { ...opts, headers: { ...(opts.headers || {}), 'X-Session-ID': sid } };
     }
     return _orig.call(this, url, opts).then(resp => {
@@ -173,7 +173,7 @@
         resp.clone().json().then(d => {
           if (d.detail === 'session_expired') {
             sessionStorage.removeItem('pac_session_id');
-            window.location.href = '/switch-project';
+            window.location.href = '{{ base_path }}/switch-project';
           }
         }).catch(() => {});
       }
@@ -189,8 +189,8 @@
 
 function exportMarkdown() {
   const sid = sessionStorage.getItem('pac_session_id');
-  const url = sid ? `/api/project/download` : '/api/project/download';
-  // For session-based downloads, need the header — use fetch + blob
+  const url = '{{ base_path }}/api/project/download';
+  // For session-based downloads, need the header - use fetch + blob
   if (sid) {
     fetch(url, { headers: { 'X-Session-ID': sid } })
       .then(r => r.blob())
@@ -205,7 +205,7 @@ function exportMarkdown() {
   }
 }
 (function() {
-  const es = new EventSource('/api/events');
+  const es = new EventSource('{{ base_path }}/api/events');
   es.onmessage = (e) => {
     if (e.data !== 'changed') return;
     const panel = document.getElementById('featurePanel');

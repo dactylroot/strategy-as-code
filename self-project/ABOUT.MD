@@ -6,6 +6,10 @@
 - Feature deletion with strict name-confirmation dialog
 - Feature search query preserved across page reloads via sessionStorage
 - → In Progress action visible on Scoped and Scored cards and in feature panel
+- Scoped and Scored are now derived from a Gap/Idea's Notes and Value/Effort instead of being separately-set statuses, removing the drift that could occur between the two
+
+**3.4 Authorization**
+- Okta SSO Integration: serve the app inline under a host's URL via a path prefix (`BASE_PATH`), and trust the host's session via a session-introspection callback (`AUTH_INTROSPECT_URL`) instead of a separate login; works with Okta, SAML, or local host auth, and fails closed if the host is unreachable
 
 ## 0.5.0
 

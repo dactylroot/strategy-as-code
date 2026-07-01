@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — {{ app_title }}{% endblock %}
+{% block title %}Dashboard - {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
 /* ── Lifecycle Pipeline ────────────────────────────── */
@@ -255,35 +255,35 @@
   <p class="card-title" style="margin:0 0 0.75rem;">Feature Lifecycle Pipeline</p>
   <div class="pipeline-row">
 
-    <a href="/features" class="pipeline-stage stage-gap {% if ideas_count == 0 %}stage-zero{% endif %}">
+    <a href="{{ base_path }}/features" class="pipeline-stage stage-gap {% if ideas_count == 0 %}stage-zero{% endif %}">
       <span class="pipeline-count">{{ ideas_count }}</span>
       <span class="pipeline-label">Ideas</span>
     </a>
 
     <span class="pipeline-arrow">&#8250;</span>
 
-    <a href="/features" class="pipeline-stage stage-prioritized {% if prioritized_count == 0 %}stage-zero{% endif %}">
+    <a href="{{ base_path }}/features" class="pipeline-stage stage-prioritized {% if prioritized_count == 0 %}stage-zero{% endif %}">
       <span class="pipeline-count">{{ prioritized_count }}</span>
       <span class="pipeline-label">Prioritized</span>
     </a>
 
     <span class="pipeline-arrow">&#8250;</span>
 
-    <a href="/features" class="pipeline-stage stage-inprogress {% if in_progress_count == 0 %}stage-zero{% endif %}">
+    <a href="{{ base_path }}/features" class="pipeline-stage stage-inprogress {% if in_progress_count == 0 %}stage-zero{% endif %}">
       <span class="pipeline-count">{{ in_progress_count }}</span>
       <span class="pipeline-label">In Progress</span>
     </a>
 
     <span class="pipeline-arrow">&#8250;</span>
 
-    <a href="/features" class="pipeline-stage stage-review {% if review_count == 0 %}stage-zero{% endif %}">
+    <a href="{{ base_path }}/features" class="pipeline-stage stage-review {% if review_count == 0 %}stage-zero{% endif %}">
       <span class="pipeline-count">{{ review_count }}</span>
       <span class="pipeline-label">Review</span>
     </a>
 
     <span class="pipeline-arrow">&#8250;</span>
 
-    <a href="/features" class="pipeline-stage stage-released {% if released_count == 0 %}stage-zero{% endif %}">
+    <a href="{{ base_path }}/features" class="pipeline-stage stage-released {% if released_count == 0 %}stage-zero{% endif %}">
       <span class="pipeline-count">{{ released_count }}</span>
       <span class="pipeline-label">Released</span>
     </a>
@@ -291,7 +291,7 @@
   </div>
 </div>
 
-<!-- WBS Chart — inline render so features are clickable -->
+<!-- WBS Chart - inline render so features are clickable -->
 <div style="margin-bottom:1.5rem;">
   <p class="card-title" style="margin-bottom:0.5rem;">Work Breakdown Structure</p>
   <div style="overflow-x:auto;">
@@ -319,7 +319,7 @@
               {{ (pct * 100)|int }}%
             </span>
           </div>
-          <!-- Feature list — each item clickable -->
+          <!-- Feature list - each item clickable -->
           <div style="padding:5px 8px 8px;font-size:0.72rem;color:#1e293b;line-height:1.75;">
             <ul style="list-style:none;margin:0;padding:0;">
               {% for feature in sa.features %}
@@ -327,7 +327,10 @@
                   data-wbs="{{ feature.wbs }}"
                   data-name="{{ feature.name }}"
                   data-notes="{{ feature.notes }}"
-                  data-stage="{{ feature.status.value }}"
+                  data-stage="{{ feature.stage }}"
+                  data-raw-status="{{ feature.status.value }}"
+                  {% if feature.value %}data-value="{{ feature.value }}"{% endif %}
+                  {% if feature.effort %}data-effort="{{ feature.effort }}"{% endif %}
                   data-flagged="{{ feature.flagged | lower }}"
                   onclick="openFeaturePanelFromEl(this)"
                   style="cursor:pointer;padding:0 0 0 0.5rem;border-radius:3px;transition:background 0.1s;
@@ -365,7 +368,8 @@
          data-wbs="{{ f.wbs }}"
          data-name="{{ f.name }}"
          data-notes="{{ f.notes }}"
-         data-stage="{{ f.status.value }}"
+         data-stage="{{ f.stage }}"
+         data-raw-status="{{ f.status.value }}"
          data-flagged="{{ f.flagged | lower }}"
          {% if f.value %}data-value="{{ f.value }}"{% endif %}
          {% if f.effort %}data-effort="{{ f.effort }}"{% endif %}
@@ -373,8 +377,8 @@
          onmouseover="this.style.background='#fef9c3'"
          onmouseout="this.style.background='#fffbeb'">
       <span style="font-family:monospace;font-size:0.65rem;background:#fde68a;color:#92400e;padding:0.1rem 0.35rem;border-radius:3px;white-space:nowrap;flex-shrink:0;">{{ f.wbs }}</span>
-      {% if f.status.value != 'Gap' %}
-      <span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#b45309;flex-shrink:0;">{{ f.status.value }}</span>
+      {% if f.stage != 'Gap' %}
+      <span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#b45309;flex-shrink:0;">{{ f.stage }}</span>
       {% endif %}
       <span style="font-size:0.85rem;font-weight:500;color:#1e293b;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ f.name }}</span>
       <span style="font-size:0.72rem;color:#94a3b8;flex-shrink:0;">{{ sa.wbs_prefix }} {{ sa.title | truncate(28, true, '…') }}</span>
@@ -389,7 +393,7 @@
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
     <p class="card-title" style="margin:0;">Recent Releases</p>
-    <a href="/roadmap" class="btn btn-ghost btn-sm">View Roadmap</a>
+    <a href="{{ base_path }}/roadmap" class="btn btn-ghost btn-sm">View Roadmap</a>
   </div>
   {% for entry in recent_changelog %}
   <div style="padding:0.75rem 0;border-bottom:1px solid #f1f5f9;{% if loop.last %}border-bottom:none;{% endif %}">
@@ -401,7 +405,7 @@
     </div>
     {% for group in entry.groups[:2] %}
     <div style="font-size:0.8rem;color:#64748b;margin-bottom:0.15rem;">
-      <strong style="color:#475569;">{{ group.label }}</strong> —
+      <strong style="color:#475569;">{{ group.label }}</strong> -
       {{ group.items | join(', ') | truncate(80) }}
     </div>
     {% endfor %}

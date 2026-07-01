@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Structure — {{ app_title }}{% endblock %}
+{% block title %}Structure - {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
 .str-section { background:#fff; border-radius:var(--radius); box-shadow:var(--card-shadow); margin-bottom:1.5rem; overflow:hidden; }
@@ -61,7 +61,7 @@
 {% block content %}
 <div class="page-header">
   <h1>Structure</h1>
-  <p class="subtitle">User personas, core workflows, and product scope — the strategic foundation of {{ product.title }}.</p>
+  <p class="subtitle">User personas, core workflows, and product scope - the strategic foundation of {{ product.title }}.</p>
 </div>
 
 <!-- User Personas -->
@@ -196,7 +196,7 @@ function _renderModalBody() {
       <div class="modal-field">
         <label>Persona</label>
         <select class="modal-input" onchange="_workflows[${i}].persona=this.value">
-          <option value="">— select persona —</option>
+          <option value="">- select persona -</option>
           ${opts}
         </select>
       </div>
@@ -378,9 +378,9 @@ function _save(endpoint, content, statusId) {
     .then(d=>{ st.textContent=d.ok?'Saved ✓':(d.detail||'Error'); st.style.color=d.ok?'#16a34a':'#dc2626'; if(d.ok) setTimeout(()=>st.textContent='',3000); })
     .catch(()=>{ st.textContent='Error'; st.style.color='#dc2626'; });
 }
-function saveUsers()     { _save('/api/structure/users',     serializeUsers(),     'users-status'); }
-function saveWorkflows() { _save('/api/structure/workflows', serializeWorkflows(), 'workflows-status'); }
-function saveScope()     { _save('/api/structure/scope',     serializeScope(),     'scope-status'); }
+function saveUsers()     { _save('{{ base_path }}/api/structure/users',     serializeUsers(),     'users-status'); }
+function saveWorkflows() { _save('{{ base_path }}/api/structure/workflows', serializeWorkflows(), 'workflows-status'); }
+function saveScope()     { _save('{{ base_path }}/api/structure/scope',     serializeScope(),     'scope-status'); }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderUsers();

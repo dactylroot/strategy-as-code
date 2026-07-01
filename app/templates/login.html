@@ -95,7 +95,7 @@
     {% if error %}
     <div class="error">{{ error }}</div>
     {% endif %}
-    <form method="post" action="/login">
+    <form method="post" action="{{ base_path }}/login">
       <input type="hidden" name="next" value="{{ next }}">
       <label for="username">Username</label>
       <input type="text" id="username" name="username" autocomplete="username" autofocus required>

@@ -2,11 +2,14 @@ from pathlib import Path
 import markdown as md
 from fastapi.templating import Jinja2Templates
 
+from .config import settings
+
 _templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(_templates_dir))
 templates.env.filters["markdown_to_html"] = lambda text: md.markdown(
     text, extensions=["tables", "fenced_code"]
 )
+templates.env.globals["base_path"] = settings.base_path
 
 
 def _wbs_header_color(pct: float) -> str:

@@ -133,6 +133,20 @@ class TestParseText:
         assert area.sub_areas[0].wbs_prefix == "1.1"
         assert area.sub_areas[1].wbs_prefix == "1.2"
 
+    def test_legacy_scoped_text_normalized_to_idea(self):
+        """Legacy literal 'Scoped' status text (from files predating the
+        derived-stage model) is normalized to Idea on parse."""
+        doc = parser._parse_text(MINIMAL_PRODUCT)
+        logout = next(f for f in doc.all_features if f.wbs == "1.1.2")
+        assert logout.status == FeatureStatus.idea
+        assert logout.stage == "Idea"  # blank notes - derivation doesn't promote it
+
+    def test_legacy_scored_text_normalized_but_still_derives_scored(self):
+        doc = parser._parse_text(MINIMAL_PRODUCT)
+        overview = next(f for f in doc.all_features if f.wbs == "1.2.1")
+        assert overview.status == FeatureStatus.idea
+        assert overview.stage == "Scored"  # has notes + both scores
+
 
 class TestGetFeatureStatus:
     def test_finds_status(self):
@@ -146,18 +160,22 @@ class TestGetFeatureStatus:
         status = parser.get_feature_status(MINIMAL_PRODUCT, "1.2.2")
         assert status == FeatureStatus.in_progress
 
+    def test_legacy_scoped_text_normalized(self):
+        status = parser.get_feature_status(MINIMAL_PRODUCT, "1.1.2")
+        assert status == FeatureStatus.idea
+
 
 class TestTransformFeatureStatus:
     def test_updates_status(self):
-        result = parser.transform_feature_status(MINIMAL_PRODUCT, "1.1.2", FeatureStatus.scored)
-        assert "| 1.1.2 | Logout | Scored |" in result
+        result = parser.transform_feature_status(MINIMAL_PRODUCT, "1.1.2", FeatureStatus.in_progress)
+        assert "| 1.1.2 | Logout | In-Progress |" in result
 
     def test_raises_on_missing_wbs(self):
         with pytest.raises(ValueError, match="9.9.9"):
             parser.transform_feature_status(MINIMAL_PRODUCT, "9.9.9", FeatureStatus.live)
 
     def test_does_not_affect_other_rows(self):
-        result = parser.transform_feature_status(MINIMAL_PRODUCT, "1.1.2", FeatureStatus.scored)
+        result = parser.transform_feature_status(MINIMAL_PRODUCT, "1.1.2", FeatureStatus.in_progress)
         assert "| 1.1.1 | Login | Live |" in result
 
 
@@ -186,8 +204,10 @@ class TestTransformFeatureNotes:
         assert logout.notes == "New note"
 
     def test_normalises_newlines(self):
+        # Raw newlines would break the markdown table row, so they're encoded
+        # as <br> (templates/JS decode this back to \n for editing/rendering).
         result = parser.transform_feature_notes(MINIMAL_PRODUCT, "1.1.1", "line1\nline2")
-        assert "line1 line2" in result
+        assert "line1<br>line2" in result
 
 
 class TestTransformFeatureScore:
@@ -240,10 +260,10 @@ class TestTransformAddFeature:
         assert feat.wbs == "1.2.3"
 
     def test_with_score(self):
-        req = NewFeature(wbs_prefix="1.1", name="Scored feat", status=FeatureStatus.scored, value=7, effort=3)
+        req = NewFeature(wbs_prefix="1.1", name="New feat", status=FeatureStatus.idea, value=7, effort=3)
         result, feat = parser.transform_add_feature(MINIMAL_PRODUCT, req)
         doc = parser._parse_text(result)
-        new_f = next(f for f in doc.all_features if f.name == "Scored feat")
+        new_f = next(f for f in doc.all_features if f.name == "New feat")
         assert new_f.value == 7
         assert new_f.effort == 3
 

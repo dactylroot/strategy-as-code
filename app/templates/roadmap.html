@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Roadmap — {{ app_title }}{% endblock %}
+{% block title %}Roadmap - {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
 /* ── Planning board ── */
@@ -178,7 +178,7 @@
         </div>
         {% if bucket.all_live %}
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-top:none;padding:0.35rem 0.65rem;font-size:0.7rem;color:#15803d;font-weight:600;">
-          All features live — ready to release
+          All features live - ready to release
         </div>
         {% endif %}
         <div class="version-bucket-list">
@@ -314,7 +314,8 @@
          data-source="product"
          data-name="{{ entry.f.name }}"
          data-notes="{{ entry.f.notes }}"
-         data-stage="{{ entry.f.status.value }}"
+         data-stage="{{ entry.f.stage }}"
+         data-raw-status="{{ entry.f.status.value }}"
          {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
          {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
          onclick="openFeaturePanelFromEl(this)"
@@ -366,9 +367,9 @@
     </div>
     <div class="form-group"><label>WBS Area <span style="color:#dc2626;">*</span></label>
       <select id="captureWbs" required style="width:100%;padding:0.4rem 0.5rem;border:1px solid #d1d5db;border-radius:4px;font-size:0.85rem;">
-        <option value="">— select a WBS area —</option>
+        <option value="">- select a WBS area -</option>
         {% for sa in sub_areas %}
-        <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} — {{ sa.title }}</option>
+        <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} - {{ sa.title }}</option>
         {% endfor %}
       </select>
     </div>
@@ -414,7 +415,7 @@ function saveRoadmap(evt, forceReload) {
     pool.querySelectorAll('[data-type="freeform"]').forEach(c => backlog_free.push(c.dataset.item));
   });
 
-  fetch('/api/roadmap/features', {
+  fetch('{{ base_path }}/api/roadmap/features', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -514,7 +515,7 @@ function submitCapture() {
   if (!name) return;
   if (!wbs) { alert('Please select a WBS area.'); return; }
   const notes = document.getElementById('captureNotes').value.trim();
-  fetch('/api/features', {
+  fetch('{{ base_path }}/api/features', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, notes, wbs_prefix: wbs, status: 'Idea' }),
   }).then(r => { if (r.ok) { document.getElementById('captureModal').close(); location.reload(); } });

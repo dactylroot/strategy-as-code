@@ -19,7 +19,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 ### Core Functionality
 - ~~Four-file markdown schema (PRODUCT, ABOUT, README, BUGS)~~ 🎆
 - ~~Web UI with live-reload on file changes~~ 🎆
-- ~~Feature lifecycle (Gap → Idea → Scoped → Scored → In-Progress → Live → Released)~~ 🎆
+- ~~Feature lifecycle (Gap / Idea → [Scoped] → [Scored] → In-Progress → Live → Released, with Scoped/Scored derived from Notes and Value/Effort rather than stored)~~ 🎆
 - ~~Value / Effort scoring with priority score calculation~~ 🎆
 - ~~Feature panel with inline editing~~ 🎆
 - ~~Release workflow with changelog automation~~ 🎆
@@ -48,7 +48,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 ### Product Manager Workflow
 1. Open the web UI and navigate to Features
 2. Review the Ideas column for newly captured requests
-3. Scope features by adding descriptions and moving them to Scoped
+3. Scope features by adding descriptions - they read as Scoped automatically once notes are saved
 4. Score features with Value and Effort to compute priority
 5. Navigate to Roadmap to sequence upcoming releases
 6. Cut a release via the UI when In Progress items are Live
@@ -57,7 +57,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 1. Open a Claude Code session in the project repo
 2. Invoke /program-strategy and describe the work
 3. Claude updates PRODUCT.MD, ABOUT.MD, and BUGS.MD
-4. Push changes — the live UI reflects updates immediately
+4. Push changes - the live UI reflects updates immediately
 
 ## Features
 
@@ -125,7 +125,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 | 2.1.2 | Roadmap section editing | Live | 8 | 3 | In Progress / Planned / Backlog via conversation |
 | 2.1.3 | Changelog entry generation | Live | 8 | 2 | Drafts release notes from in-progress items |
 | 2.1.4 | WBS chart regeneration | Live | 6 | 2 | Triggers PNG and HTML chart rebuild |
-| 2.1.5 | PRD generation | Scoped | 7 | 4 | Generate structured PRD docs from feature descriptions |
+| 2.1.5 | PRD generation | Idea | 7 | 4 | Generate structured PRD docs from feature descriptions |
 | 2.1.6 | OKR alignment | Idea | 6 | 5 | Map features to OKRs and surface gaps |
 
 #### 2.2 Install & Integration
@@ -171,7 +171,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
 | 3.4.1 | Role-based access control | Idea | | | Separate idea-submit, read-only, and admin roles; no write or delete for submitters |
-| 3.4.2 | Okta SSO Integration | Idea | | | Inherit roles from a parent service via Okta when the app is embedded. |
+| 3.4.2 | Okta SSO Integration | Live | | | Serves the app inline under a host project's own URL via a configurable path prefix (BASE_PATH), and trusts the host's existing session via a session-introspection callback (AUTH_INTROSPECT_URL) instead of showing a separate login screen; works regardless of whether the host uses Okta, SAML, or local auth. Fails closed if the host is unreachable. Role-based permission inheritance is a separate, still-open item under 3.4.1. |
 
 #### 3.5 Data Management
 
