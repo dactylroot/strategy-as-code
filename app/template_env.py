@@ -10,6 +10,7 @@ templates.env.filters["markdown_to_html"] = lambda text: md.markdown(
     text, extensions=["tables", "fenced_code"]
 )
 templates.env.globals["base_path"] = settings.base_path
+templates.env.globals["embed_chrome"] = settings.embed_chrome
 
 
 def _wbs_header_color(pct: float) -> str:

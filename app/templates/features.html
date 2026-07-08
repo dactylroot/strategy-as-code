@@ -191,11 +191,33 @@
   <div class="lc-col col-ideas">
     <div class="lc-header">Ideas <span class="lc-count">{{ ideas|length }}</span></div>
     <div class="lc-body" id="col-ideas">
-      {% for item in ideas %}
-        {% include "partials/fc_idea.html" %}
-      {% endfor %}
       {% if not ideas %}
       <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">All gaps are scoped. Capture new ideas above.</p>
+      {% else %}
+        {% for sa in sub_areas %}
+          {% set sa_ideas = [] %}
+          {% for item in ideas %}
+            {% if item.wbs.startswith(sa.wbs_prefix + '.') %}
+              {% if sa_ideas.append(item) %}{% endif %}
+            {% endif %}
+          {% endfor %}
+          {% if sa_ideas %}
+          <details class="fc-group">
+            <summary>
+              <div class="fc-head">
+                <div class="fc-meta">
+                  <span class="fc-wbs" style="background:#fef3c7;color:#92400e;">{{ sa.wbs_prefix }}</span>
+                  <span class="fc-stage-badge" style="color:#b45309;">{{ sa_ideas|length }} idea{{ '' if sa_ideas|length == 1 else 's' }}</span>
+                </div>
+                <div class="fc-title">{{ sa.title }}</div>
+              </div>
+            </summary>
+            {% for item in sa_ideas %}
+              {% include "partials/fc_idea.html" %}
+            {% endfor %}
+          </details>
+          {% endif %}
+        {% endfor %}
       {% endif %}
     </div>
   </div>
@@ -264,12 +286,16 @@
                  data-reviewable="true"
                  {% if item.value %}data-value="{{ item.value }}"{% endif %}
                  {% if item.effort %}data-effort="{{ item.effort }}"{% endif %}
+                 data-owner="{{ item.owner or '' }}"
+                 data-uat-confirmed="{{ item.uat_confirmed | lower }}"
                  onclick="openFeaturePanelFromEl(this)">
               <div class="fc-head" style="padding:0.4rem 0.65rem;">
                 <div class="fc-meta">
                   <span class="fc-wbs" style="background:#fff7ed;color:#92400e;">{{ item.wbs }}</span>
+                  {% if item.uat_confirmed %}<span style="font-size:0.62rem;font-weight:700;color:#166534;background:#dcfce7;padding:0.05rem 0.3rem;border-radius:3px;">UAT ✓</span>{% endif %}
                 </div>
                 <div class="fc-title" style="color:#94a3b8;font-size:0.8rem;">{{ item.name }}</div>
+                {% if item.owner %}<div style="font-size:0.68rem;color:#94a3b8;">👤 {{ item.owner }}</div>{% endif %}
               </div>
             </div>
             {% endfor %}
@@ -313,12 +339,16 @@
                  data-stage="{{ item.status.value }}"
                  {% if item.value %}data-value="{{ item.value }}"{% endif %}
                  {% if item.effort %}data-effort="{{ item.effort }}"{% endif %}
+                 data-owner="{{ item.owner or '' }}"
+                 data-uat-confirmed="{{ item.uat_confirmed | lower }}"
                  onclick="openFeaturePanelFromEl(this)">
               <div class="fc-head" style="padding:0.4rem 0.65rem;">
                 <div class="fc-meta">
                   <span class="fc-wbs" style="background:#f0fdf4;color:#166534;">{{ item.wbs }}</span>
+                  {% if item.uat_confirmed %}<span style="font-size:0.62rem;font-weight:700;color:#166534;background:#dcfce7;padding:0.05rem 0.3rem;border-radius:3px;">UAT ✓</span>{% endif %}
                 </div>
                 <div class="fc-title" style="color:#94a3b8;font-size:0.8rem;">{{ item.name }}</div>
+                {% if item.owner %}<div style="font-size:0.68rem;color:#94a3b8;">👤 {{ item.owner }}</div>{% endif %}
               </div>
             </div>
             {% endfor %}

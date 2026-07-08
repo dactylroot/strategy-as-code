@@ -34,6 +34,14 @@ def _session(request: Request) -> session_store.Session | None:
     return session_store.get(request.headers.get("X-Session-ID"))
 
 
+def _default_owner(request: Request, owner: str | None) -> str | None:
+    """Fall back to the host app's identity for the user who's actually
+    making the request, forwarded via X-Host-User (see the Embedded
+    deployment mode in README.md) - only used when the caller didn't set
+    owner explicitly."""
+    return owner or request.headers.get("X-Host-User") or None
+
+
 def _require_session(request: Request) -> session_store.Session:
     s = _session(request)
     if s is None:
@@ -71,6 +79,10 @@ def patch_feature(wbs: str, body: FeatureUpdate, request: Request):
             text = product_parser.transform_feature_notes(text, wbs, body.notes)
         if body.flagged is not None:
             text = product_parser.transform_feature_flagged(text, wbs, body.flagged)
+        if body.owner is not None:
+            text = product_parser.transform_feature_owner(text, wbs, body.owner)
+        if body.uat_confirmed is not None:
+            text = product_parser.transform_feature_uat(text, wbs, body.uat_confirmed)
         return text
 
     try:
@@ -148,6 +160,7 @@ def post_feature(body: NewFeature, request: Request):
         raise HTTPException(status_code=400, detail="Feature name cannot contain '|' or span multiple lines")
     if "|" in body.notes:
         raise HTTPException(status_code=400, detail="Feature notes cannot contain '|'")
+    body = body.model_copy(update={"owner": _default_owner(request, body.owner)})
     try:
         if s:
             text = s.get_file("PRODUCT.MD")
@@ -593,6 +606,7 @@ def get_bugs(request: Request):
 
 @router.post("/bugs")
 def post_bug(body: BugCreate, request: Request):
+    body = body.model_copy(update={"owner": _default_owner(request, body.owner)})
     s = _session(request)
     if s:
         text = s.get_file("BUGS.MD") or _EMPTY_BUGS

@@ -86,6 +86,17 @@
         </div>
       </div>
 
+      <div style="border-top:1px solid #f1f5f9;padding:1rem 0;display:flex;gap:1.5rem;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Owner</label>
+          <input type="text" id="fdp-owner" placeholder="Who owns this?" style="font-size:0.82rem;width:100%;padding:0.4rem 0.6rem;border:1px solid #e2e8f0;border-radius:6px;" onchange="saveFdpOwnership()">
+        </div>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:#374151;cursor:pointer;padding-bottom:0.45rem;">
+          <input type="checkbox" id="fdp-uat-confirmed" onchange="saveFdpOwnership()">
+          Confirmed by owner during UAT
+        </label>
+      </div>
+
       <div style="border-top:1px solid #f1f5f9;padding-top:1.25rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
           <label style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">Position in WBS - drag to reassign</label>
@@ -201,6 +212,8 @@ function openFeaturePanelFromEl(el) {
     effort: d.effort ? parseFloat(d.effort) : null,
     reviewable: d.reviewable === 'true',
     flagged: d.flagged === 'true',
+    owner: d.owner || '',
+    uatConfirmed: d.uatConfirmed === 'true',
   });
 }
 
@@ -242,6 +255,8 @@ function openFeaturePanel(opts) {
   fdpNotesMode('edit');
   document.getElementById('fdp-value').value      = opts.value  ? String(opts.value)  : '';
   document.getElementById('fdp-effort').value     = opts.effort ? String(opts.effort) : '';
+  document.getElementById('fdp-owner').value = opts.owner || '';
+  document.getElementById('fdp-uat-confirmed').checked = !!opts.uatConfirmed;
   document.getElementById('fdp-score-action').innerHTML = '';
   const isLive = opts.stage === 'Live' || opts.stage === 'Completed' || opts.stage === 'Released';
   const isReview = opts.reviewable && (opts.stage === 'Live');
@@ -327,6 +342,16 @@ function fdpClearGapFlag() {
     _renderGapActions(_fdp.rawStatus || _fdp.stage, false);
     _fdpDirty = true;
   });
+}
+
+function saveFdpOwnership() {
+  if (!_fdp.wbs) return;
+  const owner = document.getElementById('fdp-owner').value.trim();
+  const uatConfirmed = document.getElementById('fdp-uat-confirmed').checked;
+  fetch('{{ base_path }}/api/features/' + encodeURIComponent(_fdp.wbs), {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({owner: owner || null, uat_confirmed: uatConfirmed}),
+  }).then(r => { if (r.ok) { _fdp.owner = owner; _fdp.uatConfirmed = uatConfirmed; _fdpDirty = true; } });
 }
 
 let _scoreDebounce = null;

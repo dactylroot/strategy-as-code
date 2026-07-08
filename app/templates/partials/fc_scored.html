@@ -9,6 +9,8 @@
      data-value="{{ item.value or '' }}"
      data-effort="{{ item.effort or '' }}"
      data-flagged="{{ item.flagged | lower }}"
+     data-owner="{{ item.owner or '' }}"
+     data-uat-confirmed="{{ item.uat_confirmed | lower }}"
      onclick="openFeaturePanelFromEl(this)">
   <div class="fc-head">
     <div class="fc-meta">

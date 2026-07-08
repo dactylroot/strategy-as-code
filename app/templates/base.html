@@ -115,6 +115,7 @@
 </head>
 <body>
 
+{% if not embed_chrome %}
 <aside class="sidebar">
   <a href="{{ base_path }}/switch-project" class="sidebar-brand" style="text-decoration:none;display:block;"
      title="{% if lock_project %}Project files{% else %}Switch project{% endif %}">
@@ -153,6 +154,7 @@
   </div>
   {% endif %}
 </aside>
+{% endif %}
 
 <main class="main">
   {% block content %}{% endblock %}
@@ -204,6 +206,7 @@ function exportMarkdown() {
     window.location.href = url;
   }
 }
+{% if not embed_chrome %}
 (function() {
   const es = new EventSource('{{ base_path }}/api/events');
   es.onmessage = (e) => {
@@ -214,6 +217,7 @@ function exportMarkdown() {
   };
   es.onerror = () => es.close();
 })();
+{% endif %}
 </script>
 </body>
 </html>

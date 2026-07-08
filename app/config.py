@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     base_path: str = ""  # URL prefix this app is served under, e.g. "/strategy"
     auth_introspect_url: str = ""  # Host session-introspection endpoint; enables auth passthrough
     host_login_url: str = ""  # Host's login entry point; redirect target in passthrough mode
+    embed_chrome: bool = False  # When True, hide this app's own sidebar/nav (host provides its own)
 
     model_config = {"env_prefix": ""}
 
@@ -166,6 +167,10 @@ class _SettingsProxy:
     @property
     def host_login_url(self) -> str:
         return _base.host_login_url
+
+    @property
+    def embed_chrome(self) -> bool:
+        return _base.embed_chrome
 
 
 settings = _SettingsProxy()  # type: ignore[assignment]

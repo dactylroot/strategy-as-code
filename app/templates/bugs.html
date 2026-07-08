@@ -291,6 +291,16 @@
             <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Fix Version</label>
             <input type="text" id="bpFixVersion" placeholder="e.g. 0.2.2" style="font-size:0.82rem;">
           </div>
+          <div style="margin-bottom:0.75rem;">
+            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Owner</label>
+            <input type="text" id="bpOwner" placeholder="Who owns this?" style="font-size:0.82rem;" onchange="saveBugField()">
+          </div>
+          <div style="margin-bottom:0.75rem;">
+            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:#374151;cursor:pointer;">
+              <input type="checkbox" id="bpUatConfirmed" onchange="saveBugField()">
+              Confirmed by owner during UAT
+            </label>
+          </div>
           <div id="bpResolveSection">
             <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Resolved In</label>
             <input type="text" id="bpResolvedIn" placeholder="e.g. v0.3.0" style="font-size:0.82rem;margin-bottom:0.5rem;">
@@ -388,7 +398,7 @@ function submitBug() {
   });
 }
 
-function openBugPanel(id, title, severity, status, notes, wbs, fixVersion) {
+function openBugPanel(id, title, severity, status, notes, wbs, fixVersion, owner, uatConfirmed) {
   _bugId = id;
   document.getElementById('bpTitle').value    = title;
   document.getElementById('bpNotes').value    = notes;
@@ -396,6 +406,8 @@ function openBugPanel(id, title, severity, status, notes, wbs, fixVersion) {
   document.getElementById('bpStatus').value   = status;
   document.getElementById('bpSaveStatus').textContent = '';
   document.getElementById('bpFixVersion').value = fixVersion || '';
+  document.getElementById('bpOwner').value = owner || '';
+  document.getElementById('bpUatConfirmed').checked = !!uatConfirmed;
   document.getElementById('bpFixVersionSection').style.display = status === 'Fix In Progress' ? 'block' : 'none';
   // Meta badges
   const sevColors = { Critical:'#991b1b', High:'#9a3412', Medium:'#92400e', Low:'#475569' };
@@ -466,12 +478,15 @@ function saveBug() {
 
 function saveBugField() {
   const fixVersion = document.getElementById('bpFixVersion').value.trim();
+  const owner = document.getElementById('bpOwner').value.trim();
   fetch('{{ base_path }}/api/bugs/' + _bugId, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      severity:    document.getElementById('bpSeverity').value,
-      status:      document.getElementById('bpStatus').value,
-      fix_version: fixVersion || null,
+      severity:      document.getElementById('bpSeverity').value,
+      status:        document.getElementById('bpStatus').value,
+      fix_version:   fixVersion || null,
+      owner:         owner || null,
+      uat_confirmed: document.getElementById('bpUatConfirmed').checked,
     }),
   }).then(r => { if (r.ok) setTimeout(() => location.reload(), 400); });
 }

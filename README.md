@@ -127,6 +127,7 @@ Supports `linux/amd64` and `linux/arm64`.
 | `BASE_PATH` | (empty) | URL prefix to serve under, e.g. `/strategy` - see [Embedded](#embedded) below |
 | `AUTH_INTROSPECT_URL` | (empty) | Host session-introspection endpoint - see [Embedded](#embedded) below |
 | `HOST_LOGIN_URL` | (empty) | Host's login page, used as the redirect target in embedded mode |
+| `EMBED_CHROME` | `false` | When `true`, hides this app's own sidebar/nav - use when the host page already provides navigation, e.g. inside an iframe |
 
 ### Deployment modes
 
@@ -157,9 +158,14 @@ Serves the app inline under a host project's own domain at a path prefix, trusti
 BASE_PATH=/strategy \
 AUTH_INTROSPECT_URL=http://host-app:8080/internal/whoami \
 HOST_LOGIN_URL=/login \
+EMBED_CHROME=true \
 PROJECT_DIR=/path/to/your/project ./run.sh
 ```
 
 - `BASE_PATH` prefixes every route, redirect, and link so the app resolves correctly behind a reverse proxy forwarding `host.com/strategy/*` to it.
 - `AUTH_INTROSPECT_URL` points at an endpoint on the host that validates its own session cookie, however the host authenticates its users (Okta or otherwise), and returns `200` or `401`. Setting this replaces local login entirely, and access fails closed if the host is unreachable.
 - `HOST_LOGIN_URL` is where unauthenticated visitors get redirected, so there's exactly one login screen for the combined experience.
+- `EMBED_CHROME=true` hides this app's own sidebar/nav, e.g. when it's shown inside an iframe on a host page that already has its own navigation. The host is then responsible for letting users get to Dashboard/Features/Roadmap/Structure/Bugs (e.g. by pointing the iframe's `src` at `{BASE_PATH}/dashboard`, `{BASE_PATH}/features`, etc).
+
+To attribute bugs/features created through the embed to the actual host user (not a shared service account), have the host's reverse proxy forward an `X-Host-User` header (any stable identifier - username, email) on every request it proxies through. `POST /api/bugs` and `POST /api/features` use it as the `owner` when the request body doesn't set one explicitly; owner and UAT-confirmed can be reassigned later from either app's UI regardless of how they were first set.
+- `EMBED_CHROME=true` hides this app's own sidebar/nav, e.g. when it's shown inside an iframe on a host page that already has its own navigation. The host is then responsible for letting users get to Dashboard/Features/Roadmap/Structure/Bugs (e.g. by pointing the iframe's `src` at `{BASE_PATH}/dashboard`, `{BASE_PATH}/features`, etc).

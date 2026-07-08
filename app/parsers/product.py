@@ -128,20 +128,25 @@ def _parse_text(text: str) -> ProductDoc:
                 except ValueError:
                     continue
                 # 6-column format: WBS | Name | Status | Value | Effort | Notes
-                # 7-column format: WBS | Name | Status | Value | Effort | Notes | Flag
+                # 7-column format: adds Flag
+                # 8/9-column format: adds Owner / UAT Confirmed
                 # 4-column format: WBS | Name | Status | Notes (legacy)
                 if len(cells) >= 6:
                     value   = int(cells[3]) if cells[3].isdigit() else None
                     effort  = int(cells[4]) if cells[4].isdigit() else None
                     notes   = cells[5] if len(cells) > 5 else ""
                     flagged = len(cells) >= 7 and cells[6].strip().lower() in ("gap", "flagged", "true")
+                    owner   = cells[7].strip() if len(cells) > 7 and cells[7].strip() else None
+                    uat_confirmed = len(cells) > 8 and cells[8].strip().lower() in ("yes", "true")
                 else:
                     value, effort = None, None
                     notes   = cells[3] if len(cells) > 3 else ""
                     flagged = False
+                    owner = None
+                    uat_confirmed = False
                 features.append(Feature(wbs=wbs_code, name=feat_name, status=status,
                                         value=value, effort=effort, notes=notes,
-                                        flagged=flagged))
+                                        flagged=flagged, owner=owner, uat_confirmed=uat_confirmed))
 
             sub_areas.append(WBSSubArea(wbs_prefix=sub_prefix, title=sub_title, features=features))
 
@@ -257,9 +262,10 @@ def transform_feature_name(text: str, wbs: str, new_name: str) -> str:
 
 def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
     new_notes = new_notes.replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
-    # Match 6-column rows; optional 7th column (flag) captured in group 3 and preserved
+    # Match 6-column rows; any trailing columns (Flag/Owner/UAT Confirmed)
+    # captured in group 3 and preserved as-is, however many there are.
     pattern = re.compile(
-        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|[^|]*\|[^|]*\|)([^|]*)(\|(?:[^|]*\|)?)$",
+        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|[^|]*\|[^|]*\|)([^|]*)(\|.*)$",
         re.MULTILINE,
     )
     new_text, n = pattern.subn(lambda m: f"{m.group(1)} {new_notes} {m.group(3)}", text)
@@ -276,30 +282,55 @@ def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
     return new_text
 
 
-def transform_feature_flagged(text: str, wbs: str, flagged: bool) -> str:
-    """Set or clear the gap flag (7th column) on a feature row."""
+def _normalize_feature_cells(cells: list[str]) -> list[str]:
+    """Normalise a parsed feature row to at least 6 columns
+    (WBS|Name|Status|Value|Effort|Notes), preserving any trailing
+    Flag/Owner/UAT-Confirmed columns as-is."""
+    if len(cells) == 4:
+        return [cells[0], cells[1], cells[2], "", "", cells[3]]
+    if len(cells) == 5:
+        return [cells[0], cells[1], cells[2], cells[3], "", cells[4]]
+    return list(cells)
+
+
+def _set_feature_trailing_cell(text: str, wbs: str, index: int, value: str) -> str:
+    """Set the trailing column at `index` (0-based; 6=Flag, 7=Owner, 8=UAT
+    Confirmed) on a feature row, padding with empty columns as needed and
+    preserving every other trailing column untouched. Drops the trailing
+    columns entirely if none of them end up populated."""
     pattern = re.compile(
         rf"^\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|.*\|$",
         re.MULTILINE,
     )
 
     def _replace(m: re.Match) -> str:
-        cells = [c.strip() for c in m.group(0).split("|")[1:-1]]
-        # Normalise to 6 columns (WBS|Name|Status|Value|Effort|Notes)
-        if len(cells) == 4:
-            cells = [cells[0], cells[1], cells[2], "", "", cells[3]]
-        elif len(cells) == 5:
-            cells = [cells[0], cells[1], cells[2], cells[3], "", cells[4]]
-        base = cells[:6]
-        if flagged:
-            return "| " + " | ".join(base) + " | gap |"
-        else:
-            return "| " + " | ".join(base) + " |"
+        cells = _normalize_feature_cells([c.strip() for c in m.group(0).split("|")[1:-1]])
+        while len(cells) <= index:
+            cells.append("")
+        cells[index] = value
+        if not any(cells[6:]):
+            cells = cells[:6]
+        return "| " + " | ".join(cells) + " |"
 
     new_text, n = pattern.subn(_replace, text)
     if n != 1:
         raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
     return new_text
+
+
+def transform_feature_flagged(text: str, wbs: str, flagged: bool) -> str:
+    """Set or clear the gap flag (7th column) on a feature row."""
+    return _set_feature_trailing_cell(text, wbs, 6, "gap" if flagged else "")
+
+
+def transform_feature_owner(text: str, wbs: str, owner: str | None) -> str:
+    """Set or clear the Owner (8th column) on a feature row."""
+    return _set_feature_trailing_cell(text, wbs, 7, owner or "")
+
+
+def transform_feature_uat(text: str, wbs: str, uat_confirmed: bool) -> str:
+    """Set or clear the UAT Confirmed (9th column) on a feature row."""
+    return _set_feature_trailing_cell(text, wbs, 8, "Yes" if uat_confirmed else "")
 
 
 def get_feature_status(text: str, wbs: str) -> FeatureStatus | None:
@@ -322,9 +353,10 @@ def transform_feature_score(text: str, wbs: str, value: int | None, effort: int 
     Normalises legacy 4-col rows to 6-col."""
     v_str = f" {value} " if value is not None else "  "
     e_str = f" {effort} " if effort is not None else " "
-    # 6-column row (optional 7th flag column preserved in group 2)
+    # 6-column row; any trailing columns (Flag/Owner/UAT Confirmed) preserved
+    # as-is in group 2, however many there are.
     pat6 = re.compile(
-        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|)[^|]*\|[^|]*(\|[^|]*\|(?:[^|]*\|)?)$",
+        rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|)[^|]*\|[^|]*(\|[^|]*\|.*)$",
         re.MULTILINE,
     )
     new_text, n = pat6.subn(lambda m: f"{m.group(1)}{v_str}|{e_str}{m.group(2)}", text)
@@ -378,11 +410,13 @@ def transform_add_feature(text: str, req: NewFeature) -> tuple[str, Feature]:
     e_str = str(req.effort) if req.effort is not None else ""
     encoded_notes = req.notes.replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
     new_row = f"| {new_wbs} | {req.name} | {req.status.value} | {v_str} | {e_str} | {encoded_notes} |"
+    if req.owner:
+        new_row += f"  | {req.owner} |"  # empty Flag column, then Owner
     insert_pos = sub_m.end() + last_row_m.end()
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
     return new_text, Feature(
         wbs=new_wbs, name=req.name, status=req.status, notes=req.notes,
-        value=req.value, effort=req.effort,
+        value=req.value, effort=req.effort, owner=req.owner,
     )
 
 

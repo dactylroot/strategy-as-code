@@ -21,6 +21,8 @@ class Feature(BaseModel):
     effort: int | None = None
     notes: str = ""
     flagged: bool = False
+    owner: str | None = None
+    uat_confirmed: bool = False
 
     @computed_field
     @property
@@ -227,6 +229,8 @@ class BugItem(BaseModel):
     notes: str = ""
     wbs_ref: str | None = None
     fix_version: str | None = None
+    owner: str | None = None
+    uat_confirmed: bool = False
 
 
 class ResolvedBug(BaseModel):
@@ -247,6 +251,7 @@ class BugCreate(BaseModel):
     severity: BugSeverity = BugSeverity.medium
     notes: str = ""
     wbs_ref: str | None = None
+    owner: str | None = None
 
 
 class BugUpdate(BaseModel):
@@ -255,6 +260,8 @@ class BugUpdate(BaseModel):
     status: BugStatus | None = None
     notes: str | None = None
     fix_version: str | None = None
+    owner: str | None = None
+    uat_confirmed: bool | None = None
 
 
 # API request/response models
@@ -270,12 +277,15 @@ class FeatureUpdate(BaseModel):
     effort: int | None = None
     notes: str | None = None
     flagged: bool | None = None
+    owner: str | None = None
+    uat_confirmed: bool | None = None
 
 
 class NewFeature(BaseModel):
     wbs_prefix: str
     name: str
     status: FeatureStatus = FeatureStatus.idea
+    owner: str | None = None
     value: int | None = None
     effort: int | None = None
     notes: str = ""

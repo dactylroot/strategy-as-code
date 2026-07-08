@@ -6,6 +6,8 @@
      data-notes="{{ bug.notes }}"
      data-wbs="{{ bug.wbs_ref or '' }}"
      data-fix-version="{{ bug.fix_version or '' }}"
+     data-owner="{{ bug.owner or '' }}"
+     data-uat-confirmed="{{ bug.uat_confirmed | lower }}"
      onclick="openBugPanel(
        parseInt(this.dataset.id),
        this.dataset.title,
@@ -13,16 +15,20 @@
        this.dataset.status,
        this.dataset.notes,
        this.dataset.wbs,
-       this.dataset.fixVersion
+       this.dataset.fixVersion,
+       this.dataset.owner,
+       this.dataset.uatConfirmed === 'true'
      )">
   <div class="bug-meta">
     <span class="bug-id">#{{ bug.id }}</span>
     <span class="severity-badge sev-{{ bug.severity.value | lower }}">{{ bug.severity.value }}</span>
+    {% if bug.uat_confirmed %}<span style="font-size:0.65rem;font-weight:700;color:#166534;background:#dcfce7;padding:0.1rem 0.35rem;border-radius:3px;">UAT ✓</span>{% endif %}
   </div>
   <div class="bug-title">{{ bug.title }}</div>
   {% if bug.notes %}<div class="bug-notes">{{ bug.notes | truncate(80) }}</div>{% endif %}
   {% if bug.fix_version %}<div style="margin-top:0.2rem;font-size:0.65rem;font-weight:700;color:#1e40af;background:#dbeafe;padding:0.1rem 0.35rem;border-radius:3px;display:inline-block;">{{ bug.fix_version }}</div>{% endif %}
   {% if bug.wbs_ref %}<div class="bug-wbs">{{ bug.wbs_ref }}</div>{% endif %}
+  {% if bug.owner %}<div style="margin-top:0.2rem;font-size:0.68rem;color:#64748b;">👤 {{ bug.owner }}</div>{% endif %}
   <div id="bthumb-{{ bug.id }}" style="display:none;margin-top:0.45rem;" onclick="event.stopPropagation();openScreenshotLightbox({{ bug.id }})">
     <img style="width:100%;max-height:80px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0;cursor:zoom-in;display:block;" alt="Screenshot">
   </div>
