@@ -7,23 +7,25 @@
        onclick="closeFeaturePanel()"></div>
   <div id="featurePanelCard" style="
     position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:min(90vw,860px);max-height:88vh;background:#fff;
+    width:min(90vw,860px);max-height:88vh;background:var(--color-bg-card);
+    border:1px solid var(--color-border-subtle);
+    backdrop-filter:var(--card-blur);-webkit-backdrop-filter:var(--card-blur);
     border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25);
     display:flex;flex-direction:column;overflow:hidden;">
 
-    <div id="fdp-header" style="padding:1.25rem 1.5rem 0.75rem;border-bottom:1px solid #f1f5f9;flex-shrink:0;">
+    <div id="fdp-header" style="padding:1.25rem 1.5rem 0.75rem;border-bottom:1px solid var(--color-border-subtle);flex-shrink:0;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
         <div style="flex:1;min-width:0;">
           <div id="fdp-meta" style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;"></div>
           <input id="fdp-name" type="text" style="
-            width:100%;font-size:1.25rem;font-weight:700;color:#0f172a;
+            width:100%;font-size:1.25rem;font-weight:700;color:var(--color-text-primary);
             border:none;border-bottom:2px solid transparent;outline:none;padding:0.1rem 0;
             background:transparent;transition:border-color 0.15s;"
-            onfocus="this.style.borderBottomColor='#2563eb'"
+            onfocus="this.style.borderBottomColor='var(--color-t3-blue)'"
             onblur="this.style.borderBottomColor='transparent'"
             placeholder="Feature name">
         </div>
-        <button onclick="closeFeaturePanel()" style="background:none;border:none;cursor:pointer;padding:0.35rem;color:#94a3b8;font-size:1.25rem;line-height:1;flex-shrink:0;">✕</button>
+        <button onclick="closeFeaturePanel()" style="background:none;border:none;cursor:pointer;padding:0.35rem;color:var(--color-text-muted);font-size:1.25rem;line-height:1;flex-shrink:0;">✕</button>
       </div>
     </div>
 
@@ -32,37 +34,37 @@
       <div style="display:grid;grid-template-columns:1fr 220px;gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
-            <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">Description / Acceptance Criteria</label>
+            <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-secondary);">Description / Acceptance Criteria</label>
             <div style="display:flex;">
               <button type="button" id="fdp-tab-edit" class="fdp-tab active" onclick="fdpNotesMode('edit')">Edit</button>
               <button type="button" id="fdp-tab-preview" class="fdp-tab" onclick="fdpNotesMode('preview')">Preview</button>
             </div>
           </div>
-          <textarea id="fdp-notes" rows="6" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.9rem;font-family:inherit;color:#1e293b;resize:vertical;line-height:1.6;background:#fafafa;"
-                    onfocus="this.style.background='#fff';this.style.borderColor='#2563eb'"
-                    onblur="this.style.background='#fafafa';this.style.borderColor='#e2e8f0'"
+          <textarea id="fdp-notes" rows="6" style="width:100%;padding:0.6rem 0.75rem;border:1px solid var(--color-border-subtle);border-radius:6px;font-size:0.9rem;font-family:inherit;color:var(--color-text-primary);resize:vertical;line-height:1.6;background:var(--color-bg-card-hover);"
+                    onfocus="this.style.background='var(--color-bg-card)';this.style.borderColor='var(--color-t3-blue)'"
+                    onblur="this.style.background='var(--color-bg-card-hover)';this.style.borderColor='var(--color-border-subtle)'"
                     placeholder="What does this feature do? How will we know it's done?&#10;&#10;Markdown supported: **bold**, *italic*, `code`, - lists"></textarea>
-          <div id="fdp-notes-preview" class="fdp-md-preview" style="display:none;min-height:9rem;max-height:320px;overflow-y:auto;padding:0.6rem 0.75rem;border:1px solid #e2e8f0;border-radius:6px;background:#fafafa;"></div>
+          <div id="fdp-notes-preview" class="fdp-md-preview" style="display:none;min-height:9rem;max-height:320px;overflow-y:auto;padding:0.6rem 0.75rem;border:1px solid var(--color-border-subtle);border-radius:6px;background:var(--color-bg-card-hover);"></div>
           <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="saveFdp()">Save Changes</button>
             <div id="fdp-status-actions" style="display:flex;gap:0.5rem;align-items:center;"></div>
             <div id="fdp-gap-actions" style="display:flex;gap:0.5rem;align-items:center;"></div>
-            <span id="fdp-save-status" style="font-size:0.8rem;color:#64748b;"></span>
+            <span id="fdp-save-status" style="font-size:0.8rem;color:var(--color-text-secondary);"></span>
           </div>
         </div>
-        <div id="fdp-score-card" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
-          <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.75rem;">Scoring</label>
-          <span id="fdp-score-wbs-hint" style="display:block;font-size:0.72rem;color:#94a3b8;margin-bottom:0.75rem;line-height:1.4;">- set both value and effort to score</span>
+        <div id="fdp-score-card" style="background:var(--color-bg-card-hover);border:1px solid var(--color-border-subtle);border-radius:8px;padding:1rem;">
+          <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-secondary);margin-bottom:0.75rem;">Scoring</label>
+          <span id="fdp-score-wbs-hint" style="display:block;font-size:0.72rem;color:var(--color-text-muted);margin-bottom:0.75rem;line-height:1.4;">- set both value and effort to score</span>
           <div style="margin-bottom:0.65rem;">
-            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Value <span style="color:#94a3b8;font-size:0.65rem;">(10 = highest impact)</span></label>
-            <select id="fdp-value" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:#1e293b;background:#fff;cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
+            <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Value <span style="color:var(--color-text-muted);font-size:0.65rem;">(10 = highest impact)</span></label>
+            <select id="fdp-value" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid var(--color-border-muted);border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:var(--color-text-primary);background:var(--color-bg-card);cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
               <option value="">-</option>
               {% for n in range(10, 0, -1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
             </select>
           </div>
           <div style="margin-bottom:0.75rem;">
-            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Effort <span style="color:#94a3b8;font-size:0.65rem;">(1 = easy, 10 = very hard)</span></label>
-            <select id="fdp-effort" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:#1e293b;background:#fff;cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
+            <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Effort <span style="color:var(--color-text-muted);font-size:0.65rem;">(1 = easy, 10 = very hard)</span></label>
+            <select id="fdp-effort" style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid var(--color-border-muted);border-radius:6px;font-size:1.1rem;text-align:center;font-weight:700;color:var(--color-text-primary);background:var(--color-bg-card);cursor:pointer;transition:border-color 0.15s;" onchange="onFdpScoreInput()">
               <option value="">-</option>
               {% for n in range(10, 0, -1) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
             </select>
@@ -71,44 +73,44 @@
           <div id="fdp-score-action"></div>
         </div>
 
-        <div id="fdp-live-card" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:1.25rem;text-align:center;">
+        <div id="fdp-live-card" style="display:none;background:var(--live-bg);border:1px solid var(--live-border);border-radius:8px;padding:1.25rem;text-align:center;">
           <div style="font-size:2rem;line-height:1;margin-bottom:0.5rem;">✓</div>
-          <div style="font-size:1rem;font-weight:700;color:#16a34a;margin-bottom:0.25rem;">Released</div>
-          <div style="font-size:0.78rem;color:#166534;margin-bottom:1rem;">Shipped and approved</div>
-          <button class="btn btn-ghost" onclick="reportBugFromFeature()" style="width:100%;font-size:0.82rem;color:#dc2626;border-color:#fecaca;">Report Bug</button>
+          <div style="font-size:1rem;font-weight:700;color:var(--live);margin-bottom:0.25rem;">Released</div>
+          <div style="font-size:0.78rem;color:var(--live);margin-bottom:1rem;">Shipped and approved</div>
+          <button class="btn btn-ghost" onclick="reportBugFromFeature()" style="width:100%;font-size:0.82rem;color:var(--gap);border-color:var(--gap-border);">Report Bug</button>
         </div>
-        <div id="fdp-review-card" style="display:none;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:1.25rem;text-align:center;">
+        <div id="fdp-review-card" style="display:none;background:var(--color-amber-bg);border:1px solid var(--color-amber-border);border-radius:8px;padding:1.25rem;text-align:center;">
           <div style="font-size:2rem;line-height:1;margin-bottom:0.5rem;">⏳</div>
-          <div style="font-size:1rem;font-weight:700;color:#c2410c;margin-bottom:0.25rem;">Awaiting Review</div>
-          <div style="font-size:0.78rem;color:#92400e;margin-bottom:1rem;">Verify this feature meets acceptance criteria</div>
+          <div style="font-size:1rem;font-weight:700;color:var(--color-amber-text);margin-bottom:0.25rem;">Awaiting Review</div>
+          <div style="font-size:0.78rem;color:var(--color-amber-text);margin-bottom:1rem;">Verify this feature meets acceptance criteria</div>
           <button class="btn btn-success" onclick="advanceFdpStatus('Released')" style="width:100%;">Approve → Released</button>
-          <button class="btn btn-ghost" onclick="advanceFdpStatus('In-Progress')" style="width:100%;margin-top:0.5rem;color:#92400e;border-color:#fed7aa;">Reject → In-Progress</button>
+          <button class="btn btn-ghost" onclick="advanceFdpStatus('In-Progress')" style="width:100%;margin-top:0.5rem;color:var(--color-amber-text);border-color:var(--color-amber-border);">Reject → In-Progress</button>
         </div>
       </div>
 
-      <div style="border-top:1px solid #f1f5f9;padding:1rem 0;display:flex;gap:1.5rem;align-items:flex-end;flex-wrap:wrap;">
+      <div style="border-top:1px solid var(--color-border-subtle);padding:1rem 0;display:flex;gap:1.5rem;align-items:flex-end;flex-wrap:wrap;">
         <div style="flex:1;min-width:180px;">
-          <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Owner</label>
-          <input type="text" id="fdp-owner" placeholder="Who owns this?" style="font-size:0.82rem;width:100%;padding:0.4rem 0.6rem;border:1px solid #e2e8f0;border-radius:6px;" onchange="saveFdpOwnership()">
+          <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Owner</label>
+          <input type="text" id="fdp-owner" placeholder="Who owns this?" style="font-size:0.82rem;width:100%;padding:0.4rem 0.6rem;border:1px solid var(--color-border-subtle);border-radius:6px;" onchange="saveFdpOwnership()">
         </div>
-        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:#374151;cursor:pointer;padding-bottom:0.45rem;">
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--color-text-secondary);cursor:pointer;padding-bottom:0.45rem;">
           <input type="checkbox" id="fdp-uat-confirmed" onchange="saveFdpOwnership()">
           Confirmed by owner during UAT
         </label>
       </div>
 
-      <div style="border-top:1px solid #f1f5f9;padding-top:1.25rem;">
+      <div style="border-top:1px solid var(--color-border-subtle);padding-top:1.25rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-          <label style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">Position in WBS - drag to reassign</label>
-          <span id="fdp-wbs-move-status" style="font-size:0.75rem;color:#16a34a;"></span>
+          <label style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-secondary);">Position in WBS - drag to reassign</label>
+          <span id="fdp-wbs-move-status" style="font-size:0.75rem;color:var(--live);"></span>
         </div>
         <div id="fdp-wbs-tree" style="display:flex;gap:0.75rem;overflow-x:auto;padding-bottom:0.5rem;">
           {% for area in product.wbs_areas %}
           <div style="flex-shrink:0;min-width:180px;max-width:220px;">
-            <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#fff;background:#1e293b;padding:0.35rem 0.65rem;border-radius:5px 5px 0 0;">
+            <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--color-bg-base);background:var(--color-text-primary);padding:0.35rem 0.65rem;border-radius:5px 5px 0 0;">
               {{ area.number }}. {{ area.title | truncate(22, true, '…') }}
             </div>
-            <div style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 5px 5px;overflow:hidden;">
+            <div style="border:1px solid var(--color-border-subtle);border-top:none;border-radius:0 0 5px 5px;overflow:hidden;">
               {% for sa in area.sub_areas %}
               <div class="wbs-drop-target"
                    id="wbs-drop-{{ sa.wbs_prefix | replace('.', '-') }}"
@@ -116,11 +118,11 @@
                    ondragover="event.preventDefault();this.classList.add('drag-over');"
                    ondragleave="this.classList.remove('drag-over');"
                    ondrop="onWbsDrop(event,'{{ sa.wbs_prefix }}')"
-                   style="padding:0.45rem 0.65rem;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:0.78rem;transition:background 0.1s;background:#fff;"
+                   style="padding:0.45rem 0.65rem;border-bottom:1px solid var(--color-border-subtle);cursor:pointer;font-size:0.78rem;transition:background 0.1s;background:var(--color-bg-card);"
                    onclick="onWbsClick('{{ sa.wbs_prefix }}')">
-                <span style="font-family:monospace;font-size:0.65rem;color:#94a3b8;">{{ sa.wbs_prefix }}</span>
-                <div style="color:#1e293b;font-weight:500;line-height:1.3;margin-top:0.1rem;">{{ sa.title | truncate(30, true, '…') }}</div>
-                <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.15rem;">{{ sa.live_count }}L / {{ sa.planned_count }}P / {{ sa.gap_count }}G</div>
+                <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--color-text-muted);">{{ sa.wbs_prefix }}</span>
+                <div style="color:var(--color-text-primary);font-weight:500;line-height:1.3;margin-top:0.1rem;">{{ sa.title | truncate(30, true, '…') }}</div>
+                <div style="font-size:0.68rem;color:var(--color-text-muted);margin-top:0.15rem;">{{ sa.live_count }}L / {{ sa.planned_count }}P / {{ sa.gap_count }}G</div>
               </div>
               {% endfor %}
             </div>
@@ -128,27 +130,27 @@
           {% endfor %}
         </div>
         <div id="fdp-drag-token" draggable="true" ondragstart="onTokenDragStart(event)"
-             style="display:none;margin-top:0.75rem;padding:0.5rem 0.75rem;background:#ede9fe;border:2px dashed #7c3aed;border-radius:6px;cursor:grab;font-size:0.82rem;font-weight:500;color:#4c1d95;width:fit-content;user-select:none;">
+             style="display:none;margin-top:0.75rem;padding:0.5rem 0.75rem;background:var(--color-purple-bg);border:2px dashed var(--color-purple-border);border-radius:6px;cursor:grab;font-size:0.82rem;font-weight:500;color:var(--color-purple-text);width:fit-content;user-select:none;">
           ☰ <span id="fdp-token-label"></span>
         </div>
         <p class="text-muted" style="margin-top:0.5rem;font-size:0.72rem;">Drag the feature token above onto a WBS sub-area, or click a sub-area to reassign.</p>
       </div>
 
-      <div style="border-top:1px solid #f1f5f9;padding-top:1.25rem;margin-top:0.25rem;">
+      <div style="border-top:1px solid var(--color-border-subtle);padding-top:1.25rem;margin-top:0.25rem;">
         <div id="fdp-delete-section">
-          <button type="button" onclick="fdpShowDeleteConfirm()" style="background:none;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:0.35rem 0.85rem;font-size:0.78rem;font-weight:600;cursor:pointer;">Delete Feature</button>
+          <button type="button" onclick="fdpShowDeleteConfirm()" style="background:none;border:1px solid var(--gap-border);color:var(--gap);border-radius:6px;padding:0.35rem 0.85rem;font-size:0.78rem;font-weight:600;cursor:pointer;">Delete Feature</button>
         </div>
-        <div id="fdp-delete-confirm" style="display:none;background:#fff5f5;border:1px solid #fecaca;border-radius:8px;padding:1rem;">
-          <p style="font-size:0.82rem;color:#dc2626;margin:0 0 0.6rem;font-weight:600;">This action cannot be undone.</p>
-          <p style="font-size:0.8rem;color:#7f1d1d;margin:0 0 0.6rem;">Type <strong id="fdp-delete-name-hint" style="font-family:monospace;"></strong> to confirm deletion.</p>
+        <div id="fdp-delete-confirm" style="display:none;background:var(--gap-bg);border:1px solid var(--gap-border);border-radius:8px;padding:1rem;">
+          <p style="font-size:0.82rem;color:var(--gap);margin:0 0 0.6rem;font-weight:600;">This action cannot be undone.</p>
+          <p style="font-size:0.8rem;color:var(--gap);margin:0 0 0.6rem;">Type <strong id="fdp-delete-name-hint" style="font-family:var(--font-mono);"></strong> to confirm deletion.</p>
           <input id="fdp-delete-input" type="text" oninput="fdpDeleteConfirmInput()" autocomplete="off"
-                 style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid #fca5a5;border-radius:6px;font-size:0.875rem;outline:none;margin-bottom:0.65rem;"
-                 onfocus="this.style.borderColor='#dc2626'" onblur="this.style.borderColor='#fca5a5'"
+                 style="width:100%;padding:0.5rem 0.65rem;border:1.5px solid var(--gap-border);border-radius:6px;font-size:0.875rem;outline:none;margin-bottom:0.65rem;"
+                 onfocus="this.style.borderColor='var(--gap)'" onblur="this.style.borderColor='var(--gap-border)'"
                  placeholder="Type the feature name exactly">
           <div style="display:flex;gap:0.5rem;">
             <button id="fdp-delete-confirm-btn" type="button" onclick="fdpConfirmDelete()" disabled
-                    style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:0.4rem 1rem;font-size:0.82rem;font-weight:700;cursor:pointer;opacity:0.4;transition:opacity 0.15s;">Permanently Delete</button>
-            <button type="button" onclick="fdpCancelDelete()" style="background:none;border:1px solid #e2e8f0;color:#64748b;border-radius:6px;padding:0.4rem 0.85rem;font-size:0.82rem;cursor:pointer;">Cancel</button>
+                    style="background:var(--gap);color:#fff;border:none;border-radius:6px;padding:0.4rem 1rem;font-size:0.82rem;font-weight:700;cursor:pointer;opacity:0.4;transition:opacity 0.15s;">Permanently Delete</button>
+            <button type="button" onclick="fdpCancelDelete()" style="background:none;border:1px solid var(--color-border-subtle);color:var(--color-text-secondary);border-radius:6px;padding:0.4rem 0.85rem;font-size:0.82rem;cursor:pointer;">Cancel</button>
           </div>
         </div>
       </div>
@@ -158,21 +160,21 @@
 </dialog>
 
 <style>
-.wbs-drop-target.drag-over   { background: #f5f3ff !important; }
-.wbs-drop-target.current-wbs { background: #ede9fe !important; border-left: 3px solid #7c3aed; }
-.fdp-md-preview { font-size: 0.9rem; color: #1e293b; line-height: 1.6; }
+.wbs-drop-target.drag-over   { background: var(--color-purple-bg) !important; }
+.wbs-drop-target.current-wbs { background: var(--color-purple-bg) !important; border-left: 3px solid var(--color-purple-border); }
+.fdp-md-preview { font-size: 0.9rem; color: var(--color-text-primary); line-height: 1.6; }
 .fdp-md-preview p { margin: 0 0 0.5rem; }
 .fdp-md-preview p:last-child { margin-bottom: 0; }
 .fdp-md-preview ul, .fdp-md-preview ol { margin: 0 0 0.5rem; padding-left: 1.4rem; }
 .fdp-md-preview li { margin-bottom: 0.15rem; }
-.fdp-md-preview code { background: #f1f5f9; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; font-family: monospace; }
-.fdp-md-preview pre { background: #f1f5f9; padding: 0.5rem 0.75rem; border-radius: 6px; overflow-x: auto; margin: 0 0 0.5rem; }
+.fdp-md-preview code { background: var(--color-bg-card-hover); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; font-family: var(--font-mono); }
+.fdp-md-preview pre { background: var(--color-bg-card-hover); padding: 0.5rem 0.75rem; border-radius: 6px; overflow-x: auto; margin: 0 0 0.5rem; }
 .fdp-md-preview pre code { background: none; padding: 0; }
-.fdp-md-preview blockquote { border-left: 3px solid #e2e8f0; margin: 0 0 0.5rem; padding: 0.2rem 0.75rem; color: #64748b; }
+.fdp-md-preview blockquote { border-left: 3px solid var(--color-border-muted); margin: 0 0 0.5rem; padding: 0.2rem 0.75rem; color: var(--color-text-secondary); }
 .fdp-md-preview h1, .fdp-md-preview h2, .fdp-md-preview h3 { font-size: 1em; font-weight: 700; margin: 0.5rem 0 0.25rem; }
-.fdp-md-preview a { color: #2563eb; }
-.fdp-tab { font-size: 0.68rem; padding: 0.18rem 0.55rem; border: 1px solid #e2e8f0; cursor: pointer; font-weight: 600; background: #f8fafc; color: #64748b; }
-.fdp-tab.active { background: #1e293b; color: #fff; border-color: #1e293b; }
+.fdp-md-preview a { color: var(--color-t3-blue); }
+.fdp-tab { font-size: 0.68rem; padding: 0.18rem 0.55rem; border: 1px solid var(--color-border-subtle); cursor: pointer; font-weight: 600; background: var(--color-bg-card-hover); color: var(--color-text-secondary); }
+.fdp-tab.active { background: var(--color-text-primary); color: var(--color-bg-base); border-color: var(--color-text-primary); }
 .fdp-tab:first-child { border-radius: 4px 0 0 4px; }
 .fdp-tab:last-child  { border-radius: 0 4px 4px 0; border-left: none; }
 </style>
@@ -236,19 +238,19 @@ function _refreshFdpStage() {
   if (newStage === _fdp.stage) return false;
   _fdp.stage = newStage;
   _renderStatusActions(newStage);
-  const colors = {'Gap':'#b45309','Idea':'#92400e','Scoped':'#5b21b6','Scored':'#4c1d95','In-Progress':'#f59e0b','Live':'#16a34a','Released':'#16a34a','Planned':'#1e40af'};
+  const colors = {'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','Scoped':'var(--color-purple-text)','Scored':'var(--color-purple-text)','In-Progress':'var(--color-amber)','Live':'var(--live)','Released':'var(--live)','Planned':'var(--planned)'};
   const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
-  if (metaSpan) { metaSpan.textContent = newStage; metaSpan.style.color = colors[newStage] || '#475569'; }
+  if (metaSpan) { metaSpan.textContent = newStage; metaSpan.style.color = colors[newStage] || 'var(--color-text-secondary)'; }
   return true;
 }
 
 function openFeaturePanel(opts) {
   _fdp = { ...opts };
   _fdp.subPrefix = opts.wbs ? opts.wbs.split('.').slice(0,2).join('.') : null;
-  const colors = {'Gap':'#b45309','Idea':'#92400e','Scoped':'#5b21b6','Scored':'#4c1d95','In-Progress':'#f59e0b','Completed':'#16a34a','Planned':'#1e40af'};
+  const colors = {'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','Scoped':'var(--color-purple-text)','Scored':'var(--color-purple-text)','In-Progress':'var(--color-amber)','Completed':'var(--live)','Planned':'var(--planned)'};
   let meta = '';
-  if (opts.wbs)   meta += `<span style="font-family:monospace;font-size:0.72rem;background:#f1f5f9;padding:0.15rem 0.45rem;border-radius:3px;color:#475569;">${opts.wbs}</span>`;
-  if (opts.stage) meta += `<span style="font-size:0.72rem;font-weight:700;color:${colors[opts.stage]||'#475569'};">${opts.stage}</span>`;
+  if (opts.wbs)   meta += `<span style="font-family:var(--font-mono);font-size:0.72rem;background:var(--color-bg-card-hover);padding:0.15rem 0.45rem;border-radius:3px;color:var(--color-text-secondary);">${opts.wbs}</span>`;
+  if (opts.stage) meta += `<span style="font-size:0.72rem;font-weight:700;color:${colors[opts.stage]||'var(--color-text-secondary)'};">${opts.stage}</span>`;
   document.getElementById('fdp-meta').innerHTML  = meta;
   document.getElementById('fdp-name').value  = opts.name  || '';
   document.getElementById('fdp-notes').value = (opts.notes || '').replace(/<br\s*\/?>/gi, '\n');
@@ -302,11 +304,11 @@ function _renderGapActions(stage, flagged) {
   const isTerminal = stage === 'Live' || stage === 'Released' || stage === 'Completed';
   if (isTerminal) { el.innerHTML = ''; return; }
   if (stage === 'Gap') {
-    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpDismissGap()" style="color:#b45309;border-color:#fde68a;font-size:0.72rem;">Dismiss Gap</button>`;
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpDismissGap()" style="color:var(--color-amber-text);border-color:var(--color-amber-border);font-size:0.72rem;">Dismiss Gap</button>`;
   } else if (flagged) {
-    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpClearGapFlag()" style="color:#b45309;border-color:#fde68a;font-size:0.72rem;">Clear Gap Flag</button>`;
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpClearGapFlag()" style="color:var(--color-amber-text);border-color:var(--color-amber-border);font-size:0.72rem;">Clear Gap Flag</button>`;
   } else {
-    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpFlagAsGap()" style="color:#92400e;border-color:#fde68a;font-size:0.72rem;">Flag as Gap</button>`;
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="fdpFlagAsGap()" style="color:var(--color-amber-text);border-color:var(--color-amber-border);font-size:0.72rem;">Flag as Gap</button>`;
   }
 }
 
@@ -317,7 +319,7 @@ function fdpDismissGap() {
 function fdpFlagAsGap() {
   if (!_fdp.wbs) return;
   const el = document.getElementById('fdp-gap-actions');
-  if (el) el.innerHTML = `<span style="font-size:0.78rem;color:#92400e;">Flagging…</span>`;
+  if (el) el.innerHTML = `<span style="font-size:0.78rem;color:var(--color-amber-text);">Flagging…</span>`;
   fetch('{{ base_path }}/api/features/' + encodeURIComponent(_fdp.wbs), {
     method: 'PATCH', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({flagged: true}),
@@ -332,7 +334,7 @@ function fdpFlagAsGap() {
 function fdpClearGapFlag() {
   if (!_fdp.wbs) return;
   const el = document.getElementById('fdp-gap-actions');
-  if (el) el.innerHTML = `<span style="font-size:0.78rem;color:#92400e;">Clearing…</span>`;
+  if (el) el.innerHTML = `<span style="font-size:0.78rem;color:var(--color-amber-text);">Clearing…</span>`;
   fetch('{{ base_path }}/api/features/' + encodeURIComponent(_fdp.wbs), {
     method: 'PATCH', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({flagged: false}),
@@ -363,13 +365,13 @@ function _refreshScoreDisplay() {
   const vValid = vRaw !== '' && !isNaN(v);
   const eValid = eRaw !== '' && !isNaN(e);
   document.getElementById('fdp-score-display').innerHTML = (vValid && eValid)
-    ? `<span style="background:#d1fae5;color:#065f46;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.9rem;font-weight:700;">${(v/e).toFixed(1)} priority</span>`
+    ? `<span style="background:var(--live-bg);color:var(--live);padding:0.3rem 0.7rem;border-radius:999px;font-size:0.9rem;font-weight:700;">${(v/e).toFixed(1)} priority</span>`
     : '';
-  document.getElementById('fdp-value').style.borderColor  = vValid ? '#16a34a' : '#e2e8f0';
-  document.getElementById('fdp-effort').style.borderColor = eValid ? '#16a34a' : '#e2e8f0';
+  document.getElementById('fdp-value').style.borderColor  = vValid ? 'var(--live)' : 'var(--color-border-subtle)';
+  document.getElementById('fdp-effort').style.borderColor = eValid ? 'var(--live)' : 'var(--color-border-subtle)';
   const hint = document.getElementById('fdp-score-wbs-hint');
   hint.textContent = (vValid && eValid) ? '' : '- set both value and effort to score';
-  hint.style.color = '#94a3b8';
+  hint.style.color = 'var(--color-text-muted)';
 }
 
 function onFdpScoreInput() {
@@ -380,7 +382,7 @@ function onFdpScoreInput() {
   const vValid = vRaw !== '' && !isNaN(v);
   const eValid = eRaw !== '' && !isNaN(e);
   const action = document.getElementById('fdp-score-action');
-  action.innerHTML = '<span style="font-size:0.8rem;color:#64748b;">Saving…</span>';
+  action.innerHTML = '<span style="font-size:0.8rem;color:var(--color-text-secondary);">Saving…</span>';
   clearTimeout(_scoreDebounce);
   _scoreDebounce = setTimeout(() => {
     if (!_fdp.wbs) return;
@@ -393,25 +395,25 @@ function onFdpScoreInput() {
         const changed = _refreshFdpStage();
         if (vValid && eValid) {
           action.innerHTML = changed
-            ? '<span style="color:#16a34a;font-weight:600;font-size:0.875rem;">✓ Scored</span>'
-            : '<span style="color:#16a34a;font-size:0.8rem;">✓ Score saved</span>';
+            ? '<span style="color:var(--live);font-weight:600;font-size:0.875rem;">✓ Scored</span>'
+            : '<span style="color:var(--live);font-size:0.8rem;">✓ Score saved</span>';
         } else if (!vValid && !eValid) {
           action.innerHTML = wasScored
-            ? `<span style="color:#7c3aed;font-size:0.8rem;">Score cleared - back to ${_fdp.stage}</span>`
-            : '<span style="color:#64748b;font-size:0.8rem;">✓ Score cleared</span>';
+            ? `<span style="color:var(--color-purple-text);font-size:0.8rem;">Score cleared - back to ${_fdp.stage}</span>`
+            : '<span style="color:var(--color-text-secondary);font-size:0.8rem;">✓ Score cleared</span>';
         } else {
           action.innerHTML = wasScored
-            ? `<span style="color:#7c3aed;font-size:0.8rem;">Partial score - back to ${_fdp.stage}</span>`
-            : '<span style="color:#64748b;font-size:0.8rem;">✓ Saved (partial score)</span>';
+            ? `<span style="color:var(--color-purple-text);font-size:0.8rem;">Partial score - back to ${_fdp.stage}</span>`
+            : '<span style="color:var(--color-text-secondary);font-size:0.8rem;">✓ Saved (partial score)</span>';
         }
         _fdpDirty = true;
       } else {
-        r.json().then(d => { action.innerHTML = `<span style="color:#dc2626;font-size:0.8rem;">${d.detail||'Save failed'}</span>`; }).catch(()=>{
-          action.innerHTML = '<span style="color:#dc2626;font-size:0.8rem;">Save failed</span>';
+        r.json().then(d => { action.innerHTML = `<span style="color:var(--gap);font-size:0.8rem;">${d.detail||'Save failed'}</span>`; }).catch(()=>{
+          action.innerHTML = '<span style="color:var(--gap);font-size:0.8rem;">Save failed</span>';
         });
       }
     }).catch(() => {
-      action.innerHTML = '<span style="color:#dc2626;font-size:0.8rem;">Save failed</span>';
+      action.innerHTML = '<span style="color:var(--gap);font-size:0.8rem;">Save failed</span>';
     });
   }, 400);
 }
@@ -441,7 +443,7 @@ function advanceFdpStatus(newStatus) {
       _fdp.stage = newStatus;
       _fdp.rawStatus = newStatus;
       const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
-      if (metaSpan) { const c={'Gap':'#b45309','Idea':'#92400e','In-Progress':'#f59e0b'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'#475569'; }
+      if (metaSpan) { const c={'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','In-Progress':'var(--color-amber)'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'var(--color-text-secondary)'; }
       const isLive = newStatus === 'Live' || newStatus === 'Released';
       document.getElementById('fdp-score-card').style.display  = isLive ? 'none' : '';
       document.getElementById('fdp-live-card').style.display   = isLive ? '' : 'none';
@@ -535,11 +537,11 @@ function _reassignToPrefix(targetPrefix) {
     const cur=document.getElementById('wbs-drop-'+prefix.replace(/\./g,'-'));if(cur)cur.classList.add('current-wbs');
   };
   if (_fdp.wbs) {
-    moveStatus.textContent='Moving…';moveStatus.style.color='#64748b';
+    moveStatus.textContent='Moving…';moveStatus.style.color='var(--color-text-secondary)';
     fetch('{{ base_path }}/api/features/'+encodeURIComponent(_fdp.wbs)+'/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target_prefix:targetPrefix})})
     .then(r=>r.json()).then(d=>{
-      if(d.ok){moveStatus.textContent=`Moved → ${d.new_wbs} ✓`;moveStatus.style.color='#16a34a';_fdp.wbs=d.new_wbs;_markMoved(targetPrefix);}
-      else{moveStatus.textContent=d.detail||'Move failed';moveStatus.style.color='#dc2626';}
+      if(d.ok){moveStatus.textContent=`Moved → ${d.new_wbs} ✓`;moveStatus.style.color='var(--live)';_fdp.wbs=d.new_wbs;_markMoved(targetPrefix);}
+      else{moveStatus.textContent=d.detail||'Move failed';moveStatus.style.color='var(--gap)';}
     });
   }
 }

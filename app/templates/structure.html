@@ -2,60 +2,60 @@
 {% block title %}Structure - {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
-.str-section { background:#fff; border-radius:var(--radius); box-shadow:var(--card-shadow); margin-bottom:1.5rem; overflow:hidden; }
-.str-header { display:flex; justify-content:space-between; align-items:center; padding:0.9rem 1.25rem; border-bottom:1px solid #f1f5f9; background:#f8fafc; flex-wrap:wrap; gap:0.5rem; }
-.str-title { font-size:0.95rem; font-weight:700; color:#1e293b; margin:0; }
-.str-subtitle { font-size:0.78rem; color:#64748b; margin:0.1rem 0 0; }
+.str-section { background:var(--color-bg-card); border-radius:var(--radius); box-shadow:var(--card-shadow); margin-bottom:1.5rem; overflow:hidden; }
+.str-header { display:flex; justify-content:space-between; align-items:center; padding:0.9rem 1.25rem; border-bottom:1px solid var(--color-border-subtle); background:var(--color-bg-card-hover); flex-wrap:wrap; gap:0.5rem; }
+.str-title { font-size:0.95rem; font-weight:700; color:var(--color-text-primary); margin:0; }
+.str-subtitle { font-size:0.78rem; color:var(--color-text-secondary); margin:0.1rem 0 0; }
 .str-body { padding:1.25rem; }
 .item-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:0.75rem; }
-.save-status { font-size:0.75rem; color:#64748b; }
+.save-status { font-size:0.75rem; color:var(--color-text-secondary); }
 
 /* View cards */
-.item-card { border:1px solid #e2e8f0; border-radius:8px; padding:0.85rem; background:#fafafa; cursor:pointer; transition:border-color 0.12s, box-shadow 0.12s, background 0.12s; }
-.item-card:hover { border-color:#c7d2fe; background:#f5f7ff; box-shadow:0 2px 8px rgba(37,99,235,0.07); }
-.item-card.modal-active { border-color:#2563eb; background:#eff6ff; }
-.view-name { font-size:0.9rem; font-weight:600; color:#1e293b; margin:0 0 0.3rem; }
-.view-body { font-size:0.82rem; color:#374151; line-height:1.6; margin:0; white-space:pre-wrap; }
-.view-step { font-size:0.82rem; color:#374151; margin-bottom:0.18rem; }
-.view-scope-item { display:flex; align-items:baseline; gap:0.4rem; font-size:0.82rem; color:#374151; margin-bottom:0.15rem; }
-.view-scope-item.done { color:#94a3b8; text-decoration:line-through; }
-.edit-hint { font-size:0.68rem; color:#94a3b8; margin-top:0.5rem; }
+.item-card { border:1px solid var(--color-border-subtle); border-radius:8px; padding:0.85rem; background:var(--color-bg-card-hover); cursor:pointer; transition:border-color 0.12s, box-shadow 0.12s, background 0.12s; }
+.item-card:hover { border-color:var(--color-t3-blue-border); background:var(--color-t3-blue-dim); box-shadow:0 2px 8px var(--color-t3-blue-dim); }
+.item-card.modal-active { border-color:var(--color-t3-blue); background:var(--color-t3-blue-dim); }
+.view-name { font-size:0.9rem; font-weight:600; color:var(--color-text-primary); margin:0 0 0.3rem; }
+.view-body { font-size:0.82rem; color:var(--color-text-secondary); line-height:1.6; margin:0; white-space:pre-wrap; }
+.view-step { font-size:0.82rem; color:var(--color-text-secondary); margin-bottom:0.18rem; }
+.view-scope-item { display:flex; align-items:baseline; gap:0.4rem; font-size:0.82rem; color:var(--color-text-secondary); margin-bottom:0.15rem; }
+.view-scope-item.done { color:var(--color-text-muted); text-decoration:line-through; }
+.edit-hint { font-size:0.68rem; color:var(--color-text-muted); margin-top:0.5rem; }
 
 /* Workflow persona groups */
-.wf-persona-header { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#475569; margin:0.9rem 0 0.45rem; padding-bottom:0.35rem; border-bottom:1px solid #e2e8f0; }
+.wf-persona-header { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-text-secondary); margin:0.9rem 0 0.45rem; padding-bottom:0.35rem; border-bottom:1px solid var(--color-border-subtle); }
 .wf-persona-header:first-child { margin-top:0; }
 .wf-persona-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:0.75rem; margin-bottom:0.25rem; }
 
 /* Modal overlay */
 .str-modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:900; align-items:center; justify-content:center; padding:1rem; }
-.str-modal-dialog { background:#fff; border-radius:12px; width:min(560px,100%); max-height:90vh; display:flex; flex-direction:column; box-shadow:0 24px 64px rgba(0,0,0,0.22); }
-.str-modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.4rem 0.9rem; border-bottom:1px solid #f1f5f9; flex-shrink:0; }
-.str-modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:#1e293b; }
-.str-modal-close { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:1.2rem; line-height:1; padding:0.2rem 0.35rem; border-radius:4px; }
-.str-modal-close:hover { background:#f1f5f9; color:#475569; }
+.str-modal-dialog { background:var(--color-bg-card); border-radius:12px; width:min(560px,100%); max-height:90vh; display:flex; flex-direction:column; box-shadow:0 24px 64px rgba(0,0,0,0.22); }
+.str-modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.4rem 0.9rem; border-bottom:1px solid var(--color-border-subtle); flex-shrink:0; }
+.str-modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:var(--color-text-primary); }
+.str-modal-close { background:none; border:none; cursor:pointer; color:var(--color-text-muted); font-size:1.2rem; line-height:1; padding:0.2rem 0.35rem; border-radius:4px; }
+.str-modal-close:hover { background:var(--color-bg-card-hover); color:var(--color-text-secondary); }
 .str-modal-body { padding:1.3rem 1.4rem; overflow-y:auto; flex:1; }
-.str-modal-footer { display:flex; justify-content:space-between; align-items:center; padding:0.9rem 1.4rem; border-top:1px solid #f1f5f9; flex-shrink:0; }
-.btn-modal-remove { background:none; border:1px solid #fca5a5; color:#dc2626; border-radius:5px; padding:0.32rem 0.75rem; font-size:0.8rem; cursor:pointer; font-family:inherit; }
-.btn-modal-remove:hover { background:#fee2e2; }
+.str-modal-footer { display:flex; justify-content:space-between; align-items:center; padding:0.9rem 1.4rem; border-top:1px solid var(--color-border-subtle); flex-shrink:0; }
+.btn-modal-remove { background:none; border:1px solid var(--gap-border); color:var(--gap); border-radius:5px; padding:0.32rem 0.75rem; font-size:0.8rem; cursor:pointer; font-family:inherit; }
+.btn-modal-remove:hover { background:var(--gap-bg); }
 
 /* Modal form fields */
 .modal-field { margin-bottom:1rem; }
 .modal-field:last-child { margin-bottom:0; }
-.modal-field > label { display:block; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#94a3b8; margin-bottom:0.3rem; }
-.modal-input { width:100%; padding:0.5rem 0.65rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.9rem; font-family:inherit; color:#1e293b; background:#fff; outline:none; }
-.modal-input:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
-.modal-textarea { width:100%; padding:0.5rem 0.65rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem; font-family:inherit; color:#1e293b; background:#fff; outline:none; resize:vertical; min-height:7rem; line-height:1.6; }
-.modal-textarea:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+.modal-field > label { display:block; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-muted); margin-bottom:0.3rem; }
+.modal-input { width:100%; padding:0.5rem 0.65rem; border:1px solid var(--color-border-muted); border-radius:6px; font-size:0.9rem; font-family:inherit; color:var(--color-text-primary); background:var(--color-bg-card); outline:none; }
+.modal-input:focus { border-color:var(--color-t3-blue); box-shadow:0 0 0 3px var(--color-t3-blue-dim); }
+.modal-textarea { width:100%; padding:0.5rem 0.65rem; border:1px solid var(--color-border-muted); border-radius:6px; font-size:0.875rem; font-family:inherit; color:var(--color-text-primary); background:var(--color-bg-card); outline:none; resize:vertical; min-height:7rem; line-height:1.6; }
+.modal-textarea:focus { border-color:var(--color-t3-blue); box-shadow:0 0 0 3px var(--color-t3-blue-dim); }
 
 /* Scope items inside modal */
 .scope-row { display:flex; align-items:center; gap:0.45rem; margin-bottom:0.3rem; }
-.scope-row input[type=checkbox] { flex-shrink:0; width:14px; height:14px; cursor:pointer; accent-color:#16a34a; }
-.scope-text { flex:1; padding:0.35rem 0.5rem; border:1px solid #e2e8f0; border-radius:4px; font-size:0.875rem; font-family:inherit; color:#1e293b; background:#fff; outline:none; }
-.scope-text:focus { border-color:#2563eb; }
-.row-del { background:none; border:none; cursor:pointer; color:#d1d5db; font-size:0.875rem; padding:0 0.15rem; line-height:1; flex-shrink:0; }
-.row-del:hover { color:#ef4444; }
-.btn-add-row { background:none; border:1px dashed #d1d5db; color:#94a3b8; border-radius:5px; padding:0.3rem 0.7rem; font-size:0.78rem; cursor:pointer; width:100%; margin-top:0.4rem; font-family:inherit; }
-.btn-add-row:hover { border-color:#2563eb; color:#2563eb; background:#eff6ff; }
+.scope-row input[type=checkbox] { flex-shrink:0; width:14px; height:14px; cursor:pointer; accent-color:var(--live); }
+.scope-text { flex:1; padding:0.35rem 0.5rem; border:1px solid var(--color-border-subtle); border-radius:4px; font-size:0.875rem; font-family:inherit; color:var(--color-text-primary); background:var(--color-bg-card); outline:none; }
+.scope-text:focus { border-color:var(--color-t3-blue); }
+.row-del { background:none; border:none; cursor:pointer; color:var(--color-text-muted); font-size:0.875rem; padding:0 0.15rem; line-height:1; flex-shrink:0; }
+.row-del:hover { color:var(--gap); }
+.btn-add-row { background:none; border:1px dashed var(--color-border-muted); color:var(--color-text-muted); border-radius:5px; padding:0.3rem 0.7rem; font-size:0.78rem; cursor:pointer; width:100%; margin-top:0.4rem; font-family:inherit; }
+.btn-add-row:hover { border-color:var(--color-t3-blue); color:var(--color-t3-blue); background:var(--color-t3-blue-dim); }
 {% endblock %}
 
 {% block content %}
@@ -254,8 +254,8 @@ function renderUsers() {
     const card = document.createElement('div');
     const isActive = _modal && _modal.type === 'u' && _modal.index === i;
     card.className = 'item-card' + (isActive ? ' modal-active' : '');
-    const nameHtml = u.name ? `<p class="view-name">${esc(u.name)}</p>` : `<p class="view-name" style="color:#94a3b8;font-style:italic;">Unnamed persona</p>`;
-    const descHtml = u.description ? `<p class="view-body">${esc(u.description)}</p>` : `<p class="view-body" style="color:#94a3b8;font-style:italic;">No description</p>`;
+    const nameHtml = u.name ? `<p class="view-name">${esc(u.name)}</p>` : `<p class="view-name" style="color:var(--color-text-muted);font-style:italic;">Unnamed persona</p>`;
+    const descHtml = u.description ? `<p class="view-body">${esc(u.description)}</p>` : `<p class="view-body" style="color:var(--color-text-muted);font-style:italic;">No description</p>`;
     card.innerHTML = nameHtml + descHtml + `<p class="edit-hint">✎ click to edit</p>`;
     card.onclick = () => openModal('u', i);
     list.appendChild(card);
@@ -297,8 +297,8 @@ function renderWorkflows() {
       const card = document.createElement('div');
       const isActive = _modal && _modal.type === 'w' && _modal.index === wi;
       card.className = 'item-card' + (isActive ? ' modal-active' : '');
-      const nameHtml = w.name ? `<p class="view-name">${esc(w.name)}</p>` : `<p class="view-name" style="color:#94a3b8;font-style:italic;">Unnamed workflow</p>`;
-      const descHtml = w.description ? `<p class="view-body">${esc(w.description)}</p>` : `<p class="view-body" style="color:#94a3b8;font-style:italic;">No description</p>`;
+      const nameHtml = w.name ? `<p class="view-name">${esc(w.name)}</p>` : `<p class="view-name" style="color:var(--color-text-muted);font-style:italic;">Unnamed workflow</p>`;
+      const descHtml = w.description ? `<p class="view-body">${esc(w.description)}</p>` : `<p class="view-body" style="color:var(--color-text-muted);font-style:italic;">No description</p>`;
       card.innerHTML = nameHtml + descHtml + `<p class="edit-hint">✎ click to edit</p>`;
       card.onclick = () => openModal('w', wi);
       grid.appendChild(card);
@@ -324,10 +324,10 @@ function renderScope() {
     const card = document.createElement('div');
     const isActive = _modal && _modal.type === 's' && _modal.index === gi;
     card.className = 'item-card' + (isActive ? ' modal-active' : '');
-    const titleHtml = g.title ? `<p class="view-name">${esc(g.title)}</p>` : `<p class="view-name" style="color:#94a3b8;font-style:italic;">Untitled group</p>`;
+    const titleHtml = g.title ? `<p class="view-name">${esc(g.title)}</p>` : `<p class="view-name" style="color:var(--color-text-muted);font-style:italic;">Untitled group</p>`;
     const itemsHtml = g.items.filter(i=>i.text.trim()).map(item =>
       `<p class="view-scope-item ${item.complete?'done':''}">${item.complete?'🎆':''} ${esc(item.text)}</p>`
-    ).join('') || `<p class="view-scope-item" style="color:#94a3b8;font-style:italic;">No initiatives</p>`;
+    ).join('') || `<p class="view-scope-item" style="color:var(--color-text-muted);font-style:italic;">No initiatives</p>`;
     card.innerHTML = titleHtml + itemsHtml + `<p class="edit-hint">✎ click to edit</p>`;
     card.onclick = () => openModal('s', gi);
     list.appendChild(card);
@@ -372,11 +372,11 @@ function serializeScope() {
 
 function _save(endpoint, content, statusId) {
   const st = document.getElementById(statusId);
-  st.textContent = 'Saving…'; st.style.color = '#64748b';
+  st.textContent = 'Saving…'; st.style.color = 'var(--color-text-secondary)';
   fetch(endpoint, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content})})
     .then(r=>r.json())
-    .then(d=>{ st.textContent=d.ok?'Saved ✓':(d.detail||'Error'); st.style.color=d.ok?'#16a34a':'#dc2626'; if(d.ok) setTimeout(()=>st.textContent='',3000); })
-    .catch(()=>{ st.textContent='Error'; st.style.color='#dc2626'; });
+    .then(d=>{ st.textContent=d.ok?'Saved ✓':(d.detail||'Error'); st.style.color=d.ok?'var(--live)':'var(--gap)'; if(d.ok) setTimeout(()=>st.textContent='',3000); })
+    .catch(()=>{ st.textContent='Error'; st.style.color='var(--gap)'; });
 }
 function saveUsers()     { _save('{{ base_path }}/api/structure/users',     serializeUsers(),     'users-status'); }
 function saveWorkflows() { _save('{{ base_path }}/api/structure/workflows', serializeWorkflows(), 'workflows-status'); }

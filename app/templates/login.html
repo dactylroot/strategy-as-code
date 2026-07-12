@@ -3,45 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
   <title>Sign In</title>
+  <script>
+  (function() {
+    var mode = 'dark';
+    try { mode = localStorage.getItem('strategy-as-code-theme') || 'dark'; } catch (e) {}
+    if (mode === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --color-bg-base:        #0a0c10;
+      --color-bg-card:        rgba(255,255,255,0.04);
+      --color-border-subtle:  rgba(255,255,255,0.08);
+      --color-border-muted:   rgba(255,255,255,0.12);
+      --card-blur:            blur(16px);
+      --card-shadow:          none;
+      --color-text-primary:   #f0f4ff;
+      --color-text-secondary: #94a3b8;
+      --color-t3-blue:        #00a3ff;
+      --color-t3-blue-dim:    rgba(0,163,255,0.15);
+      --color-red:            #ef4444;
+    }
+    :root[data-theme="light"] {
+      --color-bg-base:        #f7f8fa;
+      --color-bg-card:        #ffffff;
+      --color-border-subtle:  rgba(15,20,30,0.08);
+      --color-border-muted:   rgba(15,20,30,0.14);
+      --card-blur:            none;
+      --card-shadow:          0 4px 24px rgba(15,20,30,0.08);
+      --color-text-primary:   #0f172a;
+      --color-text-secondary: #475569;
+      --color-t3-blue:        #0088d4;
+      --color-t3-blue-dim:    rgba(0,136,212,0.12);
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f1f5f9;
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--color-bg-base);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #1e293b;
+      color: var(--color-text-primary);
     }
     .card {
-      background: #fff;
-      border: 1px solid #e2e8f0;
+      position: relative;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-subtle);
+      backdrop-filter: var(--card-blur); -webkit-backdrop-filter: var(--card-blur);
       border-radius: 12px;
       padding: 2.5rem;
       width: 100%;
       max-width: 380px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      box-shadow: var(--card-shadow);
     }
+    .theme-toggle-btn {
+      position: absolute; top: 1.1rem; right: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+      width: 1.9rem; height: 1.9rem; border-radius: 6px; cursor: pointer;
+      background: transparent; border: 1px solid var(--color-border-muted);
+      color: var(--color-text-secondary);
+    }
+    .theme-toggle-btn:hover { color: var(--color-t3-blue); border-color: var(--color-t3-blue); }
+    .theme-toggle-btn svg { width: 14px; height: 14px; }
+    .theme-toggle-btn .icon-sun { display: none; }
+    .theme-toggle-btn .icon-moon { display: block; }
+    :root[data-theme="light"] .theme-toggle-btn .icon-sun { display: block; }
+    :root[data-theme="light"] .theme-toggle-btn .icon-moon { display: none; }
     .wordmark {
       font-size: 1.1rem;
       font-weight: 800;
-      color: #1e293b;
+      color: var(--color-text-primary);
       letter-spacing: -0.03em;
       margin-bottom: 0.25rem;
     }
-    .wordmark span { color: #2563eb; }
+    .wordmark span { color: var(--color-t3-blue); }
     .subtitle {
       font-size: 0.82rem;
-      color: #64748b;
+      color: var(--color-text-secondary);
       margin-bottom: 2rem;
     }
     label {
       display: block;
       font-size: 0.75rem;
       font-weight: 600;
-      color: #475569;
+      color: var(--color-text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       margin-bottom: 0.35rem;
@@ -49,25 +100,25 @@
     input[type="text"], input[type="password"] {
       width: 100%;
       padding: 0.6rem 0.75rem;
-      border: 1.5px solid #e2e8f0;
+      border: 1.5px solid var(--color-border-muted);
       border-radius: 7px;
       font-size: 0.95rem;
       font-family: inherit;
-      color: #1e293b;
-      background: #f8fafc;
+      color: var(--color-text-primary);
+      background: var(--color-bg-base);
       transition: border-color 0.15s, background 0.15s;
       margin-bottom: 1.1rem;
     }
     input:focus {
       outline: none;
-      border-color: #2563eb;
-      background: #fff;
+      border-color: var(--color-t3-blue);
+      background: var(--color-bg-card);
     }
     .error {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.35);
       border-radius: 7px;
-      color: #dc2626;
+      color: var(--color-red);
       font-size: 0.82rem;
       padding: 0.6rem 0.75rem;
       margin-bottom: 1.1rem;
@@ -75,7 +126,7 @@
     button[type="submit"] {
       width: 100%;
       padding: 0.65rem;
-      background: #2563eb;
+      background: linear-gradient(135deg, #0088d4, #00a3ff);
       color: #fff;
       border: none;
       border-radius: 7px;
@@ -83,13 +134,17 @@
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: filter 0.15s;
     }
-    button[type="submit"]:hover { background: #1d4ed8; }
+    button[type="submit"]:hover { filter: brightness(1.08); }
   </style>
 </head>
 <body>
   <div class="card">
+    <button type="button" class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
     <div class="wordmark">strategy<span>.</span>as<span>.</span>code</div>
     <div class="subtitle">Sign in to continue</div>
     {% if error %}
@@ -104,5 +159,14 @@
       <button type="submit">Sign In</button>
     </form>
   </div>
+  <script>
+  document.getElementById('theme-toggle').addEventListener('click', function() {
+    var current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    var next = current === 'light' ? 'dark' : 'light';
+    if (next === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('strategy-as-code-theme', next); } catch (e) {}
+  });
+  </script>
 </body>
 </html>

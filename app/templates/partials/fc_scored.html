@@ -14,14 +14,14 @@
      onclick="openFeaturePanelFromEl(this)">
   <div class="fc-head">
     <div class="fc-meta">
-      <span class="fc-wbs" style="background:#ede9fe;color:#4c1d95;">{{ item.wbs }}</span>
-      <span class="fc-stage-badge" style="color:#4c1d95;">Scored</span>
+      <span class="fc-wbs" style="background:var(--color-purple-bg);color:var(--color-purple-text);">{{ item.wbs }}</span>
+      <span class="fc-stage-badge" style="color:var(--color-purple-text);">Scored</span>
     </div>
     <div class="fc-title">{{ item.name }}</div>
     {% if item.notes %}<div class="fc-notes">{{ item.notes | replace("<br>", " ") | truncate(120, true, "…") }}</div>{% endif %}
     <div class="fc-actions" onclick="event.stopPropagation()">
       {% if item.value and item.effort %}
-      <span style="font-size:0.72rem;color:#64748b;">V:{{ item.value }} E:{{ item.effort }}</span>
+      <span style="font-size:0.72rem;color:var(--color-text-secondary);">V:{{ item.value }} E:{{ item.effort }}</span>
       <span class="priority-badge">{{ '%.1f'|format(item.priority_score) }}</span>
       {% endif %}
       <button class="btn btn-primary btn-sm" style="margin-left:auto;"

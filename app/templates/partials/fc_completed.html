@@ -1,9 +1,9 @@
 <div class="fc" id="fc-completed-{{ item.wbs | replace('.', '-') }}" style="opacity:0.75;">
   <div class="fc-head">
     <div class="fc-meta">
-      <span class="fc-wbs" style="background:#f0fdf4;color:#166534;">{{ item.wbs }}</span>
-      <span class="fc-stage-badge" style="color:#16a34a;">✓ Live</span>
+      <span class="fc-wbs" style="background:var(--live-bg);color:var(--live);">{{ item.wbs }}</span>
+      <span class="fc-stage-badge" style="color:var(--live);">✓ Live</span>
     </div>
-    <div class="fc-title" style="color:#64748b;">{{ item.name }}</div>
+    <div class="fc-title" style="color:var(--color-text-secondary);">{{ item.name }}</div>
   </div>
 </div>

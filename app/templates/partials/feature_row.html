@@ -6,7 +6,7 @@
     {% if feature.value %}data-value="{{ feature.value }}"{% endif %}
     {% if feature.effort %}data-effort="{{ feature.effort }}"{% endif %}>
   <td class="wbs-code">{{ feature.wbs }}</td>
-  <td style="font-size:0.875rem;cursor:pointer;color:#1e293b;"
+  <td style="font-size:0.875rem;cursor:pointer;color:var(--color-text-primary);"
       onclick="openFeaturePanelFromEl(this.closest('tr'))">{{ feature.name }}</td>
   <td>
     <select class="status-select {{ feature.status.value | lower }}"

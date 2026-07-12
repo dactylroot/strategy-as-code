@@ -5,9 +5,9 @@
 details > summary { cursor: pointer; list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
 details[open] .chevron { transform: rotate(90deg); }
-.chevron { display: inline-block; transition: transform 0.15s; margin-right: 0.4rem; color: #94a3b8; }
-.notes-cell { max-width: 20rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #64748b; font-size: 0.8rem; }
-.add-form { display: none; margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid #f1f5f9; }
+.chevron { display: inline-block; transition: transform 0.15s; margin-right: 0.4rem; color: var(--color-text-muted); }
+.notes-cell { max-width: 20rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-text-secondary); font-size: 0.8rem; }
+.add-form { display: none; margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-bg-card-hover); }
 .add-form.open { display: block; }
 {% endblock %}
 
@@ -38,8 +38,8 @@ details[open] .chevron { transform: rotate(90deg); }
             <div class="progress-fill" style="width:{{ (area.completion_pct * 100)|int }}%;"></div>
           </div>
         </div>
-        <span style="font-size:0.78rem;color:#64748b;white-space:nowrap;">{{ (area.completion_pct * 100)|int }}% live</span>
-        <span style="font-size:0.78rem;color:#94a3b8;white-space:nowrap;">
+        <span style="font-size:0.78rem;color:var(--color-text-secondary);white-space:nowrap;">{{ (area.completion_pct * 100)|int }}% live</span>
+        <span style="font-size:0.78rem;color:var(--color-text-muted);white-space:nowrap;">
           {{ area.live_count }}L / {{ area.planned_count }}P / {{ area.gap_count }}G
         </span>
       </div>
@@ -120,8 +120,8 @@ details[open] .chevron { transform: rotate(90deg); }
 {% endif %}
 
 <style>
-.prose h3 { font-size:0.95rem; font-weight:600; margin:1rem 0 0.3rem; color:#1e293b; }
-.prose p { font-size:0.875rem; line-height:1.6; color:#374151; margin:0 0 0.75rem; }
+.prose h3 { font-size:0.95rem; font-weight:600; margin:1rem 0 0.3rem; color:var(--color-text-primary); }
+.prose p { font-size:0.875rem; line-height:1.6; color:var(--color-text-secondary); margin:0 0 0.75rem; }
 </style>
 
 {% include "partials/feature_panel.html" %}

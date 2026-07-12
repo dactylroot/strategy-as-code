@@ -12,8 +12,8 @@
      onclick="openFeaturePanelFromEl(this)">
   <div class="fc-head">
     <div class="fc-meta">
-      <span class="fc-wbs" style="background:#fef3c7;color:#92400e;">{{ item.wbs }}</span>
-      <span class="fc-stage-badge" style="color:#b45309;">{{ item.status.value }}</span>
+      <span class="fc-wbs" style="background:var(--color-amber-bg);color:var(--color-amber-text);">{{ item.wbs }}</span>
+      <span class="fc-stage-badge" style="color:var(--color-amber-text);">{{ item.status.value }}</span>
     </div>
     <div class="fc-title">{{ item.name }}</div>
     {% if item.notes %}<div class="fc-notes">{{ item.notes | replace('<br>', ' ') | truncate(120, true, '…') }}</div>{% endif %}

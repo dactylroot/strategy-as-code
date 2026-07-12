@@ -3,23 +3,23 @@
 
 {% block extra_styles %}
   .pac-upload-card {
-    border: 2px dashed #cbd5e1;
+    border: 2px dashed var(--color-border-muted);
     border-radius: 12px;
     padding: 1.25rem 1.5rem 1rem;
     transition: border-color 0.2s, background 0.2s;
   }
-  .pac-upload-card.dragover { border-color: #2563eb; background: #eff6ff; }
-  .pac-upload-card.ready    { border-color: #16a34a; border-style: solid; }
+  .pac-upload-card.dragover { border-color: var(--color-t3-blue); background: var(--planned-bg); }
+  .pac-upload-card.ready    { border-color: var(--live); border-style: solid; }
 
   .pac-drop-area {
     text-align: center; padding: 1.25rem 1rem 0.75rem; cursor: pointer;
   }
   .pac-drop-icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
-  .pac-drop-area p { margin: 0.2rem 0; color: #555; font-size: 0.9rem; }
-  .pac-drop-area .hint { font-size: 0.78rem; color: #94a3b8; margin-top: 0.4rem; }
+  .pac-drop-area p { margin: 0.2rem 0; color: var(--color-text-secondary); font-size: 0.9rem; }
+  .pac-drop-area .hint { font-size: 0.78rem; color: var(--color-text-muted); margin-top: 0.4rem; }
   #uploadFiles { display: none; }
 
-  .pac-divider { border: none; border-top: 1px solid #e2e8f0; margin: 0.75rem 0 0.65rem; }
+  .pac-divider { border: none; border-top: 1px solid var(--color-border-subtle); margin: 0.75rem 0 0.65rem; }
 
   .pac-checklist { display: flex; flex-direction: column; gap: 0.3rem; }
   .pac-file-row {
@@ -27,36 +27,36 @@
     padding: 0.3rem 0.4rem; border-radius: 6px;
     font-size: 0.85rem; font-weight: 500;
   }
-  .pac-file-row.provided { color: #15803d; background: #f0fdf4; }
-  .pac-file-row.pending  { color: #94a3b8; }
-  .pac-file-row.optional { color: #cbd5e1; }
+  .pac-file-row.provided { color: var(--live); background: var(--live-bg); }
+  .pac-file-row.pending  { color: var(--color-text-muted); }
+  .pac-file-row.optional { color: var(--color-border-muted); }
   .pac-file-icon { width: 1.1rem; text-align: center; flex-shrink: 0; font-size: 0.9rem; }
-  .pac-file-name { flex: 1; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+  .pac-file-name { flex: 1; font-family: var(--font-mono); font-size: 0.8rem; }
   .pac-optional-tag {
     font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.06em; color: #cbd5e1; margin-left: auto;
+    letter-spacing: 0.06em; color: var(--color-border-muted); margin-left: auto;
   }
   .pac-file-remove {
     margin-left: auto; background: none; border: none; cursor: pointer;
-    color: #94a3b8; font-size: 0.9rem; padding: 0 0.15rem; line-height: 1;
+    color: var(--color-text-muted); font-size: 0.9rem; padding: 0 0.15rem; line-height: 1;
     border-radius: 3px; transition: color 0.1s, background 0.1s;
   }
-  .pac-file-remove:hover { color: #dc2626; background: #fee2e2; }
+  .pac-file-remove:hover { color: var(--gap); background: var(--gap-bg); }
 
-  .pac-warn { font-size: 0.78rem; color: #dc2626; margin-top: 0.5rem; min-height: 1rem; }
+  .pac-warn { font-size: 0.78rem; color: var(--gap); margin-top: 0.5rem; min-height: 1rem; }
 
-  .dp-row { display:flex; align-items:center; gap:0.55rem; padding:0.45rem 1.1rem; cursor:pointer; font-size:0.875rem; color:#1e293b; transition:background 0.1s; }
-  .dp-row:hover { background:#f1f5f9; }
-  .dp-up { color:#64748b; }
-  .dp-project { color:#1e40af; }
+  .dp-row { display:flex; align-items:center; gap:0.55rem; padding:0.45rem 1.1rem; cursor:pointer; font-size:0.875rem; color:var(--color-text-primary); transition:background 0.1s; }
+  .dp-row:hover { background:var(--color-bg-card-hover); }
+  .dp-up { color:var(--color-text-secondary); }
+  .dp-project { color:var(--planned); }
   .dp-icon { flex-shrink:0; font-size:0.9rem; width:1.1rem; text-align:center; }
   .dp-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .dp-badge { font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; background:#dbeafe; color:#1e40af; border-radius:3px; padding:0.1rem 0.35rem; flex-shrink:0; }
+  .dp-badge { font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; background:var(--planned-bg); color:var(--planned); border-radius:3px; padding:0.1rem 0.35rem; flex-shrink:0; }
 
   .pac-actions {
     margin-top: 0.85rem; display: flex; gap: 0.65rem; align-items: center;
   }
-  .pac-upload-status { font-size: 0.8rem; color: #94a3b8; }
+  .pac-upload-status { font-size: 0.8rem; color: var(--color-text-muted); }
 {% endblock %}
 
 {% block content %}
@@ -82,7 +82,7 @@
 
   <div class="card" style="margin-bottom:1rem;">
     <p class="card-title">Current Project</p>
-    <p style="font-size:1rem;font-weight:700;color:#1e293b;margin:0 0 0.75rem;">{{ project_title }}</p>
+    <p style="font-size:1rem;font-weight:700;color:var(--color-text-primary);margin:0 0 0.75rem;">{{ project_title }}</p>
     <a href="{{ base_path }}/api/project/download" class="btn btn-ghost btn-sm" download>
       Download project files (.zip)
     </a>
@@ -93,7 +93,7 @@
     <p class="text-muted" style="margin-bottom:0.75rem;">Points this server at a directory on your machine. Changes are saved directly to the markdown files.</p>
     <div style="display:flex;gap:0.5rem;">
       <input type="text" id="localPath" placeholder="/absolute/path  or  ../relative"
-             style="flex:1;font-family:ui-monospace,monospace;font-size:0.85rem;"
+             style="flex:1;font-family:var(--font-mono);font-size:0.85rem;"
              onkeydown="if(event.key==='Enter')switchByPath()">
       <button type="button" class="btn btn-primary btn-sm" onclick="openDirPicker()">Browse…</button>
     </div>
@@ -132,11 +132,11 @@
   <div class="card" style="margin-top:1rem;">
     <p class="card-title">Recent Projects</p>
     {% for proj in recent_projects %}
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.45rem 0;border-bottom:1px solid #f1f5f9;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.45rem 0;border-bottom:1px solid var(--color-border-subtle);">
       <div style="min-width:0;margin-right:0.75rem;">
-        <div style="font-size:0.875rem;font-weight:600;color:#1e293b;">{{ proj.title }}</div>
+        <div style="font-size:0.875rem;font-weight:600;color:var(--color-text-primary);">{{ proj.title }}</div>
         {% if not proj.uploaded %}
-        <div style="font-family:monospace;font-size:0.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ proj.path }}</div>
+        <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ proj.path }}</div>
         {% endif %}
       </div>
       <button class="btn btn-ghost btn-sm" style="flex-shrink:0;"
@@ -151,14 +151,14 @@
 </div>
 
 {% if not lock_project %}
-<dialog id="dirPickerModal" style="border:none;border-radius:10px;padding:0;width:min(92vw,28rem);box-shadow:0 8px 40px rgba(0,0,0,0.18);">
-  <div style="display:flex;justify-content:space-between;align-items:center;padding:0.9rem 1.1rem 0.65rem;border-bottom:1px solid #f1f5f9;">
-    <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#64748b;">Select Project Folder</span>
-    <button onclick="document.getElementById('dirPickerModal').close()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.1rem;line-height:1;padding:0.2rem;">✕</button>
+<dialog id="dirPickerModal" style="border:none;border-radius:10px;padding:0;width:min(92vw,28rem);box-shadow:0 8px 40px rgba(0,0,0,0.18);background:var(--color-bg-card);color:var(--color-text-primary);">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:0.9rem 1.1rem 0.65rem;border-bottom:1px solid var(--color-border-subtle);">
+    <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--color-text-secondary);">Select Project Folder</span>
+    <button onclick="document.getElementById('dirPickerModal').close()" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);font-size:1.1rem;line-height:1;padding:0.2rem;">✕</button>
   </div>
-  <div id="dpCrumb" style="padding:0.5rem 1.1rem;font-family:ui-monospace,monospace;font-size:0.72rem;color:#64748b;background:#f8fafc;border-bottom:1px solid #f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+  <div id="dpCrumb" style="padding:0.5rem 1.1rem;font-family:var(--font-mono);font-size:0.72rem;color:var(--color-text-secondary);background:var(--color-bg-card-hover);border-bottom:1px solid var(--color-border-subtle);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
   <div id="dpList" style="max-height:18rem;overflow-y:auto;padding:0.35rem 0;"></div>
-  <div style="padding:0.75rem 1.1rem;border-top:1px solid #f1f5f9;display:flex;gap:0.5rem;justify-content:flex-end;">
+  <div style="padding:0.75rem 1.1rem;border-top:1px solid var(--color-border-subtle);display:flex;gap:0.5rem;justify-content:flex-end;">
     <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dirPickerModal').close()">Cancel</button>
     <button id="dpSelectBtn" class="btn btn-primary btn-sm" onclick="dpConfirm()" disabled>Use this Folder</button>
   </div>
@@ -280,9 +280,9 @@ async function openProject() {
     const resp = await fetch('{{ base_path }}/api/project/upload', { method: 'POST', body: form });
     const d = await resp.json();
     if (d.ok) { if (d.session_id) sessionStorage.setItem('pac_session_id', d.session_id); window.location = '{{ base_path }}/dashboard'; }
-    else { statusEl.style.color = '#dc2626'; statusEl.textContent = d.detail || 'Failed to open.'; }
+    else { statusEl.style.color = 'var(--gap)'; statusEl.textContent = d.detail || 'Failed to open.'; }
   } catch {
-    statusEl.style.color = '#dc2626';
+    statusEl.style.color = 'var(--gap)';
     statusEl.textContent = 'Request failed.';
   }
 }
@@ -346,7 +346,7 @@ function openRecent(path) { _switchDiskPath(path); }
 
 function _switchDiskPath(path) {
   const statusEl = document.getElementById('dir-status');
-  statusEl.style.color = '#64748b'; statusEl.textContent = 'Switching…';
+  statusEl.style.color = 'var(--color-text-secondary)'; statusEl.textContent = 'Switching…';
   sessionStorage.removeItem('pac_session_id');
   fetch('{{ base_path }}/api/switch-project', {
     method: 'POST',
@@ -354,8 +354,8 @@ function _switchDiskPath(path) {
     body: JSON.stringify({ project_dir: path }),
   }).then(r => r.json()).then(d => {
     if (d.ok) { window.location = '{{ base_path }}/dashboard'; }
-    else { statusEl.style.color = '#dc2626'; statusEl.textContent = d.detail || 'Failed.'; }
-  }).catch(() => { statusEl.style.color = '#dc2626'; statusEl.textContent = 'Request failed.'; });
+    else { statusEl.style.color = 'var(--gap)'; statusEl.textContent = d.detail || 'Failed.'; }
+  }).catch(() => { statusEl.style.color = 'var(--gap)'; statusEl.textContent = 'Request failed.'; });
 }
 
 /* ── Server-side directory picker ── */
@@ -372,11 +372,11 @@ async function dpNavigate(path) {
   const list = document.getElementById('dpList');
   const crumb = document.getElementById('dpCrumb');
   const selectBtn = document.getElementById('dpSelectBtn');
-  list.innerHTML = '<div style="padding:1rem 1.1rem;color:#94a3b8;font-size:0.85rem;">Loading…</div>';
+  list.innerHTML = '<div style="padding:1rem 1.1rem;color:var(--color-text-muted);font-size:0.85rem;">Loading…</div>';
   selectBtn.disabled = true;
   try {
     const r = await fetch('{{ base_path }}/api/browse?path=' + encodeURIComponent(path));
-    if (!r.ok) { const d = await r.json(); list.innerHTML = `<div style="padding:1rem 1.1rem;color:#dc2626;font-size:0.85rem;">${d.detail||'Error'}</div>`; return; }
+    if (!r.ok) { const d = await r.json(); list.innerHTML = `<div style="padding:1rem 1.1rem;color:var(--gap);font-size:0.85rem;">${d.detail||'Error'}</div>`; return; }
     const data = await r.json();
     _dpCurrent = data.path;
     crumb.textContent = data.path;
@@ -389,7 +389,7 @@ async function dpNavigate(path) {
       </div>`;
     }
     if (!data.dirs.length) {
-      html += '<div style="padding:0.75rem 1.1rem;color:#94a3b8;font-size:0.85rem;">No subdirectories</div>';
+      html += '<div style="padding:0.75rem 1.1rem;color:var(--color-text-muted);font-size:0.85rem;">No subdirectories</div>';
     }
     data.dirs.forEach(d => {
       const badge = d.is_project ? '<span class="dp-badge">project</span>' : '';
@@ -402,7 +402,7 @@ async function dpNavigate(path) {
       row.addEventListener('click', () => dpNavigate(row.dataset.nav))
     );
   } catch {
-    list.innerHTML = '<div style="padding:1rem 1.1rem;color:#dc2626;font-size:0.85rem;">Request failed</div>';
+    list.innerHTML = '<div style="padding:1rem 1.1rem;color:var(--gap);font-size:0.85rem;">Request failed</div>';
   }
 }
 

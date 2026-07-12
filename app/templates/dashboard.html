@@ -4,8 +4,8 @@
 {% block extra_styles %}
 /* ── Lifecycle Pipeline ────────────────────────────── */
 .pipeline-wrap {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
   padding: 1rem 1.25rem;
   box-shadow: var(--card-shadow);
@@ -49,7 +49,7 @@
 }
 .pipeline-arrow {
   font-size: 1.4rem;
-  color: #cbd5e1;
+  color: var(--color-border-muted);
   padding: 0 0.1rem;
   flex-shrink: 0;
   line-height: 1;
@@ -61,19 +61,19 @@
   .pipeline-arrow { display: none; }
 }
 
-.stage-gap          { background: #fffbeb; border-color: #fde68a; color: #92400e; }
-.stage-gap          .pipeline-count { color: #b45309; }
+.stage-gap          { background: var(--color-amber-bg); border-color: var(--color-amber-border); color: var(--color-amber-text); }
+.stage-gap          .pipeline-count { color: var(--color-amber-text); }
 
-.stage-prioritized  { background: #ede9fe; border-color: #c4b5fd; color: #4c1d95; }
-.stage-prioritized  .pipeline-count { color: #5b21b6; }
+.stage-prioritized  { background: var(--color-purple-bg); border-color: var(--color-purple-border); color: var(--color-purple-text); }
+.stage-prioritized  .pipeline-count { color: var(--color-purple-text); }
 
-.stage-inprogress   { background: #fff7ed; border-color: #fed7aa; color: #92400e; }
-.stage-inprogress   .pipeline-count { color: #f59e0b; }
+.stage-inprogress   { background: var(--color-amber-bg); border-color: var(--color-amber-border); color: var(--color-amber-text); }
+.stage-inprogress   .pipeline-count { color: var(--color-amber); }
 
-.stage-review       { background: #fff7ed; border-color: #fdba74; color: #c2410c; }
-.stage-review       .pipeline-count { color: #ea580c; }
+.stage-review       { background: var(--color-amber-bg); border-color: var(--color-amber-border); color: var(--color-amber-text); }
+.stage-review       .pipeline-count { color: var(--color-amber-text); }
 
-.stage-released     { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.stage-released     { background: var(--live-bg); border-color: var(--live-border); color: var(--live); }
 .stage-released     .pipeline-count { color: var(--live); }
 
 .stage-zero { opacity: 0.45; }
@@ -92,13 +92,13 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 .rp-section-count {
   font-size: 0.72rem;
   font-weight: 700;
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-amber-bg);
+  color: var(--color-amber-text);
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
 }
@@ -110,23 +110,23 @@
   margin-bottom: 1rem;
 }
 .rp-ip-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-top: 3px solid #f59e0b;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-subtle);
+  border-top: 3px solid var(--color-amber);
   border-radius: var(--radius);
   padding: 0.85rem 1rem;
   box-shadow: var(--card-shadow);
 }
 .rp-ip-wbs {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   margin-bottom: 0.2rem;
 }
 .rp-ip-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin-bottom: 0.5rem;
   line-height: 1.3;
 }
@@ -137,7 +137,7 @@
   font-size: 0.75rem;
 }
 .rp-ip-pct { font-weight: 700; }
-.rp-ip-counts { color: #64748b; }
+.rp-ip-counts { color: var(--color-text-secondary); }
 
 .rp-release-ready {
   display: flex;
@@ -170,8 +170,8 @@
 .rp-queue-count {
   font-size: 0.72rem;
   font-weight: 700;
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--planned-bg);
+  color: var(--planned);
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
 }
@@ -187,7 +187,7 @@
   align-items: baseline;
   gap: 0.5rem;
   padding: 0.45rem 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-border-subtle);
   font-size: 0.85rem;
 }
 .rp-planned-item:last-child { border-bottom: none; }
@@ -195,19 +195,19 @@
   content: counter(planned-counter);
   font-size: 0.68rem;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   min-width: 1rem;
   text-align: right;
   flex-shrink: 0;
 }
 .rp-planned-wbs {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   flex-shrink: 0;
 }
 .rp-planned-label {
-  color: #334155;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
@@ -217,7 +217,7 @@
 {% block content %}
 <div class="page-header" style="display:flex;align-items:baseline;gap:2rem;flex-wrap:wrap;">
   {% if not embed_chrome %}<h1 style="flex-shrink:0;margin:0;">{{ product.title }}</h1>{% endif %}
-  {% if product.summary %}<p style="color:#64748b;font-size:0.875rem;line-height:1.6;margin:0;max-width:72ch;">{{ product.summary }}</p>{% endif %}
+  {% if product.summary %}<p style="color:var(--color-text-secondary);font-size:0.875rem;line-height:1.6;margin:0;max-width:72ch;">{{ product.summary }}</p>{% endif %}
 </div>
 
 <!-- Stats row -->
@@ -240,7 +240,7 @@
   </div>
   <div class="stat-card">
     <p class="stat-label">Overall</p>
-    <p class="stat-value" style="color:#1e293b;">{{ (product.overall_completion_pct * 100)|int }}%</p>
+    <p class="stat-value" style="color:var(--color-text-primary);">{{ (product.overall_completion_pct * 100)|int }}%</p>
   </div>
 </div>
 
@@ -298,13 +298,13 @@
     {% for area in product.wbs_areas %}
     <div style="display:flex;margin-bottom:6px;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
       <!-- Lane label -->
-      <div style="width:84px;min-width:84px;background:#1e293b;color:#fff;display:flex;align-items:center;
+      <div style="width:84px;min-width:84px;background:var(--color-text-primary);color:var(--color-bg-base);display:flex;align-items:center;
                   justify-content:center;text-align:center;font-size:0.7rem;font-weight:700;
                   padding:8px;line-height:1.45;">
         {{ area.number }}.<br>{{ area.title | truncate(18, true, '…') }}
       </div>
       <!-- Sub-area sections -->
-      <div style="display:flex;flex:1;gap:3px;background:#e2e8f0;padding:3px;">
+      <div style="display:flex;flex:1;gap:3px;background:var(--color-border-subtle);padding:3px;">
         {% for sa in area.sub_areas %}
         {% set pct = sa.completion_pct %}
         <div style="flex:1;min-width:7rem;background:{{ pct | wbs_body_color }};
@@ -320,7 +320,7 @@
             </span>
           </div>
           <!-- Feature list - each item clickable -->
-          <div style="padding:5px 8px 8px;font-size:0.72rem;color:#1e293b;line-height:1.75;">
+          <div style="padding:5px 8px 8px;font-size:0.72rem;color:var(--color-text-primary);line-height:1.75;">
             <ul style="list-style:none;margin:0;padding:0;">
               {% for feature in sa.features %}
               <li data-source="product"
@@ -334,7 +334,7 @@
                   data-flagged="{{ feature.flagged | lower }}"
                   onclick="openFeaturePanelFromEl(this)"
                   style="cursor:pointer;padding:0 0 0 0.5rem;border-radius:3px;transition:background 0.1s;
-                         {% if feature.status.value in ('Live', 'Released') %}text-decoration:line-through;color:#94a3b8;{% endif %}"
+                         {% if feature.status.value in ('Live', 'Released') %}text-decoration:line-through;color:var(--color-text-muted);{% endif %}"
                   onmouseover="this.style.background='rgba(0,0,0,0.06)'"
                   onmouseout="this.style.background='transparent'">
                 • {{ feature.name }}
@@ -357,13 +357,13 @@
 <div class="card" style="margin-bottom:1.5rem;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
     <p class="card-title" style="margin:0;">Known Gaps for Team Discussion</p>
-    <span style="font-size:0.75rem;color:#b45309;background:#fef3c7;padding:0.2rem 0.6rem;border-radius:999px;font-weight:600;">{{ known_gaps | length }} gap{% if known_gaps | length != 1 %}s{% endif %}</span>
+    <span style="font-size:0.75rem;color:var(--color-amber-text);background:var(--color-amber-bg);padding:0.2rem 0.6rem;border-radius:999px;font-weight:600;">{{ known_gaps | length }} gap{% if known_gaps | length != 1 %}s{% endif %}</span>
   </div>
   <div style="display:flex;flex-direction:column;gap:0.35rem;">
     {% for entry in known_gaps %}
     {% set f = entry.f %}
     {% set sa = entry.sa %}
-    <div style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.65rem;border-radius:6px;border:1px solid #fde68a;background:#fffbeb;cursor:pointer;transition:background 0.1s;"
+    <div style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.65rem;border-radius:6px;border:1px solid var(--color-amber-border);background:var(--color-amber-bg);cursor:pointer;transition:background 0.1s;"
          data-source="product"
          data-wbs="{{ f.wbs }}"
          data-name="{{ f.name }}"
@@ -374,14 +374,14 @@
          {% if f.value %}data-value="{{ f.value }}"{% endif %}
          {% if f.effort %}data-effort="{{ f.effort }}"{% endif %}
          onclick="openFeaturePanelFromEl(this)"
-         onmouseover="this.style.background='#fef9c3'"
-         onmouseout="this.style.background='#fffbeb'">
-      <span style="font-family:monospace;font-size:0.65rem;background:#fde68a;color:#92400e;padding:0.1rem 0.35rem;border-radius:3px;white-space:nowrap;flex-shrink:0;">{{ f.wbs }}</span>
+         onmouseover="this.style.background='var(--color-bg-card-hover)'"
+         onmouseout="this.style.background='var(--color-amber-bg)'">
+      <span style="font-family:var(--font-mono);font-size:0.65rem;background:var(--color-amber-border);color:var(--color-amber-text);padding:0.1rem 0.35rem;border-radius:3px;white-space:nowrap;flex-shrink:0;">{{ f.wbs }}</span>
       {% if f.stage != 'Gap' %}
-      <span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#b45309;flex-shrink:0;">{{ f.stage }}</span>
+      <span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-amber-text);flex-shrink:0;">{{ f.stage }}</span>
       {% endif %}
-      <span style="font-size:0.85rem;font-weight:500;color:#1e293b;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ f.name }}</span>
-      <span style="font-size:0.72rem;color:#94a3b8;flex-shrink:0;">{{ sa.wbs_prefix }} {{ sa.title | truncate(28, true, '…') }}</span>
+      <span style="font-size:0.85rem;font-weight:500;color:var(--color-text-primary);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ f.name }}</span>
+      <span style="font-size:0.72rem;color:var(--color-text-muted);flex-shrink:0;">{{ sa.wbs_prefix }} {{ sa.title | truncate(28, true, '…') }}</span>
     </div>
     {% endfor %}
   </div>
@@ -396,22 +396,22 @@
     <a href="{{ base_path }}/roadmap" class="btn btn-ghost btn-sm">View Roadmap</a>
   </div>
   {% for entry in recent_changelog %}
-  <div style="padding:0.75rem 0;border-bottom:1px solid #f1f5f9;{% if loop.last %}border-bottom:none;{% endif %}">
+  <div style="padding:0.75rem 0;border-bottom:1px solid var(--color-border-subtle);{% if loop.last %}border-bottom:none;{% endif %}">
     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">
       <span style="font-weight:600;font-size:0.875rem;">v{{ entry.version }}</span>
       {% if entry.in_progress %}
-      <span class="badge" style="background:#fef3c7;color:#92400e;">In Progress</span>
+      <span class="badge" style="background:var(--color-amber-bg);color:var(--color-amber-text);">In Progress</span>
       {% endif %}
     </div>
     {% for group in entry.groups[:2] %}
-    <div style="font-size:0.8rem;color:#64748b;margin-bottom:0.15rem;">
-      <strong style="color:#475569;">{{ group.label }}</strong> -
+    <div style="font-size:0.8rem;color:var(--color-text-secondary);margin-bottom:0.15rem;">
+      <strong style="color:var(--color-text-secondary);">{{ group.label }}</strong> -
       {{ group.items | join(', ') | truncate(80) }}
     </div>
     {% endfor %}
     {% if entry.bug_fixes %}
-    <div style="font-size:0.8rem;color:#64748b;">
-      <strong style="color:#475569;">Bug fixes:</strong> {{ entry.bug_fixes | join(', ') | truncate(80) }}
+    <div style="font-size:0.8rem;color:var(--color-text-secondary);">
+      <strong style="color:var(--color-text-secondary);">Bug fixes:</strong> {{ entry.bug_fixes | join(', ') | truncate(80) }}
     </div>
     {% endif %}
   </div>

@@ -13,46 +13,46 @@
   border-radius: var(--radius) var(--radius) 0 0;
 }
 .bug-col-count { font-size: 0.78rem; font-weight: 700; opacity: 0.75; }
-.col-open       .bug-col-header { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; border-bottom: none; }
-.col-invest     .bug-col-header { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-bottom: none; }
-.col-fixing     .bug-col-header { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; border-bottom: none; }
+.col-open       .bug-col-header { background: var(--gap-bg); color: var(--gap); border: 1px solid var(--gap-border); border-bottom: none; }
+.col-invest     .bug-col-header { background: var(--color-amber-bg); color: var(--color-amber-text); border: 1px solid var(--color-amber-border); border-bottom: none; }
+.col-fixing     .bug-col-header { background: var(--planned-bg); color: var(--planned); border: 1px solid var(--planned-border); border-bottom: none; }
 
 .bug-list {
-  background: #f8fafc; border: 1px solid #e2e8f0;
+  background: var(--color-bg-card-hover); border: 1px solid var(--color-border-subtle);
   border-radius: 0 0 var(--radius) var(--radius);
   padding: 0.5rem; min-height: 5rem;
 }
 
 .bug-card {
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+  background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: 6px;
   padding: 0.7rem 0.75rem; margin-bottom: 0.5rem; cursor: pointer;
   transition: box-shadow 0.1s;
 }
 .bug-card:last-child { margin-bottom: 0; }
 .bug-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
 
-.col-open   .bug-card { border-left: 3px solid #ef4444; }
-.col-invest .bug-card { border-left: 3px solid #f97316; }
-.col-fixing .bug-card { border-left: 3px solid #3b82f6; }
+.col-open   .bug-card { border-left: 3px solid var(--gap); }
+.col-invest .bug-card { border-left: 3px solid var(--color-amber); }
+.col-fixing .bug-card { border-left: 3px solid var(--planned); }
 
 .bug-meta { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; flex-wrap: wrap; }
-.bug-id   { font-family: monospace; font-size: 0.62rem; color: #94a3b8; }
+.bug-id   { font-family: var(--font-mono); font-size: 0.62rem; color: var(--color-text-muted); }
 .severity-badge {
   font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
   padding: 0.1rem 0.35rem; border-radius: 3px;
 }
-.sev-critical { background: #fee2e2; color: #991b1b; }
-.sev-high     { background: #ffedd5; color: #9a3412; }
-.sev-medium   { background: #fef3c7; color: #92400e; }
-.sev-low      { background: #f1f5f9; color: #475569; }
+.sev-critical { background: var(--gap-bg); color: var(--gap); }
+.sev-high     { background: var(--color-amber-bg); color: var(--color-amber-text); }
+.sev-medium   { background: var(--color-amber-bg); color: var(--color-amber-text); }
+.sev-low      { background: var(--color-bg-card-hover); color: var(--color-text-secondary); }
 
-.bug-title { font-size: 0.875rem; font-weight: 500; color: #1e293b; line-height: 1.4; margin-bottom: 0.2rem; }
-.bug-notes { font-size: 0.75rem; color: #64748b; line-height: 1.4; }
-.bug-wbs   { font-family: monospace; font-size: 0.65rem; color: #94a3b8; margin-top: 0.2rem; }
+.bug-title { font-size: 0.875rem; font-weight: 500; color: var(--color-text-primary); line-height: 1.4; margin-bottom: 0.2rem; }
+.bug-notes { font-size: 0.75rem; color: var(--color-text-secondary); line-height: 1.4; }
+.bug-wbs   { font-family: var(--font-mono); font-size: 0.65rem; color: var(--color-text-muted); margin-top: 0.2rem; }
 .bug-actions { display: flex; gap: 0.35rem; margin-top: 0.45rem; flex-wrap: wrap; }
 
 /* Resolved section */
-.resolved-section { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; }
+.resolved-section { background: var(--color-bg-card); border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; }
 
 /* Screenshot lightbox */
 .screenshot-lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:1000; align-items:center; justify-content:center; cursor:zoom-out; }
@@ -128,7 +128,7 @@
             data-date="{{ r.date or '' }}"
             onclick="openResolvedPanel(this.dataset.id, this.dataset.title, this.dataset.resolvedIn, this.dataset.date)">
           <td class="wbs-code">{{ r.id }}</td>
-          <td style="font-size:0.875rem;text-decoration:line-through;color:#94a3b8;">{{ r.title }}</td>
+          <td style="font-size:0.875rem;text-decoration:line-through;color:var(--color-text-muted);">{{ r.title }}</td>
           <td class="text-muted">{{ r.resolved_in or '-' }}</td>
           <td class="text-muted">{{ r.date }}</td>
         </tr>
@@ -141,33 +141,33 @@
 
 <!-- Resolved bug panel -->
 <dialog id="resolvedPanel" style="border:none;border-radius:12px;padding:0;width:min(90vw,520px);
-        box-shadow:0 20px 60px rgba(0,0,0,0.22);overflow:hidden;background:#fff;">
-  <div style="padding:1.1rem 1.4rem 0.9rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;">
+        box-shadow:0 20px 60px rgba(0,0,0,0.22);overflow:hidden;background:var(--color-bg-card);">
+  <div style="padding:1.1rem 1.4rem 0.9rem;border-bottom:1px solid var(--color-border-subtle);display:flex;justify-content:space-between;align-items:flex-start;">
     <div>
       <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
-        <span id="rpId" style="font-family:monospace;font-size:0.72rem;color:#94a3b8;"></span>
-        <span style="font-size:0.72rem;font-weight:700;background:#dcfce7;color:#15803d;padding:0.15rem 0.45rem;border-radius:3px;">Resolved</span>
+        <span id="rpId" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--color-text-muted);"></span>
+        <span style="font-size:0.72rem;font-weight:700;background:var(--live-bg);color:var(--live);padding:0.15rem 0.45rem;border-radius:3px;">Resolved</span>
       </div>
-      <p id="rpTitle" style="font-size:1.05rem;font-weight:700;color:#1e293b;margin:0;"></p>
+      <p id="rpTitle" style="font-size:1.05rem;font-weight:700;color:var(--color-text-primary);margin:0;"></p>
     </div>
     <button onclick="document.getElementById('resolvedPanel').close()"
-            style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.2rem;padding:0.2rem 0.35rem;border-radius:4px;flex-shrink:0;">✕</button>
+            style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);font-size:1.2rem;padding:0.2rem 0.35rem;border-radius:4px;flex-shrink:0;">✕</button>
   </div>
   <div style="padding:1.2rem 1.4rem;">
     <div style="display:flex;gap:1.5rem;margin-bottom:1rem;">
       <div>
-        <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 0.2rem;">Resolved In</p>
-        <p id="rpResolvedIn" style="font-size:0.9rem;color:#1e293b;margin:0;"></p>
+        <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-muted);margin:0 0 0.2rem;">Resolved In</p>
+        <p id="rpResolvedIn" style="font-size:0.9rem;color:var(--color-text-primary);margin:0;"></p>
       </div>
       <div>
-        <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 0.2rem;">Date</p>
-        <p id="rpDate" style="font-size:0.9rem;color:#1e293b;margin:0;"></p>
+        <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-muted);margin:0 0 0.2rem;">Date</p>
+        <p id="rpDate" style="font-size:0.9rem;color:var(--color-text-primary);margin:0;"></p>
       </div>
     </div>
     <div id="rpScreenshotSection" style="display:none;">
-      <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 0.4rem;">Screenshot</p>
+      <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-muted);margin:0 0 0.4rem;">Screenshot</p>
       <img id="rpScreenshotImg"
-           style="max-width:100%;max-height:280px;border-radius:6px;border:1px solid #e2e8f0;display:block;cursor:zoom-in;"
+           style="max-width:100%;max-height:280px;border-radius:6px;border:1px solid var(--color-border-subtle);display:block;cursor:zoom-in;"
            alt="Screenshot"
            onclick="openScreenshotLightbox(_rpId)">
     </div>
@@ -175,7 +175,7 @@
 </dialog>
 
 <!-- New bug modal -->
-<dialog id="newBugModal" style="border:1px solid #d1d5db;border-radius:8px;padding:1.5rem;min-width:28rem;max-width:34rem;">
+<dialog id="newBugModal" style="border:1px solid var(--color-border-muted);border-radius:8px;padding:1.5rem;min-width:28rem;max-width:34rem;">
   <h3 style="margin:0 0 1rem;font-size:1rem;">Report a Bug</h3>
   <div class="form-group">
     <label>Title</label>
@@ -210,7 +210,7 @@
            onchange="previewNewBugScreenshot(this)">
     <div id="bugScreenshotPreview" style="display:none;margin-top:0.5rem;">
       <img id="bugScreenshotPreviewImg"
-           style="max-width:100%;max-height:140px;border-radius:5px;border:1px solid #e2e8f0;display:block;">
+           style="max-width:100%;max-height:140px;border-radius:5px;border:1px solid var(--color-border-subtle);display:block;">
     </div>
   </div>
   <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
@@ -227,39 +227,39 @@
   <div style="position:absolute;inset:0;background:rgba(15,23,42,0.45);backdrop-filter:blur(2px);"
        onclick="closeBugPanel()"></div>
   <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-              width:min(90vw,700px);max-height:80vh;background:#fff;
+              width:min(90vw,700px);max-height:80vh;background:var(--color-bg-card);
               border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25);
               display:flex;flex-direction:column;overflow:hidden;">
-    <div style="padding:1.25rem 1.5rem 0.75rem;border-bottom:1px solid #f1f5f9;flex-shrink:0;">
+    <div style="padding:1.25rem 1.5rem 0.75rem;border-bottom:1px solid var(--color-border-subtle);flex-shrink:0;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
         <div style="flex:1;min-width:0;">
           <div id="bpMeta" style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;"></div>
-          <input id="bpTitle" type="text" style="width:100%;font-size:1.1rem;font-weight:700;color:#0f172a;
+          <input id="bpTitle" type="text" style="width:100%;font-size:1.1rem;font-weight:700;color:var(--color-text-primary);
                  border:none;border-bottom:2px solid transparent;outline:none;padding:0.1rem 0;
                  background:transparent;transition:border-color 0.15s;"
-                 onfocus="this.style.borderBottomColor='#ef4444'"
+                 onfocus="this.style.borderBottomColor='var(--gap)'"
                  onblur="this.style.borderBottomColor='transparent'">
         </div>
-        <button onclick="closeBugPanel()" style="background:none;border:none;cursor:pointer;padding:0.35rem;color:#94a3b8;font-size:1.25rem;line-height:1;">✕</button>
+        <button onclick="closeBugPanel()" style="background:none;border:none;cursor:pointer;padding:0.35rem;color:var(--color-text-muted);font-size:1.25rem;line-height:1;">✕</button>
       </div>
     </div>
     <div style="flex:1;overflow-y:auto;padding:1.25rem 1.5rem;">
       <div style="display:grid;grid-template-columns:1fr 180px;gap:1.25rem;margin-bottom:1.25rem;">
         <div>
-          <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.4rem;">Notes / Steps to Reproduce</label>
-          <textarea id="bpNotes" rows="5" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.9rem;font-family:inherit;color:#1e293b;resize:vertical;background:#fafafa;line-height:1.6;"
-                    onfocus="this.style.background='#fff';this.style.borderColor='#ef4444'"
-                    onblur="this.style.background='#fafafa';this.style.borderColor='#e2e8f0'"
+          <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-secondary);margin-bottom:0.4rem;">Notes / Steps to Reproduce</label>
+          <textarea id="bpNotes" rows="5" style="width:100%;padding:0.6rem 0.75rem;border:1px solid var(--color-border-subtle);border-radius:6px;font-size:0.9rem;font-family:inherit;color:var(--color-text-primary);resize:vertical;background:var(--color-bg-card-hover);line-height:1.6;"
+                    onfocus="this.style.background='var(--color-bg-card)';this.style.borderColor='var(--gap)'"
+                    onblur="this.style.background='var(--color-bg-card-hover)';this.style.borderColor='var(--color-border-subtle)'"
                     placeholder="Steps to reproduce, expected vs actual..."></textarea>
           <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;">
             <button class="btn btn-primary" onclick="saveBug()">Save Changes</button>
-            <span id="bpSaveStatus" style="font-size:0.8rem;color:#64748b;"></span>
+            <span id="bpSaveStatus" style="font-size:0.8rem;color:var(--color-text-secondary);"></span>
           </div>
           <div style="margin-top:1.1rem;">
-            <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:0.4rem;">Screenshot</label>
+            <label style="display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-secondary);margin-bottom:0.4rem;">Screenshot</label>
             <div id="bpScreenshotExisting" style="display:none;margin-bottom:0.5rem;">
               <img id="bpScreenshotImg"
-                   style="max-width:100%;max-height:300px;border-radius:6px;border:1px solid #e2e8f0;display:block;cursor:pointer;"
+                   style="max-width:100%;max-height:300px;border-radius:6px;border:1px solid var(--color-border-subtle);display:block;cursor:pointer;"
                    alt="Screenshot"
                    onclick="openScreenshotLightbox(_bugId)">
             </div>
@@ -269,9 +269,9 @@
             </label>
           </div>
         </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div style="background:var(--color-bg-card-hover);border:1px solid var(--color-border-subtle);border-radius:8px;padding:1rem;">
           <div style="margin-bottom:0.75rem;">
-            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Severity</label>
+            <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Severity</label>
             <select id="bpSeverity" class="form-select" style="font-size:0.875rem;" onchange="saveBugField()">
               <option value="Critical">Critical</option>
               <option value="High">High</option>
@@ -280,7 +280,7 @@
             </select>
           </div>
           <div style="margin-bottom:0.75rem;">
-            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Status</label>
+            <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Status</label>
             <select id="bpStatus" class="form-select" style="font-size:0.875rem;" onchange="onStatusChange()">
               <option value="Open">Open</option>
               <option value="Investigating">Investigating</option>
@@ -288,21 +288,21 @@
             </select>
           </div>
           <div id="bpFixVersionSection" style="display:none;margin-bottom:0.75rem;">
-            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Fix Version</label>
+            <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Fix Version</label>
             <input type="text" id="bpFixVersion" placeholder="e.g. 0.2.2" style="font-size:0.82rem;">
           </div>
           <div style="margin-bottom:0.75rem;">
-            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Owner</label>
+            <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Owner</label>
             <input type="text" id="bpOwner" placeholder="Who owns this?" style="font-size:0.82rem;" onchange="saveBugField()">
           </div>
           <div style="margin-bottom:0.75rem;">
-            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:#374151;cursor:pointer;">
+            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--color-text-primary);cursor:pointer;">
               <input type="checkbox" id="bpUatConfirmed" onchange="saveBugField()">
               Confirmed by owner during UAT
             </label>
           </div>
           <div id="bpResolveSection">
-            <label style="display:block;font-size:0.7rem;color:#64748b;margin-bottom:0.3rem;">Resolved In</label>
+            <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Resolved In</label>
             <input type="text" id="bpResolvedIn" placeholder="e.g. v0.3.0" style="font-size:0.82rem;margin-bottom:0.5rem;">
             <button class="btn btn-success btn-sm" style="width:100%;justify-content:center;" onclick="resolveBug()">✓ Mark Resolved</button>
           </div>
@@ -410,12 +410,12 @@ function openBugPanel(id, title, severity, status, notes, wbs, fixVersion, owner
   document.getElementById('bpUatConfirmed').checked = !!uatConfirmed;
   document.getElementById('bpFixVersionSection').style.display = status === 'Fix In Progress' ? 'block' : 'none';
   // Meta badges
-  const sevColors = { Critical:'#991b1b', High:'#9a3412', Medium:'#92400e', Low:'#475569' };
-  const sevBgs    = { Critical:'#fee2e2', High:'#ffedd5', Medium:'#fef3c7', Low:'#f1f5f9' };
+  const sevColors = { Critical:'var(--gap)', High:'var(--color-amber-text)', Medium:'var(--color-amber-text)', Low:'var(--color-text-secondary)' };
+  const sevBgs    = { Critical:'var(--gap-bg)', High:'var(--color-amber-bg)', Medium:'var(--color-amber-bg)', Low:'var(--color-bg-card-hover)' };
   let meta = `<span style="font-size:0.72rem;font-weight:700;background:${sevBgs[severity]};color:${sevColors[severity]};padding:0.15rem 0.45rem;border-radius:3px;">${severity}</span>`;
-  meta += `<span style="font-size:0.72rem;color:#64748b;">${status}</span>`;
-  if (fixVersion) meta += `<span style="font-size:0.68rem;font-weight:700;color:#1e40af;background:#dbeafe;padding:0.1rem 0.35rem;border-radius:3px;">${fixVersion}</span>`;
-  if (wbs) meta += `<span style="font-family:monospace;font-size:0.68rem;color:#94a3b8;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:3px;">${wbs}</span>`;
+  meta += `<span style="font-size:0.72rem;color:var(--color-text-secondary);">${status}</span>`;
+  if (fixVersion) meta += `<span style="font-size:0.68rem;font-weight:700;color:var(--planned);background:var(--planned-bg);padding:0.1rem 0.35rem;border-radius:3px;">${fixVersion}</span>`;
+  if (wbs) meta += `<span style="font-family:var(--font-mono);font-size:0.68rem;color:var(--color-text-muted);background:var(--color-bg-card-hover);padding:0.1rem 0.35rem;border-radius:3px;">${wbs}</span>`;
   document.getElementById('bpMeta').innerHTML = meta;
   document.getElementById('bpResolvedIn').value = '';
   // Load screenshot

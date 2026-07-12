@@ -14,37 +14,37 @@
   display: flex; justify-content: space-between; align-items: center;
 }
 .roadmap-col-count { font-weight: 400; font-size: 0.78rem; opacity: 0.75; }
-.col-planned     .roadmap-col-header { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; border-bottom: none; }
-.col-inprogress  .roadmap-col-header { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-bottom: none; }
-.col-nextrelease .roadmap-col-header { background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-bottom: none; }
+.col-planned     .roadmap-col-header { background: var(--planned-bg); color: var(--planned); border: 1px solid var(--planned-border); border-bottom: none; }
+.col-inprogress  .roadmap-col-header { background: var(--color-amber-bg); color: var(--color-amber-text); border: 1px solid var(--color-amber-border); border-bottom: none; }
+.col-nextrelease .roadmap-col-header { background: var(--live-bg); color: var(--live); border: 1px solid var(--live-border); border-bottom: none; }
 
 .col-planned .roadmap-col-body {
-  background: #f8fafc; border: 1px solid #bfdbfe; border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--color-bg-card-hover); border: 1px solid var(--planned-border); border-radius: 0 0 var(--radius) var(--radius);
   padding: 0.4rem; min-height: 4rem; flex: 1;
 }
-.col-inprogress  .roadmap-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 var(--radius) var(--radius); padding: 0.5rem; min-height: 4rem; flex: 1; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: flex-start; border-top: none; }
-.col-nextrelease .roadmap-list { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 var(--radius) var(--radius); padding: 0.5rem; min-height: 4rem; flex: 1; display: block; border-top: none; }
+.col-inprogress  .roadmap-list { background: var(--color-bg-card-hover); border: 1px solid var(--color-border-subtle); border-radius: 0 0 var(--radius) var(--radius); padding: 0.5rem; min-height: 4rem; flex: 1; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: flex-start; border-top: none; }
+.col-nextrelease .roadmap-list { background: var(--color-bg-card-hover); border: 1px solid var(--color-border-subtle); border-radius: 0 0 var(--radius) var(--radius); padding: 0.5rem; min-height: 4rem; flex: 1; display: block; border-top: none; }
 
 /* ── fc card styles (shared with Features page) ── */
-.fc { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 0.5rem; overflow: hidden; transition: box-shadow 0.1s; }
+.fc { background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: 6px; margin-bottom: 0.5rem; overflow: hidden; transition: box-shadow 0.1s; }
 .fc:last-child { margin-bottom: 0; }
 .fc:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.07); }
 .fc-head { padding: 0.65rem 0.75rem; cursor: pointer; }
 .fc-meta { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; }
-.fc-wbs  { font-family: monospace; font-size: 0.62rem; padding: 0.1rem 0.3rem; border-radius: 3px; font-weight: 600; }
+.fc-wbs  { font-family: var(--font-mono); font-size: 0.62rem; padding: 0.1rem 0.3rem; border-radius: 3px; font-weight: 600; }
 .fc-stage-badge { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
-.fc-title { font-size: 0.85rem; font-weight: 500; color: #1e293b; line-height: 1.4; }
+.fc-title { font-size: 0.85rem; font-weight: 500; color: var(--color-text-primary); line-height: 1.4; }
 .fc-group { margin-bottom: 0.5rem; }
 .fc-group > summary { list-style: none; cursor: pointer; }
 .fc-group > summary::-webkit-details-marker { display: none; }
-.fc-group > summary .fc { border-left: 3px solid #16a34a; }
-.fc-group > summary .fc-title::before { content: '▸ '; font-size: 0.7rem; color: #94a3b8; }
+.fc-group > summary .fc { border-left: 3px solid var(--live); }
+.fc-group > summary .fc-title::before { content: '▸ '; font-size: 0.7rem; color: var(--color-text-muted); }
 .fc-group[open] > summary .fc-title::before { content: '▾ '; }
-.fc-live-item { cursor: pointer; opacity: 0.8; margin-left: 0.5rem; border-left: 3px solid #bbf7d0 !important; }
+.fc-live-item { cursor: pointer; opacity: 0.8; margin-left: 0.5rem; border-left: 3px solid var(--live-border) !important; }
 
 /* ── Feature cards ── */
 .rm-feat {
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 5px;
+  background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: 5px;
   padding: 0.5rem 0.65rem; margin-bottom: 0.35rem;
   cursor: grab; transition: box-shadow 0.1s;
 }
@@ -52,66 +52,66 @@
 .rm-feat:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
 .rm-feat.sortable-ghost  { opacity: 0.35; }
 .rm-feat.sortable-chosen { box-shadow: 0 3px 10px rgba(0,0,0,0.14); }
-.col-inprogress  .rm-feat { border-left: 3px solid #f97316; flex: 0 0 auto; max-width: 280px; }
-.rm-feat-wbs   { font-family: monospace; font-size: 0.62rem; color: #94a3b8; }
-.rm-feat-title { font-size: 0.82rem; font-weight: 500; color: #1e293b; line-height: 1.4; margin: 0.1rem 0; }
-.rm-feat-sa    { font-size: 0.68rem; color: #94a3b8; }
+.col-inprogress  .rm-feat { border-left: 3px solid var(--color-amber); flex: 0 0 auto; max-width: 280px; }
+.rm-feat-wbs   { font-family: var(--font-mono); font-size: 0.62rem; color: var(--color-text-muted); }
+.rm-feat-title { font-size: 0.82rem; font-weight: 500; color: var(--color-text-primary); line-height: 1.4; margin: 0.1rem 0; }
+.rm-feat-sa    { font-size: 0.68rem; color: var(--color-text-muted); }
 
 /* ── Version buckets ── */
 .version-bucket { margin-bottom: 0.35rem; }
 .version-bucket-header {
   display: flex; align-items: center; gap: 0.45rem;
   padding: 0.38rem 0.65rem; cursor: pointer; border-radius: 5px 5px 0 0;
-  background: #eff6ff; border: 1px solid #bfdbfe; border-bottom: none;
+  background: var(--planned-bg); border: 1px solid var(--planned-border); border-bottom: none;
   font-size: 0.75rem; font-weight: 600; user-select: none;
 }
 .version-bucket-header:hover { filter: brightness(0.97); }
-.vb-chevron { font-size: 0.65rem; color: #93c5fd; flex-shrink: 0; }
-.vb-label { color: #1e40af; font-weight: 700; letter-spacing: -0.01em; }
-.vb-count { margin-left: auto; font-weight: 400; font-size: 0.7rem; color: #93c5fd; }
-.vb-remove { margin-left: 0.25rem; background: none; border: none; cursor: pointer; color: #93c5fd; font-size: 0.8rem; padding: 0; line-height: 1; border-radius: 3px; }
-.vb-remove:hover { color: #dc2626; }
+.vb-chevron { font-size: 0.65rem; color: var(--planned-border); flex-shrink: 0; }
+.vb-label { color: var(--planned); font-weight: 700; letter-spacing: -0.01em; }
+.vb-count { margin-left: auto; font-weight: 400; font-size: 0.7rem; color: var(--planned-border); }
+.vb-remove { margin-left: 0.25rem; background: none; border: none; cursor: pointer; color: var(--planned-border); font-size: 0.8rem; padding: 0; line-height: 1; border-radius: 3px; }
+.vb-remove:hover { color: var(--gap); }
 .version-bucket-list {
-  background: #fff; border: 1px solid #bfdbfe; border-top: none;
+  background: var(--color-bg-card); border: 1px solid var(--planned-border); border-top: none;
   border-radius: 0 0 5px 5px; padding: 0.35rem; min-height: 2.5rem;
 }
-.version-bucket-list .rm-feat { border-left: 3px solid #3b82f6; }
-.vb-empty { color: #94a3b8; font-size: 0.72rem; padding: 0.35rem 0.25rem; margin: 0; text-align: center; }
+.version-bucket-list .rm-feat { border-left: 3px solid var(--planned); }
+.vb-empty { color: var(--color-text-muted); font-size: 0.72rem; padding: 0.35rem 0.25rem; margin: 0; text-align: center; }
 
 /* ── Add version ── */
 .add-version-row {
   display: flex; gap: 0.35rem; padding: 0.35rem 0.4rem; margin-top: 0.25rem;
-  background: #f8fafc; border: 1px dashed #bfdbfe; border-radius: 5px;
+  background: var(--color-bg-card-hover); border: 1px dashed var(--planned-border); border-radius: 5px;
 }
 .add-version-input {
-  flex: 1; padding: 0.25rem 0.5rem; border: 1px solid #bfdbfe; border-radius: 4px;
+  flex: 1; padding: 0.25rem 0.5rem; border: 1px solid var(--planned-border); border-radius: 4px;
   font-size: 0.8rem; font-family: inherit; outline: none;
 }
-.add-version-input:focus { border-color: #3b82f6; }
+.add-version-input:focus { border-color: var(--planned); }
 
 /* ── Backlog sub-area groups ── */
-.backlog-section { background: #fff; border: 1px solid #e2e8f0; border-radius: var(--radius); margin-bottom: 1.5rem; overflow: hidden; }
-.backlog-section-header { background: #f1f5f9; color: #475569; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
+.backlog-section { background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: var(--radius); margin-bottom: 1.5rem; overflow: hidden; }
+.backlog-section-header { background: var(--color-bg-card-hover); color: var(--color-text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border-subtle); }
 .backlog-pool { padding: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.3rem; min-height: 2.5rem; }
 
 /* ── Backlog chips ── */
 .rm-feat-chip {
-  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px;
-  padding: 0.35rem 0.65rem; cursor: grab; font-size: 0.8rem; color: #1e293b;
+  background: var(--color-bg-card-hover); border: 1px solid var(--color-border-subtle); border-radius: 5px;
+  padding: 0.35rem 0.65rem; cursor: grab; font-size: 0.8rem; color: var(--color-text-primary);
   display: inline-flex; align-items: center; gap: 0.35rem; transition: box-shadow 0.1s;
 }
 .rm-feat-chip:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
 .rm-feat-chip.sortable-ghost  { opacity: 0.35; }
 .rm-feat-chip.sortable-chosen { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
-.rm-feat-chip .rm-feat-wbs { color: #94a3b8; font-size: 0.62rem; }
-.rm-freeform-chip { border-left: 3px solid #94a3b8; color: #475569; cursor: default; opacity: 0.8; }
+.rm-feat-chip .rm-feat-wbs { color: var(--color-text-muted); font-size: 0.62rem; }
+.rm-freeform-chip { border-left: 3px solid var(--color-text-muted); color: var(--color-text-secondary); cursor: default; opacity: 0.8; }
 
 /* ── Changelog ── */
-.changelog-card { background: #fff; border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; margin-bottom: 0.75rem; }
-.changelog-version { font-weight: 700; font-size: 1rem; color: #1e293b; }
-.changelog-group { font-size: 0.82rem; font-weight: 600; color: #374151; margin: 0.5rem 0 0.2rem; }
+.changelog-card { background: var(--color-bg-card); border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; margin-bottom: 0.75rem; }
+.changelog-version { font-weight: 700; font-size: 1rem; color: var(--color-text-primary); }
+.changelog-group { font-size: 0.82rem; font-weight: 600; color: var(--color-text-secondary); margin: 0.5rem 0 0.2rem; }
 .changelog-items { list-style: disc; padding-left: 1.25rem; margin: 0; }
-.changelog-items li { font-size: 0.82rem; color: #4b5563; line-height: 1.5; margin-bottom: 0.15rem; }
+.changelog-items li { font-size: 0.82rem; color: var(--color-text-secondary); line-height: 1.5; margin-bottom: 0.15rem; }
 {% endblock %}
 
 {% block content %}
@@ -147,7 +147,7 @@
   <div class="roadmap-col col-planned">
     <div class="roadmap-col-header">
       <div>Planned <span class="roadmap-col-count">{{ version_buckets | map(attribute='features') | map('length') | sum }}</span></div>
-      <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:rgba(37,99,235,0.1);color:#1e40af;border:1px solid #bfdbfe;"
+      <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:var(--planned-bg);color:var(--planned);border:1px solid var(--planned-border);"
               onclick="showAddVersion()" title="Add milestone">+ version</button>
     </div>
     <div class="col-planned col-planned-body roadmap-col-body">
@@ -169,7 +169,7 @@
           {% if bucket.total > 0 %}
           <span class="vb-count" title="{{ bucket.live_count }} live, {{ bucket.in_flight_count }} in progress, {{ bucket.total - bucket.live_count - bucket.in_flight_count }} remaining">
             {{ bucket.live_count }}/{{ bucket.total }}
-            {% if bucket.all_live %}<span style="color:#16a34a;">✓</span>{% endif %}
+            {% if bucket.all_live %}<span style="color:var(--live);">✓</span>{% endif %}
           </span>
           {% else %}
           <span class="vb-count">0</span>
@@ -177,7 +177,7 @@
           <button class="vb-remove" onclick="removeBucket(event, this)" title="Remove">✕</button>
         </div>
         {% if bucket.all_live %}
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-top:none;padding:0.35rem 0.65rem;font-size:0.7rem;color:#15803d;font-weight:600;">
+        <div style="background:var(--live-bg);border:1px solid var(--live-border);border-top:none;padding:0.35rem 0.65rem;font-size:0.7rem;color:var(--live);font-weight:600;">
           All features live - ready to release
         </div>
         {% endif %}
@@ -236,13 +236,13 @@
       </div>
       {% if next_version %}
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.1rem;">
-        <span style="font-size:0.62rem;color:#15803d;opacity:0.8;font-weight:400;">version</span>
-        <span style="font-size:0.78rem;font-weight:800;color:#15803d;letter-spacing:-0.02em;">v{{ next_version }}</span>
+        <span style="font-size:0.62rem;color:var(--live);opacity:0.8;font-weight:400;">version</span>
+        <span style="font-size:0.78rem;font-weight:800;color:var(--live);letter-spacing:-0.02em;">v{{ next_version }}</span>
       </div>
       {% endif %}
     </div>
     {% if version_rationale %}
-    <div style="padding:0.35rem 0.75rem;font-size:0.7rem;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-top:none;border-bottom:none;">
+    <div style="padding:0.35rem 0.75rem;font-size:0.7rem;color:var(--live);background:var(--live-bg);border:1px solid var(--live-border);border-top:none;border-bottom:none;">
       {{ version_rationale }}
     </div>
     {% endif %}
@@ -260,8 +260,8 @@
             <div class="fc">
               <div class="fc-head">
                 <div class="fc-meta">
-                  <span class="fc-wbs" style="background:#f0fdf4;color:#166534;">{{ sa.wbs_prefix }}</span>
-                  <span class="fc-stage-badge" style="color:#16a34a;">{{ sa_entries|length }} live</span>
+                  <span class="fc-wbs" style="background:var(--live-bg);color:var(--live);">{{ sa.wbs_prefix }}</span>
+                  <span class="fc-stage-badge" style="color:var(--live);">{{ sa_entries|length }} live</span>
                 </div>
                 <div class="fc-title">{{ sa.title }}</div>
               </div>
@@ -278,9 +278,9 @@
                onclick="openFeaturePanelFromEl(this)">
             <div class="fc-head" style="padding:0.4rem 0.65rem;">
               <div class="fc-meta">
-                <span class="fc-wbs" style="background:#f0fdf4;color:#166534;">{{ entry.f.wbs }}</span>
+                <span class="fc-wbs" style="background:var(--live-bg);color:var(--live);">{{ entry.f.wbs }}</span>
               </div>
-              <div class="fc-title" style="color:#94a3b8;font-size:0.8rem;">{{ entry.f.name }}</div>
+              <div class="fc-title" style="color:var(--color-text-muted);font-size:0.8rem;">{{ entry.f.name }}</div>
             </div>
           </div>
           {% endfor %}
@@ -301,7 +301,7 @@
     Backlog
     <div style="display:flex;align-items:center;gap:0.75rem;">
       <span style="font-weight:400;">{{ backlog_sorted | length + (freeform_backlog | length) }} items</span>
-      <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:rgba(124,58,237,0.08);color:#5b21b6;border:1px solid #ddd6fe;"
+      <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:var(--color-purple-bg);color:var(--color-purple-text);border:1px solid var(--color-purple-border);"
               onclick="document.getElementById('captureModal').showModal()">+ Capture Idea</button>
     </div>
   </div>
@@ -336,13 +336,13 @@
 </div>
 
 <!-- ── Release History ── -->
-<h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem;color:#1e293b;">Release History</h2>
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem;color:var(--color-text-primary);">Release History</h2>
 {% for entry in about.changelog %}
 <div class="changelog-card">
   <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
     <span class="changelog-version">v{{ entry.version }}</span>
     {% if entry.in_progress %}
-    <span class="badge" style="background:#fef3c7;color:#92400e;">In Progress</span>
+    <span class="badge" style="background:var(--color-amber-bg);color:var(--color-amber-text);">In Progress</span>
     {% endif %}
   </div>
   {% for group in entry.groups %}
@@ -359,14 +359,14 @@
 {% include "partials/feature_panel.html" %}
 
 <!-- Capture modal (mirrors Features page) -->
-<dialog id="captureModal" style="border:1px solid #d1d5db;border-radius:8px;padding:1.5rem;min-width:26rem;max-width:36rem;">
+<dialog id="captureModal" style="border:1px solid var(--color-border-muted);border-radius:8px;padding:1.5rem;min-width:26rem;max-width:36rem;">
   <h3 style="margin:0 0 1rem;font-size:1rem;">Capture New Idea</h3>
   <form id="captureForm" onsubmit="return false;">
     <div class="form-group"><label>Name</label>
       <input type="text" id="captureIdea" required placeholder="Describe the feature or improvement">
     </div>
-    <div class="form-group"><label>WBS Area <span style="color:#dc2626;">*</span></label>
-      <select id="captureWbs" required style="width:100%;padding:0.4rem 0.5rem;border:1px solid #d1d5db;border-radius:4px;font-size:0.85rem;">
+    <div class="form-group"><label>WBS Area <span style="color:var(--gap);">*</span></label>
+      <select id="captureWbs" required style="width:100%;padding:0.4rem 0.5rem;border:1px solid var(--color-border-muted);border-radius:4px;font-size:0.85rem;">
         <option value="">- select a WBS area -</option>
         {% for sa in sub_areas %}
         <option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} - {{ sa.title }}</option>

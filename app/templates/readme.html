@@ -3,18 +3,18 @@
 
 {% block extra_styles %}
 .readme-content h1 { font-size: 1.4rem; margin: 1.5rem 0 0.75rem; }
-.readme-content h2 { font-size: 1.15rem; margin: 1.25rem 0 0.6rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.35rem; }
-.readme-content h3 { font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151; }
-.readme-content p { font-size: 0.875rem; line-height: 1.7; color: #374151; margin: 0 0 0.75rem; }
-.readme-content pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; line-height: 1.5; margin-bottom: 1rem; }
-.readme-content code { font-family: 'SF Mono', Consolas, monospace; font-size: 0.82em; }
-.readme-content p code, .readme-content li code { background: #f1f5f9; padding: 0.1em 0.35em; border-radius: 3px; color: #0f172a; }
+.readme-content h2 { font-size: 1.15rem; margin: 1.25rem 0 0.6rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.35rem; }
+.readme-content h3 { font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--color-text-primary); }
+.readme-content p { font-size: 0.875rem; line-height: 1.7; color: var(--color-text-primary); margin: 0 0 0.75rem; }
+.readme-content pre { background: var(--color-bg-card-hover); color: var(--color-text-primary); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; line-height: 1.5; margin-bottom: 1rem; }
+.readme-content code { font-family: var(--font-mono); font-size: 0.82em; }
+.readme-content p code, .readme-content li code { background: var(--color-bg-card-hover); padding: 0.1em 0.35em; border-radius: 3px; color: var(--color-text-primary); }
 .readme-content table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 1rem; }
-.readme-content th { background: #f8fafc; text-align: left; padding: 0.45rem 0.65rem; border: 1px solid #e2e8f0; font-weight: 600; color: #374151; }
-.readme-content td { padding: 0.4rem 0.65rem; border: 1px solid #e2e8f0; color: #4b5563; }
-.readme-content ul, .readme-content ol { font-size: 0.875rem; line-height: 1.7; padding-left: 1.5rem; color: #374151; margin-bottom: 0.75rem; }
+.readme-content th { background: var(--color-bg-card-hover); text-align: left; padding: 0.45rem 0.65rem; border: 1px solid var(--color-border-subtle); font-weight: 600; color: var(--color-text-secondary); }
+.readme-content td { padding: 0.4rem 0.65rem; border: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); }
+.readme-content ul, .readme-content ol { font-size: 0.875rem; line-height: 1.7; padding-left: 1.5rem; color: var(--color-text-primary); margin-bottom: 0.75rem; }
 .readme-content li { margin-bottom: 0.2rem; }
-.readme-content hr { border: none; border-top: 1px solid #e2e8f0; margin: 1.5rem 0; }
+.readme-content hr { border: none; border-top: 1px solid var(--color-border-subtle); margin: 1.5rem 0; }
 {% endblock %}
 
 {% block content %}
