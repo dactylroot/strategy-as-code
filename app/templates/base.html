@@ -8,7 +8,15 @@
   <script>
   (function() {
     var EMBED_CHROME = {{ 'true' if embed_chrome else 'false' }};
-    if (EMBED_CHROME) return; // waits for the host's postMessage instead
+    if (EMBED_CHROME) {
+      // The host (renewals-web-react) passes its current theme as a `?theme=`
+      // query param on this iframe's src (same-origin embed, so we can read
+      // it synchronously) - applying it now avoids painting the dark default
+      // and then flashing to light once postMessage arrives.
+      var embedMode = new URLSearchParams(window.location.search).get('theme');
+      if (embedMode === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      return; // subsequent changes arrive via the host's postMessage instead
+    }
     var mode = 'dark';
     try { mode = localStorage.getItem('strategy-as-code-theme') || 'dark'; } catch (e) {}
     if (mode === 'light') document.documentElement.setAttribute('data-theme', 'light');
