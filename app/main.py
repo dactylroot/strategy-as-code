@@ -1,3 +1,6 @@
+import threading
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -7,8 +10,30 @@ from .config import settings, full
 from .routers import pages, api
 from .routers import auth_router
 from .auth import is_authenticated
+from . import git_sync
+from . import github_issues
 
-app = FastAPI(title=settings.app_title, docs_url=full("/api-docs"))
+
+def _periodic_sync_loop() -> None:
+    # Catches drift from any writer of the synced paths (e.g. renewals'
+    # bug_report_service.py, which has no git/GitHub awareness of its own),
+    # not just edits made through this app's own UI.
+    while True:
+        time.sleep(max(settings.git_sync_poll_seconds, 5))
+        if settings.github_repo:
+            github_issues.create_missing_issues()
+        if settings.git_sync_enabled:
+            git_sync.sync_now("periodic")
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    if settings.git_sync_enabled or settings.github_repo:
+        threading.Thread(target=_periodic_sync_loop, daemon=True).start()
+    yield
+
+
+app = FastAPI(title=settings.app_title, docs_url=full("/api-docs"), lifespan=_lifespan)
 
 # Serve static files from the project's docs/ directory (WBS charts etc.)
 docs_dir = settings.docs_dir

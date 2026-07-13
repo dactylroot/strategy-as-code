@@ -1,30 +1,13 @@
 from __future__ import annotations
-import os
 import re
-import threading
 from pathlib import Path
 
+from ..fileio import _atomic_write, _lock_for
 from ..models import (
     AboutDoc, ChangelogEntry, ChangelogGroup,
     RoadmapSection, NewRelease, RoadmapUpdate, VersionBucket,
 )
 from ..versioning import _ver
-
-_locks: dict[Path, threading.Lock] = {}
-_locks_mutex = threading.Lock()
-
-
-def _lock_for(path: Path) -> threading.Lock:
-    with _locks_mutex:
-        if path not in _locks:
-            _locks[path] = threading.Lock()
-        return _locks[path]
-
-
-def _atomic_write(path: Path, text: str) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
 
 
 def parse(path: Path) -> AboutDoc:

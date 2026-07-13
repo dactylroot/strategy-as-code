@@ -1,41 +1,24 @@
 from __future__ import annotations
-import os
 import re
-import threading
 from datetime import date
 from pathlib import Path
 
+from ..fileio import _atomic_write, _lock_for
 from ..models import BugItem, BugSeverity, BugStatus, BugCreate, BugUpdate
-
-_locks: dict[Path, threading.Lock] = {}
-_locks_mutex = threading.Lock()
 
 _EMPTY_BUGS = """\
 # Bugs
 
 ## Active
 
-| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed |
-|----|-------|----------|--------|-------|-----|-------------|-------|----------------|
+| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |
+|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|
 
 ## Resolved
 
-| ID | Title | Resolved In | Date |
-|----|-------|-------------|------|
+| ID | Title | Resolved In | Date | GH Issue |
+|----|-------|-------------|------|----------|
 """
-
-
-def _lock_for(path: Path) -> threading.Lock:
-    with _locks_mutex:
-        if path not in _locks:
-            _locks[path] = threading.Lock()
-        return _locks[path]
-
-
-def _atomic_write(path: Path, text: str) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
 
 
 def _ensure_exists(path: Path) -> None:
@@ -105,10 +88,11 @@ def _parse_text(text: str):
             fix_version = row[6].strip() if len(row) > 6 and row[6].strip() else None
             owner = row[7].strip() if len(row) > 7 and row[7].strip() else None
             uat_confirmed = len(row) > 8 and row[8].strip().lower() in ("yes", "true")
+            gh_issue = row[9].strip() if len(row) > 9 and row[9].strip() else None
             active.append(BugItem(
                 id=bug_id, title=row[1], severity=severity,
                 status=status, notes=row[4], wbs_ref=wbs_ref, fix_version=fix_version,
-                owner=owner, uat_confirmed=uat_confirmed,
+                owner=owner, uat_confirmed=uat_confirmed, gh_issue=gh_issue,
             ))
 
     resolved_m = re.search(r"\n## Resolved\n(.*?)(?=\n## |\Z)", "\n" + text, re.DOTALL)
@@ -120,7 +104,8 @@ def _parse_text(text: str):
                 bug_id = int(row[0])
             except ValueError:
                 continue
-            resolved.append(ResolvedBug(id=bug_id, title=row[1], resolved_in=row[2], date=row[3]))
+            gh_issue = row[4].strip() if len(row) > 4 and row[4].strip() else None
+            resolved.append(ResolvedBug(id=bug_id, title=row[1], resolved_in=row[2], date=row[3], gh_issue=gh_issue))
 
     return BugDoc(raw_text=text, active=active, resolved=resolved)
 
@@ -158,6 +143,21 @@ def resolve_bug(path: Path, bug_id: int, resolved_in: str = "", today: str | Non
         _atomic_write(path, transform_resolve_bug(text, bug_id, resolved_in, today))
 
 
+def set_gh_issue(path: Path, bug_id: int, issue_ref: str) -> bool:
+    """Backfill the GH Issue column for a bug row - called by the periodic
+    reconciliation loop (see ../github_issues.py) after mirroring a new bug to a
+    real GitHub Issue. Returns False (without raising) if the row can't be
+    found/updated unambiguously, so one bad row doesn't abort a whole backfill pass."""
+    lock = _lock_for(path)
+    with lock:
+        _ensure_exists(path)
+        text = path.read_text(encoding="utf-8")
+        new_text, ok = transform_set_gh_issue(text, bug_id, issue_ref)
+        if ok:
+            _atomic_write(path, new_text)
+        return ok
+
+
 # ── Pure transform functions (text-in / text-out, no I/O) ────────────────────
 
 def transform_add_bug(text: str, req: BugCreate) -> tuple[str, BugItem]:
@@ -167,7 +167,7 @@ def transform_add_bug(text: str, req: BugCreate) -> tuple[str, BugItem]:
     new_id = _next_id(doc.active, doc.resolved)
     wbs_col = req.wbs_ref or ""
     owner_col = req.owner or ""
-    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {req.notes} | {wbs_col} |  | {owner_col} |  |"
+    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {req.notes} | {wbs_col} |  | {owner_col} |  |  |"
     insert_pos = _find_section_last_row(text, "## Active")
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
     return new_text, BugItem(id=new_id, title=req.title, severity=req.severity,
@@ -193,15 +193,17 @@ def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, B
     fix_ver_col  = new_fix_ver or ""
     owner_col    = new_owner or ""
     uat_col      = "Yes" if new_uat else ""
+    gh_issue_col = bug.gh_issue or ""
     pattern  = rf"^\| {bug_id} \|[^\n]+\|$"
     new_row  = (f"| {bug_id} | {new_title} | {new_severity.value} | {new_status.value} | {new_notes} | "
-                f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} |")
+                f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {gh_issue_col} |")
     new_text, n = re.subn(pattern, new_row, text, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
     return new_text, BugItem(id=bug_id, title=new_title, severity=new_severity,
                              status=new_status, notes=new_notes, wbs_ref=bug.wbs_ref,
-                             fix_version=new_fix_ver, owner=new_owner, uat_confirmed=new_uat)
+                             fix_version=new_fix_ver, owner=new_owner, uat_confirmed=new_uat,
+                             gh_issue=bug.gh_issue)
 
 
 def transform_resolve_bug(text: str, bug_id: int, resolved_in: str = "", today: str | None = None) -> str:
@@ -216,16 +218,33 @@ def transform_resolve_bug(text: str, bug_id: int, resolved_in: str = "", today: 
     fix_ver_col = bug.fix_version or ""
     owner_col = bug.owner or ""
     uat_col = "Yes" if bug.uat_confirmed else ""
+    gh_issue_col = bug.gh_issue or ""
     pattern = rf"^\| {bug_id} \|[^\n]+\|$"
     resolved_row = (f"| {bug_id} | {bug.title} | {bug.severity.value} | Resolved | {bug.notes} | "
-                    f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} |")
+                    f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {gh_issue_col} |")
     text, n = re.subn(pattern, resolved_row, text, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
-    new_resolved_row = f"| {bug_id} | {bug.title} | {resolved_in} | {date_str} |"
+    new_resolved_row = f"| {bug_id} | {bug.title} | {resolved_in} | {date_str} | {gh_issue_col} |"
     try:
         insert_pos = _find_section_last_row(text, "## Resolved")
         text = text[:insert_pos] + "\n" + new_resolved_row + text[insert_pos:]
     except ValueError:
         pass
     return text
+
+
+def transform_set_gh_issue(text: str, bug_id: int, issue_ref: str) -> tuple[str, bool]:
+    doc = _parse_text(text)
+    bug = next((b for b in doc.active if b.id == bug_id), None)
+    if bug is None:
+        return text, False
+    wbs_col = bug.wbs_ref or ""
+    fix_ver_col = bug.fix_version or ""
+    owner_col = bug.owner or ""
+    uat_col = "Yes" if bug.uat_confirmed else ""
+    pattern = rf"^\| {bug_id} \|[^\n]+\|$"
+    new_row = (f"| {bug_id} | {bug.title} | {bug.severity.value} | {bug.status.value} | {bug.notes} | "
+               f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {issue_ref} |")
+    new_text, n = re.subn(pattern, new_row, text, count=1, flags=re.MULTILINE)
+    return new_text, n == 1
