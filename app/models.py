@@ -231,6 +231,7 @@ class BugItem(BaseModel):
     fix_version: str | None = None
     owner: str | None = None
     uat_confirmed: bool = False
+    gh_issue: str | None = None  # GitHub issue number, e.g. "42" - one-way mirror, never read back
 
 
 class ResolvedBug(BaseModel):
@@ -238,6 +239,7 @@ class ResolvedBug(BaseModel):
     title: str
     resolved_in: str = ""
     date: str = ""
+    gh_issue: str | None = None
 
 
 class BugDoc(BaseModel):

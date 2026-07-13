@@ -15,6 +15,20 @@ class Settings(BaseSettings):
     auth_introspect_url: str = ""  # Host session-introspection endpoint; enables auth passthrough
     host_login_url: str = ""  # Host's login entry point; redirect target in passthrough mode
     embed_chrome: bool = False  # When True, hide this app's own sidebar/nav (host provides its own)
+    github_repo: str = ""  # Host-registered "owner/repo" for the bug-report issue mirror below,
+                           # e.g. "dactylroot/t3-renewals-manager" - same pattern as
+                           # auth_introspect_url/host_login_url: an embedding host declares this
+                           # via its own docker-compose env vars, and its mere presence enables
+                           # the feature (see github_issues.py).
+
+    # ── Content git-sync (writes to a dedicated branch, never main/staging) ──
+    git_sync_enabled: bool = False
+    git_sync_branch: str = "content-sync"
+    git_sync_remote: str = "content-sync-origin"
+    git_sync_paths: str = "PRODUCT.MD,ABOUT.MD,BUGS.MD,README.MD,.screenshots"
+    git_sync_poll_seconds: int = 30
+    git_token: str = ""  # Same token entrypoint.sh seeds into the HTTPS credential store;
+                         # reused here as the GitHub REST API bearer token for github_issues.py.
 
     model_config = {"env_prefix": ""}
 
@@ -171,6 +185,34 @@ class _SettingsProxy:
     @property
     def embed_chrome(self) -> bool:
         return _base.embed_chrome
+
+    @property
+    def github_repo(self) -> str:
+        return _base.github_repo
+
+    @property
+    def git_sync_enabled(self) -> bool:
+        return _base.git_sync_enabled
+
+    @property
+    def git_sync_branch(self) -> str:
+        return _base.git_sync_branch
+
+    @property
+    def git_sync_remote(self) -> str:
+        return _base.git_sync_remote
+
+    @property
+    def git_sync_paths(self) -> list[str]:
+        return [p.strip() for p in _base.git_sync_paths.split(",") if p.strip()]
+
+    @property
+    def git_sync_poll_seconds(self) -> int:
+        return _base.git_sync_poll_seconds
+
+    @property
+    def git_token(self) -> str:
+        return _base.git_token
 
 
 settings = _SettingsProxy()  # type: ignore[assignment]
