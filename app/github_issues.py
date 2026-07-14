@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import re
 from pathlib import Path
 
 import httpx
@@ -24,6 +25,19 @@ _SCREENSHOT_MIME = {
     ".gif": "image/gif", ".webp": "image/webp",
 }
 
+# Embedded (invisible, since it's an HTML comment) in every mirrored Issue's
+# body so GitHub itself - not just BUGS.MD's GH Issue column - can answer
+# "does this bug already have an Issue?". BUGS.MD is git-tracked and gets
+# reset/restored by CI on deploy; if that restore ever no-ops (as happened
+# 2026-07-14, see strategy-as-code history), the GH Issue column can revert
+# to blank even though the Issue already exists. Re-scanning Issues each
+# pass makes create_missing_issues idempotent regardless of BUGS.MD's state.
+_DEDUP_MARKER_RE = re.compile(r"<!-- strategy-as-code:bugs-md-id=(\d+) -->")
+
+
+def _dedup_marker(bug_id: int) -> str:
+    return f"<!-- strategy-as-code:bugs-md-id={bug_id} -->"
+
 
 def _auth_headers() -> dict:
     return {
@@ -32,13 +46,51 @@ def _auth_headers() -> dict:
     }
 
 
+def _scan_mirrored_issues() -> dict[int, dict]:
+    """Page through all Issues (any state) in the repo and return
+    {bug_id: {"number": str, "state": "open"|"closed"}} for every one
+    carrying our dedup marker. Uses the plain issues-list endpoint rather
+    than GitHub's search API, since search indexing lags writes and isn't a
+    reliable dedup check for an Issue created moments earlier in the same
+    pass. Shared by create_missing_issues (to avoid duplicate creation) and
+    close_resolved_issues (to avoid re-closing an already-closed Issue)."""
+    found: dict[int, dict] = {}
+    page = 1
+    try:
+        while True:
+            resp = httpx.get(
+                f"{_API_BASE}/repos/{settings.github_repo}/issues",
+                params={"state": "all", "per_page": 100, "page": page},
+                headers=_auth_headers(), timeout=10.0,
+            )
+            resp.raise_for_status()
+            items = resp.json()
+            if not items:
+                break
+            for item in items:
+                m = _DEDUP_MARKER_RE.search(item.get("body") or "")
+                if m:
+                    found[int(m.group(1))] = {"number": str(item["number"]), "state": item["state"]}
+            if len(items) < 100:
+                break
+            page += 1
+    except Exception:
+        logger.exception("github_issues: failed to list existing issues for dedup scan")
+    return found
+
+
 def create_missing_issues() -> None:
     """One-way mirror: for every bug row in BUGS.MD lacking a linked GitHub
     Issue, create one and backfill the row's GH Issue column. Never reads
     Issues back into BUGS.MD - it stays the authoritative source, this is a
     creation-time export only. Covers rows written by either this app's own
     UI or an embedding host's own bug-report feature (e.g. renewals'
-    bug_report_service.py), since it just scans BUGS.MD's current state."""
+    bug_report_service.py), since it just scans BUGS.MD's current state.
+
+    Before creating anything, cross-checks GitHub's own Issues for the dedup
+    marker (see _scan_mirrored_issues) so a bug that already has a mirrored
+    Issue is never duplicated even if BUGS.MD's GH Issue column was lost or
+    reverted."""
     if not settings.github_repo or not settings.git_token:
         return
 
@@ -47,10 +99,15 @@ def create_missing_issues() -> None:
         return
 
     doc = bugs_parser.parse(path)
-    for bug in doc.active:
-        if bug.gh_issue:
-            continue
-        issue_ref = _create_issue(bug)
+    pending = [bug for bug in doc.active if not bug.gh_issue]
+    if not pending:
+        return
+
+    mirrored = _scan_mirrored_issues()
+
+    for bug in pending:
+        entry = mirrored.get(bug.id)
+        issue_ref = entry["number"] if entry else _create_issue(bug)
         if issue_ref is None:
             continue
         if not bugs_parser.set_gh_issue(path, bug.id, issue_ref):
@@ -58,6 +115,46 @@ def create_missing_issues() -> None:
                 "github_issues: created issue %s for bug %s but failed to backfill BUGS.MD",
                 issue_ref, bug.id,
             )
+
+
+def close_resolved_issues() -> None:
+    """Companion half of the mirror: for every Resolved bug in BUGS.MD that
+    has a linked Issue, close that Issue if it isn't already closed. Still
+    one-way and still never writes Issue state back into BUGS.MD - this only
+    flips GitHub's state field, matching a status change that already
+    happened in Project Planning."""
+    if not settings.github_repo or not settings.git_token:
+        return
+
+    path = settings.bugs_md
+    if not path.exists():
+        return
+
+    doc = bugs_parser.parse(path)
+    resolved_with_issue = [bug for bug in doc.resolved if bug.gh_issue]
+    if not resolved_with_issue:
+        return
+
+    mirrored = _scan_mirrored_issues()
+
+    for bug in resolved_with_issue:
+        entry = mirrored.get(bug.id)
+        if entry and entry["state"] == "closed":
+            continue
+        issue_number = entry["number"] if entry else bug.gh_issue
+        _close_issue(issue_number, bug.id)
+
+
+def _close_issue(issue_number: str, bug_id: int) -> None:
+    try:
+        resp = httpx.patch(
+            f"{_API_BASE}/repos/{settings.github_repo}/issues/{issue_number}",
+            json={"state": "closed", "state_reason": "completed"},
+            headers=_auth_headers(), timeout=10.0,
+        )
+        resp.raise_for_status()
+    except Exception:
+        logger.exception("github_issues: failed to close issue %s for resolved bug %s", issue_number, bug_id)
 
 
 def _find_screenshot(bug_id: int) -> Path | None:
@@ -150,7 +247,8 @@ def _create_issue(bug) -> str | None:
     body_parts.append(
         "---\n"
         f"Mirrored from BUGS.MD row {bug.id} (Project Planning) - this is a one-way "
-        "mirror, edit status/notes in Project Planning rather than here."
+        "mirror, edit status/notes in Project Planning rather than here.\n"
+        f"{_dedup_marker(bug.id)}"
     )
     body = "\n\n".join(body_parts)
 
