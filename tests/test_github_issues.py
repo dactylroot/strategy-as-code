@@ -3,6 +3,7 @@ import pytest
 
 from app import github_issues
 from app.models import BugItem, BugSeverity, BugStatus
+from app.parsers import bugs as bugs_parser
 
 
 class _FakeResponse:
@@ -185,3 +186,198 @@ class TestUploadScreenshotAsset:
         path.write_bytes(b"fake-png")
         monkeypatch.setattr(github_issues, "_asset_release_id", lambda: None)
         assert github_issues._upload_screenshot_asset(3, path) is None
+
+
+class TestScanMirroredIssues:
+    def test_matches_marker_in_body(self, monkeypatch):
+        def fake_get(url, params=None, headers=None, timeout=None):
+            if params["page"] == 1:
+                return _FakeResponse(200, [
+                    {"number": 45, "state": "open", "body": f"blah\n{github_issues._dedup_marker(3)}"},
+                    {"number": 46, "state": "open", "body": "no marker here"},
+                ])
+            return _FakeResponse(200, [])
+
+        monkeypatch.setattr(github_issues.httpx, "get", fake_get)
+        assert github_issues._scan_mirrored_issues() == {3: {"number": "45", "state": "open"}}
+
+    def test_captures_closed_state(self, monkeypatch):
+        def fake_get(url, params=None, headers=None, timeout=None):
+            if params["page"] == 1:
+                return _FakeResponse(200, [
+                    {"number": 45, "state": "closed", "body": github_issues._dedup_marker(3)},
+                ])
+            return _FakeResponse(200, [])
+
+        monkeypatch.setattr(github_issues.httpx, "get", fake_get)
+        assert github_issues._scan_mirrored_issues() == {3: {"number": "45", "state": "closed"}}
+
+    def test_paginates_until_short_page(self, monkeypatch):
+        pages = {
+            1: [{"number": i, "state": "open", "body": github_issues._dedup_marker(i)} for i in range(100)],
+            2: [{"number": 100, "state": "open", "body": github_issues._dedup_marker(100)}],
+        }
+
+        def fake_get(url, params=None, headers=None, timeout=None):
+            return _FakeResponse(200, pages.get(params["page"], []))
+
+        monkeypatch.setattr(github_issues.httpx, "get", fake_get)
+        result = github_issues._scan_mirrored_issues()
+        assert len(result) == 101
+        assert result[100] == {"number": "100", "state": "open"}
+
+    def test_returns_empty_on_request_failure(self, monkeypatch):
+        def fake_get(url, params=None, headers=None, timeout=None):
+            raise httpx.ConnectError("boom")
+
+        monkeypatch.setattr(github_issues.httpx, "get", fake_get)
+        assert github_issues._scan_mirrored_issues() == {}
+
+
+class TestCreateMissingIssues:
+    def _write_bugs_md(self, tmp_path, rows):
+        header = (
+            "# Bugs\n\n## Active\n\n"
+            "| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |\n"
+            "|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|\n"
+        )
+        (tmp_path / "BUGS.MD").write_text(header + "\n".join(rows) + "\n", encoding="utf-8")
+
+    def test_backfills_from_existing_issue_without_creating(self, monkeypatch, tmp_path):
+        self._write_bugs_md(tmp_path, ["| 1 | Broken thing | Medium | Open | It broke. |  |  |  |  |  |"])
+        monkeypatch.setattr(
+            github_issues, "_scan_mirrored_issues", lambda: {1: {"number": "45", "state": "open"}}
+        )
+        created = {"called": False}
+        monkeypatch.setattr(
+            github_issues, "_create_issue",
+            lambda bug: created.__setitem__("called", True) or "999",
+        )
+
+        github_issues.create_missing_issues()
+
+        assert created["called"] is False
+        doc = bugs_parser.parse(github_issues.settings.bugs_md)
+        assert doc.active[0].gh_issue == "45"
+
+    def test_creates_issue_when_none_exists_yet(self, monkeypatch, tmp_path):
+        self._write_bugs_md(tmp_path, ["| 1 | Broken thing | Medium | Open | It broke. |  |  |  |  |  |"])
+        monkeypatch.setattr(github_issues, "_scan_mirrored_issues", lambda: {})
+        monkeypatch.setattr(github_issues, "_create_issue", lambda bug: "77")
+
+        github_issues.create_missing_issues()
+
+        doc = bugs_parser.parse(github_issues.settings.bugs_md)
+        assert doc.active[0].gh_issue == "77"
+
+    def test_skips_bugs_already_linked(self, monkeypatch, tmp_path):
+        self._write_bugs_md(tmp_path, ["| 1 | Broken thing | Medium | Open | It broke. |  |  |  | | 12 |"])
+        scan_called = {"called": False}
+        monkeypatch.setattr(
+            github_issues, "_scan_mirrored_issues",
+            lambda: scan_called.__setitem__("called", True) or {},
+        )
+
+        github_issues.create_missing_issues()
+
+        assert scan_called["called"] is False
+
+    def test_embeds_dedup_marker_in_created_issue_body(self, monkeypatch):
+        bug = make_bug(id=8)
+        captured = {}
+
+        def fake_post(url, json=None, headers=None, timeout=None):
+            captured["payload"] = json
+            return _FakeResponse(201, {"number": 1})
+
+        monkeypatch.setattr(github_issues.httpx, "post", fake_post)
+        github_issues._create_issue(bug)
+
+        assert github_issues._dedup_marker(8) in captured["payload"]["body"]
+
+
+class TestCloseResolvedIssues:
+    def _write_bugs_md(self, tmp_path, active_rows=(), resolved_rows=()):
+        text = (
+            "# Bugs\n\n## Active\n\n"
+            "| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |\n"
+            "|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|\n"
+            + "\n".join(active_rows) + "\n\n"
+            "## Resolved\n\n"
+            "| ID | Title | Resolved In | Date | GH Issue |\n"
+            "|----|-------|-------------|------|----------|\n"
+            + "\n".join(resolved_rows) + "\n"
+        )
+        (tmp_path / "BUGS.MD").write_text(text, encoding="utf-8")
+
+    def test_closes_issue_for_resolved_bug(self, monkeypatch, tmp_path):
+        self._write_bugs_md(tmp_path, resolved_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
+        monkeypatch.setattr(github_issues, "_scan_mirrored_issues", lambda: {1: {"number": "45", "state": "open"}})
+        closed = {}
+        monkeypatch.setattr(
+            github_issues, "_close_issue",
+            lambda number, bug_id: closed.update(number=number, bug_id=bug_id),
+        )
+
+        github_issues.close_resolved_issues()
+
+        assert closed == {"number": "45", "bug_id": 1}
+
+    def test_skips_when_already_closed(self, monkeypatch, tmp_path):
+        self._write_bugs_md(tmp_path, resolved_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
+        monkeypatch.setattr(github_issues, "_scan_mirrored_issues", lambda: {1: {"number": "45", "state": "closed"}})
+        called = {"called": False}
+        monkeypatch.setattr(
+            github_issues, "_close_issue",
+            lambda number, bug_id: called.__setitem__("called", True),
+        )
+
+        github_issues.close_resolved_issues()
+
+        assert called["called"] is False
+
+    def test_falls_back_to_bugs_md_number_when_marker_not_found(self, monkeypatch, tmp_path):
+        self._write_bugs_md(tmp_path, resolved_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
+        monkeypatch.setattr(github_issues, "_scan_mirrored_issues", lambda: {})
+        closed = {}
+        monkeypatch.setattr(
+            github_issues, "_close_issue",
+            lambda number, bug_id: closed.update(number=number, bug_id=bug_id),
+        )
+
+        github_issues.close_resolved_issues()
+
+        assert closed == {"number": "45", "bug_id": 1}
+
+    def test_skips_resolved_bugs_without_linked_issue(self, monkeypatch, tmp_path):
+        self._write_bugs_md(tmp_path, resolved_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 |  |"])
+        scan_called = {"called": False}
+        monkeypatch.setattr(
+            github_issues, "_scan_mirrored_issues",
+            lambda: scan_called.__setitem__("called", True) or {},
+        )
+
+        github_issues.close_resolved_issues()
+
+        assert scan_called["called"] is False
+
+    def test_patches_issue_state_to_closed(self, monkeypatch):
+        captured = {}
+
+        def fake_patch(url, json=None, headers=None, timeout=None):
+            captured["url"] = url
+            captured["payload"] = json
+            return _FakeResponse(200, {})
+
+        monkeypatch.setattr(github_issues.httpx, "patch", fake_patch)
+        github_issues._close_issue("45", 1)
+
+        assert captured["url"].endswith("/issues/45")
+        assert captured["payload"]["state"] == "closed"
+
+    def test_logs_and_swallows_error_on_patch_failure(self, monkeypatch):
+        def fake_patch(url, json=None, headers=None, timeout=None):
+            raise httpx.ConnectError("boom")
+
+        monkeypatch.setattr(github_issues.httpx, "patch", fake_patch)
+        github_issues._close_issue("45", 1)  # must not raise

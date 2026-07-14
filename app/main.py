@@ -22,6 +22,7 @@ def _periodic_sync_loop() -> None:
         time.sleep(max(settings.git_sync_poll_seconds, 5))
         if settings.github_repo:
             github_issues.create_missing_issues()
+            github_issues.close_resolved_issues()
         if settings.git_sync_enabled:
             git_sync.sync_now("periodic")
 
