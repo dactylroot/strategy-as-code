@@ -158,9 +158,9 @@ Bug tracking. Two sections: `## Active` (bugs still on the board, including code
 ```markdown
 ## Active
 
-| ID | Title | Severity | Status | Notes | WBS | Fix Version |
-|----|-------|----------|--------|-------|-----|-------------|
-| 1 | Short title | Medium | Open | Optional notes | 1.2.3 |  |
+| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |
+|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|
+| 1 | Short title | Medium | Open | Optional notes | 1.2.3 |  |  |  |  |
 ```
 
 **Severity values:** `Critical`, `High`, `Medium`, `Low`
@@ -178,16 +178,22 @@ Bug tracking. Two sections: `## Active` (bugs still on the board, including code
 
 **Fix Version** is the planned build version in which the fix will ship (e.g. `0.2.2`). Set it when advancing a bug to `Resolved`. Leave blank for `Open` and `Investigating` bugs. The UI displays it as a badge on Resolved cards.
 
+**Owner** is a free-text name/handle of whoever is working the bug. Optional; leave blank if unassigned.
+
+**UAT Confirmed** is `Yes` once a human has verified the fix in production/staging - it's the signal that a `Resolved` bug is ready to advance to `Closed`. Leave blank until then; any value other than `Yes`/`true` reads as unconfirmed.
+
+**GH Issue** is a one-way mirror column - never hand-edit it. A background reconciliation loop creates a real GitHub Issue for any bug row that doesn't have one yet, writes the issue number back into this column, and keeps the Issue's open/closed state in sync with which section the row lives in (`## Active` → open, `## Closed` → closed). Each mirrored Issue's body embeds an invisible `<!-- strategy-as-code:bugs-md-id=N -->` marker so re-scans stay idempotent even if this column's value is ever lost (e.g. a deploy that restores BUGS.MD from a stale commit and reverts the column to blank - this has happened in practice). If a bug's Notes mention a screenshot being attached, the same loop looks for `.screenshots/bug_<ID>.*` in the project directory and uploads it as a GitHub Release asset linked from the mirrored Issue.
+
 **Closed table format:**
 ```markdown
 ## Closed
 
-| ID | Title | Resolved In | Date |
-|----|-------|-------------|------|
-| 3 | Short title | 0.2.0 | 2025-04-10 |
+| ID | Title | Resolved In | Date | GH Issue |
+|----|-------|-------------|------|----------|
+| 3 | Short title | 0.2.0 | 2025-04-10 |  |
 ```
 
-When closing a bug, its row is removed from `## Active` and a new row is appended to `## Closed` with the version and date. (Files still using the older `## Resolved` header or a `Fix In Progress` status are read transparently - `Fix In Progress` is treated as `Resolved`, and a legacy `## Resolved` section as `## Closed`.)
+When closing a bug, its row is removed from `## Active` and a new row is appended to `## Closed` with the version and date (its GH Issue number, if any, carries over). `Fix In Progress` on an old row still reads as `Resolved` (a retired status folded into the current lifecycle), and a legacy `## Resolved` header is still read as `## Closed` so old files keep working - but rename a legacy `## Resolved` header to `## Closed` the next time you touch that file, rather than perpetuating the old name.
 
 The `WBS` column in Active is optional; leave blank if the bug has no feature association.
 
