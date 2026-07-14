@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     git_sync_enabled: bool = False
     git_sync_branch: str = "content-sync"
     git_sync_remote: str = "content-sync-origin"
-    git_sync_paths: str = "PRODUCT.MD,ABOUT.MD,BUGS.MD,README.MD,.screenshots"
+    # .screenshots deliberately excluded - bug screenshots are uploaded as
+    # GitHub Release assets instead (see github_issues.py), not committed to git.
+    git_sync_paths: str = "PRODUCT.MD,ABOUT.MD,BUGS.MD,README.MD"
     git_sync_poll_seconds: int = 30
     git_token: str = ""  # Same token entrypoint.sh seeds into the HTTPS credential store;
                          # reused here as the GitHub REST API bearer token for github_issues.py.
