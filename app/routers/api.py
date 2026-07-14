@@ -630,19 +630,19 @@ def patch_bug(bug_id: int, body: BugUpdate, request: Request):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/bugs/{bug_id}/resolve")
-def resolve_bug(bug_id: int, request: Request, body: dict = {}):
+@router.post("/bugs/{bug_id}/close")
+def close_bug(bug_id: int, request: Request, body: dict = {}):
     resolved_in = body.get("resolved_in", "") if isinstance(body, dict) else ""
     s = _session(request)
     try:
         if s:
             text = s.get_file("BUGS.MD") or _EMPTY_BUGS
-            s.set_file("BUGS.MD", bugs_parser.transform_resolve_bug(text, bug_id, resolved_in))
+            s.set_file("BUGS.MD", bugs_parser.transform_close_bug(text, bug_id, resolved_in))
         else:
-            bugs_parser.resolve_bug(settings.bugs_md, bug_id, resolved_in)
+            bugs_parser.close_bug(settings.bugs_md, bug_id, resolved_in)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    # Delete screenshot now that the bug is resolved
+    # Delete screenshot now that the bug is closed
     if s:
         _session_screenshots.get(s.session_id, {}).pop(bug_id, None)
     else:

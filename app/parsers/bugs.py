@@ -6,6 +6,16 @@ from pathlib import Path
 from ..fileio import _atomic_write, _lock_for
 from ..models import BugItem, BugSeverity, BugStatus, BugCreate, BugUpdate
 
+# Legacy status folded into the current lifecycle - "Fix In Progress" was
+# retired (it duplicated "Investigating"); rows carrying it read as Resolved.
+_LEGACY_STATUS = {"Fix In Progress": BugStatus.resolved}
+
+# The terminal section was renamed "Resolved" -> "Closed" so "Resolved" could
+# become an active board column (code-fixed, awaiting UAT). Parse either header
+# so files still on the old schema (including host-written ones) keep working.
+_CLOSED_SECTION = "## Closed"
+_LEGACY_CLOSED_SECTION = "## Resolved"
+
 _EMPTY_BUGS = """\
 # Bugs
 
@@ -14,7 +24,7 @@ _EMPTY_BUGS = """\
 | ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |
 |----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|
 
-## Resolved
+## Closed
 
 | ID | Title | Resolved In | Date | GH Issue |
 |----|-------|-------------|------|----------|
@@ -41,6 +51,17 @@ def _parse_table_rows(block: str) -> list[list[str]]:
     return rows
 
 
+def _closed_section_header(text: str) -> str:
+    """Return whichever terminal-section header this file actually uses,
+    preferring the current "## Closed" and falling back to the legacy
+    "## Resolved" so inserts land in the section that already exists."""
+    if f"\n{_CLOSED_SECTION}\n" in text:
+        return _CLOSED_SECTION
+    if f"\n{_LEGACY_CLOSED_SECTION}\n" in text:
+        return _LEGACY_CLOSED_SECTION
+    return _CLOSED_SECTION
+
+
 def _find_section_last_row(text: str, section_header: str) -> int:
     header_pos = text.find(f"\n{section_header}\n")
     if header_pos == -1:
@@ -63,9 +84,9 @@ def parse(path: Path):
 
 
 def _parse_text(text: str):
-    from ..models import BugDoc, ResolvedBug
+    from ..models import BugDoc, ClosedBug
     active: list[BugItem] = []
-    resolved: list[ResolvedBug] = []
+    closed: list[ClosedBug] = []
 
     active_m = re.search(r"\n## Active\n(.*?)(?=\n## |\Z)", "\n" + text, re.DOTALL)
     if active_m:
@@ -80,10 +101,13 @@ def _parse_text(text: str):
                 severity = BugSeverity(row[2])
             except ValueError:
                 severity = BugSeverity.medium
-            try:
-                status = BugStatus(row[3])
-            except ValueError:
-                status = BugStatus.open
+            if row[3] in _LEGACY_STATUS:
+                status = _LEGACY_STATUS[row[3]]
+            else:
+                try:
+                    status = BugStatus(row[3])
+                except ValueError:
+                    status = BugStatus.open
             wbs_ref = row[5].strip() if len(row) > 5 and row[5].strip() else None
             fix_version = row[6].strip() if len(row) > 6 and row[6].strip() else None
             owner = row[7].strip() if len(row) > 7 and row[7].strip() else None
@@ -95,9 +119,9 @@ def _parse_text(text: str):
                 owner=owner, uat_confirmed=uat_confirmed, gh_issue=gh_issue,
             ))
 
-    resolved_m = re.search(r"\n## Resolved\n(.*?)(?=\n## |\Z)", "\n" + text, re.DOTALL)
-    if resolved_m:
-        for row in _parse_table_rows(resolved_m.group(1)):
+    closed_m = re.search(r"\n## (?:Closed|Resolved)\n(.*?)(?=\n## |\Z)", "\n" + text, re.DOTALL)
+    if closed_m:
+        for row in _parse_table_rows(closed_m.group(1)):
             if len(row) < 4:
                 continue
             try:
@@ -105,13 +129,13 @@ def _parse_text(text: str):
             except ValueError:
                 continue
             gh_issue = row[4].strip() if len(row) > 4 and row[4].strip() else None
-            resolved.append(ResolvedBug(id=bug_id, title=row[1], resolved_in=row[2], date=row[3], gh_issue=gh_issue))
+            closed.append(ClosedBug(id=bug_id, title=row[1], resolved_in=row[2], date=row[3], gh_issue=gh_issue))
 
-    return BugDoc(raw_text=text, active=active, resolved=resolved)
+    return BugDoc(raw_text=text, active=active, closed=closed)
 
 
-def _next_id(active, resolved) -> int:
-    all_ids = [b.id for b in active] + [r.id for r in resolved]
+def _next_id(active, closed) -> int:
+    all_ids = [b.id for b in active] + [r.id for r in closed]
     return max(all_ids, default=0) + 1
 
 
@@ -135,12 +159,12 @@ def update_bug(path: Path, bug_id: int, req: BugUpdate) -> BugItem:
         return bug
 
 
-def resolve_bug(path: Path, bug_id: int, resolved_in: str = "", today: str | None = None) -> None:
+def close_bug(path: Path, bug_id: int, resolved_in: str = "", today: str | None = None) -> None:
     lock = _lock_for(path)
     with lock:
         _ensure_exists(path)
         text = path.read_text(encoding="utf-8")
-        _atomic_write(path, transform_resolve_bug(text, bug_id, resolved_in, today))
+        _atomic_write(path, transform_close_bug(text, bug_id, resolved_in, today))
 
 
 def set_gh_issue(path: Path, bug_id: int, issue_ref: str) -> bool:
@@ -164,7 +188,7 @@ def transform_add_bug(text: str, req: BugCreate) -> tuple[str, BugItem]:
     if not text.strip():
         text = _EMPTY_BUGS
     doc = _parse_text(text)
-    new_id = _next_id(doc.active, doc.resolved)
+    new_id = _next_id(doc.active, doc.closed)
     wbs_col = req.wbs_ref or ""
     owner_col = req.owner or ""
     new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {req.notes} | {wbs_col} |  | {owner_col} |  |  |"
@@ -206,7 +230,7 @@ def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, B
                              gh_issue=bug.gh_issue)
 
 
-def transform_resolve_bug(text: str, bug_id: int, resolved_in: str = "", today: str | None = None) -> str:
+def transform_close_bug(text: str, bug_id: int, resolved_in: str = "", today: str | None = None) -> str:
     if not text.strip():
         text = _EMPTY_BUGS
     doc = _parse_text(text)
@@ -214,21 +238,18 @@ def transform_resolve_bug(text: str, bug_id: int, resolved_in: str = "", today: 
     if bug is None:
         raise ValueError(f"Bug {bug_id} not found")
     date_str = today or str(date.today())
-    wbs_col = bug.wbs_ref or ""
-    fix_ver_col = bug.fix_version or ""
-    owner_col = bug.owner or ""
-    uat_col = "Yes" if bug.uat_confirmed else ""
     gh_issue_col = bug.gh_issue or ""
-    pattern = rf"^\| {bug_id} \|[^\n]+\|$"
-    resolved_row = (f"| {bug_id} | {bug.title} | {bug.severity.value} | Resolved | {bug.notes} | "
-                    f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {gh_issue_col} |")
-    text, n = re.subn(pattern, resolved_row, text, flags=re.MULTILINE)
+    # Closing removes the bug from the active board entirely (it lives only in
+    # the Closed section afterwards) - unlike the active statuses, which keep
+    # their row. This is what flips the mirrored GitHub Issue to closed.
+    pattern = rf"^\| {bug_id} \|[^\n]+\|$\n?"
+    text, n = re.subn(pattern, "", text, count=1, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
-    new_resolved_row = f"| {bug_id} | {bug.title} | {resolved_in} | {date_str} | {gh_issue_col} |"
+    closed_row = f"| {bug_id} | {bug.title} | {resolved_in} | {date_str} | {gh_issue_col} |"
     try:
-        insert_pos = _find_section_last_row(text, "## Resolved")
-        text = text[:insert_pos] + "\n" + new_resolved_row + text[insert_pos:]
+        insert_pos = _find_section_last_row(text, _closed_section_header(text))
+        text = text[:insert_pos] + "\n" + closed_row + text[insert_pos:]
     except ValueError:
         pass
     return text

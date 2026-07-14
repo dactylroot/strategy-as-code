@@ -380,14 +380,14 @@ def bugs_page(request: Request):
     sub_areas = [sa for area in product.wbs_areas for sa in area.sub_areas]
     open_bugs          = [b for b in doc.active if b.status == BugStatus.open]
     investigating_bugs = [b for b in doc.active if b.status == BugStatus.investigating]
-    fixing_bugs        = [b for b in doc.active if b.status == BugStatus.fix_in_progress]
+    resolved_bugs      = [b for b in doc.active if b.status == BugStatus.resolved]
 
     return templates.TemplateResponse(request, "bugs.html", _ctx(
         request, "bugs",
         doc=doc,
         open_bugs=open_bugs,
         investigating_bugs=investigating_bugs,
-        fixing_bugs=fixing_bugs,
+        resolved_bugs=resolved_bugs,
         sub_areas=sub_areas,
     ))
 

@@ -118,11 +118,11 @@ def create_missing_issues() -> None:
 
 
 def close_resolved_issues() -> None:
-    """Companion half of the mirror: for every Resolved bug in BUGS.MD that
-    has a linked Issue, close that Issue if it isn't already closed. Still
-    one-way and still never writes Issue state back into BUGS.MD - this only
-    flips GitHub's state field, matching a status change that already
-    happened in Project Planning."""
+    """Companion half of the mirror: for every Closed bug in BUGS.MD that
+    has a linked Issue, close that Issue if it isn't already closed. Active
+    bugs - including those in the Resolved (awaiting-UAT) column - keep their
+    Issue open; only the Closed section flips GitHub's state. Still one-way
+    and still never writes Issue state back into BUGS.MD."""
     if not settings.github_repo or not settings.git_token:
         return
 
@@ -131,13 +131,13 @@ def close_resolved_issues() -> None:
         return
 
     doc = bugs_parser.parse(path)
-    resolved_with_issue = [bug for bug in doc.resolved if bug.gh_issue]
-    if not resolved_with_issue:
+    closed_with_issue = [bug for bug in doc.closed if bug.gh_issue]
+    if not closed_with_issue:
         return
 
     mirrored = _scan_mirrored_issues()
 
-    for bug in resolved_with_issue:
+    for bug in closed_with_issue:
         entry = mirrored.get(bug.id)
         if entry and entry["state"] == "closed":
             continue

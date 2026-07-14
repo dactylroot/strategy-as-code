@@ -38,7 +38,7 @@
             onclick="quickAdvance({{ bug.id }}, 'Investigating')">→ Investigate</button>
     {% elif bug.status.value == 'Investigating' %}
     <button class="btn btn-ghost btn-sm" style="font-size:0.7rem;"
-            onclick="quickAdvance({{ bug.id }}, 'Fix In Progress')">→ Start Fix</button>
+            onclick="quickAdvance({{ bug.id }}, 'Resolved')">→ Mark Resolved</button>
     {% endif %}
   </div>
 </div>

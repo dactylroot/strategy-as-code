@@ -217,8 +217,7 @@ class BugSeverity(str, Enum):
 class BugStatus(str, Enum):
     open        = "Open"
     investigating = "Investigating"
-    fix_in_progress = "Fix In Progress"
-    resolved    = "Resolved"
+    resolved    = "Resolved"   # code-level fix landed; stays active for UAT
 
 
 class BugItem(BaseModel):
@@ -234,7 +233,7 @@ class BugItem(BaseModel):
     gh_issue: str | None = None  # GitHub issue number, e.g. "42" - one-way mirror, never read back
 
 
-class ResolvedBug(BaseModel):
+class ClosedBug(BaseModel):
     id: int
     title: str
     resolved_in: str = ""
@@ -245,7 +244,7 @@ class ResolvedBug(BaseModel):
 class BugDoc(BaseModel):
     raw_text: str
     active: list[BugItem] = []
-    resolved: list[ResolvedBug] = []
+    closed: list[ClosedBug] = []
 
 
 class BugCreate(BaseModel):
