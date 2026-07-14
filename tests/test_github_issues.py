@@ -297,21 +297,21 @@ class TestCreateMissingIssues:
 
 
 class TestCloseResolvedIssues:
-    def _write_bugs_md(self, tmp_path, active_rows=(), resolved_rows=()):
+    def _write_bugs_md(self, tmp_path, active_rows=(), closed_rows=()):
         text = (
             "# Bugs\n\n## Active\n\n"
             "| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |\n"
             "|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|\n"
             + "\n".join(active_rows) + "\n\n"
-            "## Resolved\n\n"
+            "## Closed\n\n"
             "| ID | Title | Resolved In | Date | GH Issue |\n"
             "|----|-------|-------------|------|----------|\n"
-            + "\n".join(resolved_rows) + "\n"
+            + "\n".join(closed_rows) + "\n"
         )
         (tmp_path / "BUGS.MD").write_text(text, encoding="utf-8")
 
     def test_closes_issue_for_resolved_bug(self, monkeypatch, tmp_path):
-        self._write_bugs_md(tmp_path, resolved_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
+        self._write_bugs_md(tmp_path, closed_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
         monkeypatch.setattr(github_issues, "_scan_mirrored_issues", lambda: {1: {"number": "45", "state": "open"}})
         closed = {}
         monkeypatch.setattr(
@@ -324,7 +324,7 @@ class TestCloseResolvedIssues:
         assert closed == {"number": "45", "bug_id": 1}
 
     def test_skips_when_already_closed(self, monkeypatch, tmp_path):
-        self._write_bugs_md(tmp_path, resolved_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
+        self._write_bugs_md(tmp_path, closed_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
         monkeypatch.setattr(github_issues, "_scan_mirrored_issues", lambda: {1: {"number": "45", "state": "closed"}})
         called = {"called": False}
         monkeypatch.setattr(
@@ -337,7 +337,7 @@ class TestCloseResolvedIssues:
         assert called["called"] is False
 
     def test_falls_back_to_bugs_md_number_when_marker_not_found(self, monkeypatch, tmp_path):
-        self._write_bugs_md(tmp_path, resolved_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
+        self._write_bugs_md(tmp_path, closed_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 | 45 |"])
         monkeypatch.setattr(github_issues, "_scan_mirrored_issues", lambda: {})
         closed = {}
         monkeypatch.setattr(
@@ -350,7 +350,7 @@ class TestCloseResolvedIssues:
         assert closed == {"number": "45", "bug_id": 1}
 
     def test_skips_resolved_bugs_without_linked_issue(self, monkeypatch, tmp_path):
-        self._write_bugs_md(tmp_path, resolved_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 |  |"])
+        self._write_bugs_md(tmp_path, closed_rows=["| 1 | Broken thing | v1.2 | 2026-07-14 |  |"])
         scan_called = {"called": False}
         monkeypatch.setattr(
             github_issues, "_scan_mirrored_issues",

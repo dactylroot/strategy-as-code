@@ -7,7 +7,7 @@
 | 1 | SSE reload fires while feature panel is open | Medium | Investigating | Editing a score saves correctly but the panel closes unexpectedly on some browsers | 1.2.2 |
 | 2 | Priority matrix chart overflows on narrow viewports | Low | Open | Chart clipped at ~1100px wide; need responsive breakpoint | 1.2.4 |
 
-## Resolved
+## Closed
 
 | ID | Title | Resolved In | Date |
 |----|-------|-------------|------|

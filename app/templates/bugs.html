@@ -15,7 +15,7 @@
 .bug-col-count { font-size: 0.78rem; font-weight: 700; opacity: 0.75; }
 .col-open       .bug-col-header { background: var(--gap-bg); color: var(--gap); border: 1px solid var(--gap-border); border-bottom: none; }
 .col-invest     .bug-col-header { background: var(--color-amber-bg); color: var(--color-amber-text); border: 1px solid var(--color-amber-border); border-bottom: none; }
-.col-fixing     .bug-col-header { background: var(--planned-bg); color: var(--planned); border: 1px solid var(--planned-border); border-bottom: none; }
+.col-resolved   .bug-col-header { background: var(--planned-bg); color: var(--planned); border: 1px solid var(--planned-border); border-bottom: none; }
 
 .bug-list {
   background: var(--color-bg-card-hover); border: 1px solid var(--color-border-subtle);
@@ -31,9 +31,9 @@
 .bug-card:last-child { margin-bottom: 0; }
 .bug-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
 
-.col-open   .bug-card { border-left: 3px solid var(--gap); }
-.col-invest .bug-card { border-left: 3px solid var(--color-amber); }
-.col-fixing .bug-card { border-left: 3px solid var(--planned); }
+.col-open     .bug-card { border-left: 3px solid var(--gap); }
+.col-invest   .bug-card { border-left: 3px solid var(--color-amber); }
+.col-resolved .bug-card { border-left: 3px solid var(--planned); }
 
 .bug-meta { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; flex-wrap: wrap; }
 .bug-id   { font-family: var(--font-mono); font-size: 0.62rem; color: var(--color-text-muted); }
@@ -51,8 +51,8 @@
 .bug-wbs   { font-family: var(--font-mono); font-size: 0.65rem; color: var(--color-text-muted); margin-top: 0.2rem; }
 .bug-actions { display: flex; gap: 0.35rem; margin-top: 0.45rem; flex-wrap: wrap; }
 
-/* Resolved section */
-.resolved-section { background: var(--color-bg-card); border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; }
+/* Closed section */
+.closed-section { background: var(--color-bg-card); border-radius: var(--radius); box-shadow: var(--card-shadow); padding: 1.25rem; }
 
 /* Screenshot lightbox */
 .screenshot-lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:1000; align-items:center; justify-content:center; cursor:zoom-out; }
@@ -66,8 +66,8 @@
     <p class="subtitle">
       {{ open_bugs|length }} open &middot;
       {{ investigating_bugs|length }} investigating &middot;
-      {{ fixing_bugs|length }} fixing &middot;
-      {{ doc.resolved|length }} resolved
+      {{ resolved_bugs|length }} resolved &middot;
+      {{ doc.closed|length }} closed
     </p>
   </div>
   <button class="btn btn-primary" onclick="document.getElementById('newBugModal').showModal()">+ Report Bug</button>
@@ -94,21 +94,21 @@
     </div>
   </div>
 
-  <!-- Fix In Progress -->
-  <div class="col-fixing">
-    <div class="bug-col-header">Fix In Progress <span class="bug-col-count">{{ fixing_bugs|length }}</span></div>
+  <!-- Resolved -->
+  <div class="col-resolved">
+    <div class="bug-col-header">Resolved <span class="bug-col-count">{{ resolved_bugs|length }}</span></div>
     <div class="bug-list">
-      {% for bug in fixing_bugs %}{% include "partials/bug_card.html" %}{% endfor %}
-      {% if not fixing_bugs %}<p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">No fixes in progress.</p>{% endif %}
+      {% for bug in resolved_bugs %}{% include "partials/bug_card.html" %}{% endfor %}
+      {% if not resolved_bugs %}<p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Nothing awaiting UAT.</p>{% endif %}
     </div>
   </div>
 
 </div>
 
-<!-- Resolved -->
-{% if doc.resolved %}
-<div class="resolved-section">
-  <p class="card-title">Resolved <span style="font-weight:400;text-transform:none;letter-spacing:0;">- {{ doc.resolved|length }} total</span></p>
+<!-- Closed -->
+{% if doc.closed %}
+<div class="closed-section">
+  <p class="card-title">Closed <span style="font-weight:400;text-transform:none;letter-spacing:0;">- {{ doc.closed|length }} total</span></p>
   <div class="table-wrap">
     <table>
       <thead>
@@ -120,7 +120,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for r in doc.resolved %}
+        {% for r in doc.closed %}
         <tr style="cursor:pointer;"
             data-id="{{ r.id }}"
             data-title="{{ r.title }}"
@@ -139,14 +139,14 @@
 </div>
 {% endif %}
 
-<!-- Resolved bug panel -->
+<!-- Closed bug panel -->
 <dialog id="resolvedPanel" style="border:none;border-radius:12px;padding:0;width:min(90vw,520px);
         box-shadow:0 20px 60px rgba(0,0,0,0.22);overflow:hidden;background:var(--color-bg-card);">
   <div style="padding:1.1rem 1.4rem 0.9rem;border-bottom:1px solid var(--color-border-subtle);display:flex;justify-content:space-between;align-items:flex-start;">
     <div>
       <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
         <span id="rpId" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--color-text-muted);"></span>
-        <span style="font-size:0.72rem;font-weight:700;background:var(--live-bg);color:var(--live);padding:0.15rem 0.45rem;border-radius:3px;">Resolved</span>
+        <span style="font-size:0.72rem;font-weight:700;background:var(--live-bg);color:var(--live);padding:0.15rem 0.45rem;border-radius:3px;">Closed</span>
       </div>
       <p id="rpTitle" style="font-size:1.05rem;font-weight:700;color:var(--color-text-primary);margin:0;"></p>
     </div>
@@ -284,7 +284,7 @@
             <select id="bpStatus" class="form-select" style="font-size:0.875rem;" onchange="onStatusChange()">
               <option value="Open">Open</option>
               <option value="Investigating">Investigating</option>
-              <option value="Fix In Progress">Fix In Progress</option>
+              <option value="Resolved">Resolved</option>
             </select>
           </div>
           <div id="bpFixVersionSection" style="display:none;margin-bottom:0.75rem;">
@@ -301,10 +301,10 @@
               Confirmed by owner during UAT
             </label>
           </div>
-          <div id="bpResolveSection">
+          <div id="bpCloseSection">
             <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Resolved In</label>
             <input type="text" id="bpResolvedIn" placeholder="e.g. v0.3.0" style="font-size:0.82rem;margin-bottom:0.5rem;">
-            <button class="btn btn-success btn-sm" style="width:100%;justify-content:center;" onclick="resolveBug()">✓ Mark Resolved</button>
+            <button class="btn btn-success btn-sm" style="width:100%;justify-content:center;" onclick="closeBug()">✓ Mark Closed</button>
           </div>
         </div>
       </div>
@@ -408,7 +408,7 @@ function openBugPanel(id, title, severity, status, notes, wbs, fixVersion, owner
   document.getElementById('bpFixVersion').value = fixVersion || '';
   document.getElementById('bpOwner').value = owner || '';
   document.getElementById('bpUatConfirmed').checked = !!uatConfirmed;
-  document.getElementById('bpFixVersionSection').style.display = status === 'Fix In Progress' ? 'block' : 'none';
+  document.getElementById('bpFixVersionSection').style.display = status === 'Resolved' ? 'block' : 'none';
   // Meta badges
   const sevColors = { Critical:'var(--gap)', High:'var(--color-amber-text)', Medium:'var(--color-amber-text)', Low:'var(--color-text-secondary)' };
   const sevBgs    = { Critical:'var(--gap-bg)', High:'var(--color-amber-bg)', Medium:'var(--color-amber-bg)', Low:'var(--color-bg-card-hover)' };
@@ -455,7 +455,7 @@ function closeBugPanel() { document.getElementById('bugPanel').close(); }
 
 function onStatusChange() {
   const status = document.getElementById('bpStatus').value;
-  document.getElementById('bpFixVersionSection').style.display = status === 'Fix In Progress' ? 'block' : 'none';
+  document.getElementById('bpFixVersionSection').style.display = status === 'Resolved' ? 'block' : 'none';
   saveBugField();
 }
 
@@ -491,10 +491,10 @@ function saveBugField() {
   }).then(r => { if (r.ok) setTimeout(() => location.reload(), 400); });
 }
 
-function resolveBug() {
+function closeBug() {
   const resolved_in = document.getElementById('bpResolvedIn').value.trim();
-  if (!confirm('Mark this bug as Resolved?')) return;
-  fetch('{{ base_path }}/api/bugs/' + _bugId + '/resolve', {
+  if (!confirm('Mark this bug as Closed? This removes it from the active board.')) return;
+  fetch('{{ base_path }}/api/bugs/' + _bugId + '/close', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ resolved_in }),
   }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });

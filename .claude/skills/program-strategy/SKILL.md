@@ -152,7 +152,7 @@ Operational and development details including technical architecture, local setu
 
 ### BUGS.MD
 
-Bug tracking. Two sections: `## Active` (open bugs) and `## Resolved` (closed bugs).
+Bug tracking. Two sections: `## Active` (bugs still on the board, including code-fixed ones awaiting UAT) and `## Closed` (bugs fully done and verified).
 
 **Active table format:**
 ```markdown
@@ -165,27 +165,29 @@ Bug tracking. Two sections: `## Active` (open bugs) and `## Resolved` (closed bu
 
 **Severity values:** `Critical`, `High`, `Medium`, `Low`
 
-**Status values:** `Open`, `Investigating`, `Fix In Progress`, `Resolved`
+**Status values:** `Open`, `Investigating`, `Resolved`
 
 **Bug status lifecycle:**
 - `Open` → `Investigating` (root cause being identified)
-- `Investigating` → `Fix In Progress` (fix is being implemented but not yet verified)
-- `Fix In Progress` → `Resolved` (fix verified - user confirms or tests pass in production)
+- `Investigating` → `Resolved` (code-level fix has landed, but not yet verified in UAT)
+- `Resolved` → `Closed` (fix verified - user confirms or tests pass in production; the bug moves to the `## Closed` section)
 
-**When a fix is implemented but not yet verified by the user or in production, set status to `Fix In Progress`.** Do not advance to `Resolved` until the fix is confirmed.
+`Open`, `Investigating`, and `Resolved` are all *active* - a bug keeps its board row and, when mirrored, its GitHub Issue stays open through all three. Only moving to `## Closed` closes the mirrored Issue. This matches the GitHub flow: `Open → Open → Open → Closed`.
 
-**Fix Version** is the planned build version in which the fix will ship (e.g. `0.2.2`). Set it when advancing a bug to `Fix In Progress`. Leave blank for `Open` and `Investigating` bugs. The UI displays it as a badge on Fix In Progress cards.
+**When a fix is implemented but not yet verified by the user or in production, set status to `Resolved`.** Do not close the bug (move it to `## Closed`) until the fix is confirmed in UAT.
 
-**Resolved table format:**
+**Fix Version** is the planned build version in which the fix will ship (e.g. `0.2.2`). Set it when advancing a bug to `Resolved`. Leave blank for `Open` and `Investigating` bugs. The UI displays it as a badge on Resolved cards.
+
+**Closed table format:**
 ```markdown
-## Resolved
+## Closed
 
 | ID | Title | Resolved In | Date |
 |----|-------|-------------|------|
 | 3 | Short title | 0.2.0 | 2025-04-10 |
 ```
 
-When resolving a bug, the row in `## Active` changes status to `Resolved` in-place and a new row is appended to `## Resolved` with the version and date. Do not delete the Active row - the parser keeps it in place with `Resolved` status.
+When closing a bug, its row is removed from `## Active` and a new row is appended to `## Closed` with the version and date. (Files still using the older `## Resolved` header or a `Fix In Progress` status are read transparently - `Fix In Progress` is treated as `Resolved`, and a legacy `## Resolved` section as `## Closed`.)
 
 The `WBS` column in Active is optional; leave blank if the bug has no feature association.
 

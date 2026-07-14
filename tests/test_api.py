@@ -162,17 +162,18 @@ class TestBugEndpoints:
         assert r2.status_code == 200
         assert r2.json()["status"] == "Investigating"
 
-    def test_resolve_bug(self, client):
-        r = client.post("/api/bugs", json={"title": "Resolve me"})
+    def test_close_bug(self, client):
+        r = client.post("/api/bugs", json={"title": "Close me"})
         bug_id = r.json()["id"]
-        r2 = client.post(f"/api/bugs/{bug_id}/resolve", json={"resolved_in": "0.2.0"})
+        r2 = client.post(f"/api/bugs/{bug_id}/close", json={"resolved_in": "0.2.0"})
         assert r2.status_code == 200
         bugs = client.get("/api/bugs").json()
-        # Active row stays with Resolved status; bug also appears in resolved table
-        active_statuses = {b["id"]: b["status"] for b in bugs["active"]}
-        resolved_ids = [b["id"] for b in bugs["resolved"]]
-        assert active_statuses.get(bug_id) == "Resolved"
-        assert bug_id in resolved_ids
+        # Closing removes the bug from the active board; it lives only in the
+        # Closed table afterwards.
+        active_ids = [b["id"] for b in bugs["active"]]
+        closed_ids = [b["id"] for b in bugs["closed"]]
+        assert bug_id not in active_ids
+        assert bug_id in closed_ids
 
     def test_update_nonexistent_bug(self, client):
         r = client.patch("/api/bugs/9999", json={"title": "Ghost"})

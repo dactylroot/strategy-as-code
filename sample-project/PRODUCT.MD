@@ -97,7 +97,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
-| 1.4.1 | Active bug board | Live | 8 | 3 | Columns for Open, Investigating, Fix In Progress |
+| 1.4.1 | Active bug board | Live | 8 | 3 | Columns for Open, Investigating, Resolved |
 | 1.4.2 | Bug severity badges | Live | 6 | 1 | Critical / High / Medium / Low color-coded |
 | 1.4.3 | Resolve to history | Live | 7 | 2 | Move bug to resolved table with version and date |
 | 1.4.4 | Screenshot attachment | Idea | 6 | 3 | Upload and store screenshots per bug |
