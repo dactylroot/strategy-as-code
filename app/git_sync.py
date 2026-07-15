@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 from .config import settings
@@ -14,6 +15,43 @@ _DEBOUNCE_SECONDS = 5
 _timer_lock = threading.Lock()
 _debounce_timer: threading.Timer | None = None
 _git_lock = threading.Lock()  # serializes actual git operations against the repo
+
+# Last-known content-sync health, so a silently-failing push (bad auth, git
+# `safe.directory`/ownership, missing remote) becomes observable instead of
+# only landing in the logs. Exposed via get_status() and the /api/sync-status
+# endpoint. sync_now() still never raises - this only records what happened.
+_status_lock = threading.Lock()
+_status: dict = {
+    "last_attempt": None,   # epoch seconds of the most recent sync attempt
+    "last_success": None,   # epoch seconds of the most recent clean completion
+    "last_push": None,      # epoch seconds of the most recent actual push
+    "last_error": None,     # str of the most recent failure, or None
+    "last_ok": None,        # True/False of the most recent attempt (None = never)
+    "pushes": 0,            # count of commits actually pushed this process
+}
+
+
+def _record(*, ok: bool, error: str | None, pushed: bool = False) -> None:
+    now = time.time()
+    with _status_lock:
+        _status["last_attempt"] = now
+        _status["last_ok"] = ok
+        _status["last_error"] = error
+        if ok:
+            _status["last_success"] = now
+        if pushed:
+            _status["pushes"] += 1
+            _status["last_push"] = now
+
+
+def get_status() -> dict:
+    """Snapshot of content-sync health for operators/UI. `healthy` is False only
+    when git-sync is enabled and the last attempt actually failed."""
+    with _status_lock:
+        snapshot = dict(_status)
+    snapshot["enabled"] = settings.git_sync_enabled
+    snapshot["healthy"] = (not snapshot["enabled"]) or (snapshot["last_ok"] is not False)
+    return snapshot
 
 
 def schedule_sync(reason: str = "save") -> None:
@@ -48,14 +86,19 @@ def sync_now(reason: str = "manual") -> bool:
 
     repo_dir = settings.project_dir
     if not (repo_dir / ".git").exists():
-        logger.warning("git-sync enabled but %s is not a git repository; skipping", repo_dir)
+        msg = f"{repo_dir} is not a git repository"
+        logger.warning("git-sync enabled but %s; skipping", msg)
+        _record(ok=False, error=msg)
         return False
 
     try:
         with _git_lock:
-            return _sync_locked(repo_dir, reason)
-    except Exception:
+            pushed = _sync_locked(repo_dir, reason)
+        _record(ok=True, error=None, pushed=pushed)
+        return pushed
+    except Exception as exc:
         logger.exception("git content-sync failed (reason=%s)", reason)
+        _record(ok=False, error=str(exc))
         return False
 
 

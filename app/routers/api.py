@@ -19,9 +19,18 @@ from ..parsers import product as product_parser
 from ..parsers import about as about_parser
 from ..parsers import bugs as bugs_parser
 from .. import wbs as wbs_module
+from .. import git_sync
 from ..template_env import templates
 
 router = APIRouter()
+
+
+@router.get("/sync-status")
+def get_sync_status():
+    """Content git-sync health. `healthy: false` means edits are being written
+    to disk but are NOT reaching the content-sync branch - so they will be lost
+    on the next container recreation (see git_sync.py / redeploy workflow)."""
+    return git_sync.get_status()
 
 _EMPTY_BUGS = bugs_parser._EMPTY_BUGS
 
