@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -13,18 +14,31 @@ from .auth import is_authenticated
 from . import git_sync
 from . import github_issues
 
+logger = logging.getLogger(__name__)
+
 
 def _periodic_sync_loop() -> None:
     # Catches drift from any writer of the synced paths (e.g. renewals'
     # bug_report_service.py, which has no git/GitHub awareness of its own),
     # not just edits made through this app's own UI.
+    #
+    # Each leg is guarded independently: a GitHub API hiccup must never take out
+    # the content-sync push, which is the only thing carrying edits out of this
+    # ephemeral container. An unguarded raise here would kill the whole thread -
+    # and with it every subsequent sync until the next container restart.
     while True:
         time.sleep(max(settings.git_sync_poll_seconds, 5))
-        if settings.github_repo:
-            github_issues.create_missing_issues()
-            github_issues.close_resolved_issues()
-        if settings.git_sync_enabled:
-            git_sync.sync_now("periodic")
+        try:
+            if settings.github_repo:
+                github_issues.create_missing_issues()
+                github_issues.close_resolved_issues()
+        except Exception:
+            logger.exception("periodic GitHub issue sync failed; continuing")
+        try:
+            if settings.git_sync_enabled:
+                git_sync.sync_now("periodic")
+        except Exception:
+            logger.exception("periodic git content-sync failed; continuing")
 
 
 @asynccontextmanager
