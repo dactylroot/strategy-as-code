@@ -257,7 +257,7 @@
     <div class="lc-header">Review <span class="lc-count">{{ review|length }}</span></div>
     <div class="lc-body" id="col-review">
       {% if not review %}
-      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Features completed in the current or most recent release appear here.</p>
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Completed features awaiting UAT appear here. Approve one to move it to Released.</p>
       {% else %}
         {% for sa in sub_areas %}
           {% set sa_review = [] %}
