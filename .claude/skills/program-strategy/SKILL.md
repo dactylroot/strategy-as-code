@@ -181,6 +181,7 @@ Bug tracking. Two sections: `## Active` (bugs still on the board, including code
 - `Open` → `Investigating` (root cause being identified)
 - `Investigating` → `Resolved` (code-level fix has landed, but not yet verified in UAT)
 - `Resolved` → `Closed` (fix verified - user confirms or tests pass in production; the bug moves to the `## Closed` section)
+- `Resolved` → `Investigating` (UAT fails or the fix doesn't hold - the bug panel's "Mark Incomplete" button reopens it and clears the resolution metadata that no longer applies, Fix Version and UAT confirmation)
 
 `Open`, `Investigating`, and `Resolved` are all *active* - a bug keeps its board row and, when mirrored, its GitHub Issue stays open through all three. Only moving to `## Closed` closes the mirrored Issue. This matches the GitHub flow: `Open → Open → Open → Closed`.
 
