@@ -53,6 +53,16 @@ Gap / Idea → [Scoped] → [Scored] → In-Progress → Live → Released
 
 Scoped and Scored never appear as literal transitions - they just happen to be how a Gap/Idea row currently reads based on its Notes/Value/Effort.
 
+**Review and UAT mirror the bug lifecycle.** A `Live` feature is done but not yet accepted, exactly like a `Resolved` bug; `Released` is the accepted final state, exactly like a `Closed` bug. The feature board shows this directly:
+
+| Board column | Status | Meaning |
+|--------------|--------|---------|
+| **In Progress** | `In-Progress` | Work underway |
+| **Review** | `Live` | Completed, awaiting UAT sign-off |
+| **Released** | `Released` | Approved after UAT |
+
+Marking a feature Complete sets it to `Live`, so it lands in **Review** and stays there until a human approves it - independent of any changelog or release entry. Every `Live` feature is in Review; approving one advances it to `Released`. Never set `Released` yourself from a code change - that transition is the human UAT step (see below).
+
 **When implementation work finishes, advance the feature to `Live` immediately - do not wait to be asked.** If a code change (bug fix or new functionality) satisfies an `In-Progress` (or `Gap`/`Idea`) feature's described requirement, update PRODUCT.MD in the same pass as the code change:
 - Move its `Status` to `Live`. Never set `Released` from a code change alone - that status requires a human UAT sign-off and is a separate, later, human-triggered step.
 - Rewrite the `Notes` text if it was phrased as a pending requirement (e.g. "X should do Y"). Once shipped, describe the implemented behavior instead (e.g. "X does Y"), so a `Live` row doesn't read like an open TODO.
