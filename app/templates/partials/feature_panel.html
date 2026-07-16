@@ -260,10 +260,15 @@ function openFeaturePanel(opts) {
   document.getElementById('fdp-owner').value = opts.owner || '';
   document.getElementById('fdp-uat-confirmed').checked = !!opts.uatConfirmed;
   document.getElementById('fdp-score-action').innerHTML = '';
-  const isLive = opts.stage === 'Live' || opts.stage === 'Completed' || opts.stage === 'Released';
-  const isReview = opts.reviewable && (opts.stage === 'Live');
-  document.getElementById('fdp-score-card').style.display  = isLive ? 'none' : '';
-  document.getElementById('fdp-live-card').style.display   = (isLive && !isReview) ? '' : 'none';
+  // Drive the status card off the feature's status, not the `reviewable` flag:
+  // a Live feature is shipped but NOT yet approved (awaiting UAT), so it always
+  // shows the review card - regardless of where the panel was opened from (board,
+  // search, etc.). Only Released is "Shipped and approved". Completed is a legacy
+  // alias for Live and reads the same way.
+  const isReleased = opts.stage === 'Released';
+  const isReview   = opts.stage === 'Live' || opts.stage === 'Completed';
+  document.getElementById('fdp-score-card').style.display  = (isReleased || isReview) ? 'none' : '';
+  document.getElementById('fdp-live-card').style.display   = isReleased ? '' : 'none';
   document.getElementById('fdp-review-card').style.display = isReview ? '' : 'none';
   _refreshScoreDisplay();
   _renderStatusActions(opts.stage);
@@ -444,10 +449,11 @@ function advanceFdpStatus(newStatus) {
       _fdp.rawStatus = newStatus;
       const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
       if (metaSpan) { const c={'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','In-Progress':'var(--color-amber)'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'var(--color-text-secondary)'; }
-      const isLive = newStatus === 'Live' || newStatus === 'Released';
-      document.getElementById('fdp-score-card').style.display  = isLive ? 'none' : '';
-      document.getElementById('fdp-live-card').style.display   = isLive ? '' : 'none';
-      document.getElementById('fdp-review-card').style.display = 'none';
+      const isReleased = newStatus === 'Released';
+      const isReview   = newStatus === 'Live';
+      document.getElementById('fdp-score-card').style.display  = (isReleased || isReview) ? 'none' : '';
+      document.getElementById('fdp-live-card').style.display   = isReleased ? '' : 'none';
+      document.getElementById('fdp-review-card').style.display = isReview ? '' : 'none';
       _renderStatusActions(newStatus);
       _fdpDirty = true;
     } else {

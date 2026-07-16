@@ -447,13 +447,15 @@ function _feScore(f, q) {
   const tokens = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (!tokens.length) return 0;
   const full = tokens.join(' ');
-  if (wbs === full)          return 110;
-  if (wbs.startsWith(full))  return 105;
+  if (wbs === full)          return 110;   // exact WBS, e.g. "1.1.18"
+  if (wbs.startsWith(full))  return 105;   // WBS prefix, e.g. "1.1"
+  if (wbs.includes(full))    return 102;   // WBS substring, e.g. "1.18"
   if (name.includes(full))   return 100;
   if (notes.includes(full))  return 80;
   const inName  = tokens.filter(t => name.includes(t)).length;
   const inNotes = tokens.filter(t => notes.includes(t)).length;
-  return (inName * 10) + (inNotes * 5);
+  const inWbs   = tokens.filter(t => wbs.includes(t)).length;
+  return (inName * 10) + (inNotes * 5) + (inWbs * 8);
 }
 
 function onFeatureSearch(q) {
