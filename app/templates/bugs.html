@@ -305,6 +305,7 @@
             <label style="display:block;font-size:0.7rem;color:var(--color-text-secondary);margin-bottom:0.3rem;">Resolved In</label>
             <input type="text" id="bpResolvedIn" placeholder="e.g. v0.3.0" style="font-size:0.82rem;margin-bottom:0.5rem;">
             <button class="btn btn-success btn-sm" style="width:100%;justify-content:center;" onclick="closeBug()">✓ Mark Closed</button>
+            <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:0.5rem;color:var(--color-amber-text);border-color:var(--color-amber-border);" onclick="markBugIncomplete()">↩ Mark Incomplete</button>
           </div>
         </div>
       </div>
@@ -497,6 +498,18 @@ function closeBug() {
   fetch('{{ base_path }}/api/bugs/' + _bugId + '/close', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ resolved_in }),
+  }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });
+}
+
+function markBugIncomplete() {
+  // The resolution didn't hold - send the bug back to Investigating and clear
+  // the resolution metadata (Fix Version, UAT confirmation) that only applies
+  // to a Resolved bug. Fix Version must be sent as "" not null to actually
+  // clear it (see transform_update_bug).
+  if (!confirm('Move this bug back to Investigating? This clears its Fix Version and UAT confirmation.')) return;
+  fetch('{{ base_path }}/api/bugs/' + _bugId, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'Investigating', fix_version: '', uat_confirmed: false }),
   }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });
 }
 
