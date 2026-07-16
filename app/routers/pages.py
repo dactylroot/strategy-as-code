@@ -159,23 +159,12 @@ def features_page(request: Request):
     if (r := _redirect_if_no_project(s)):
         return r
     if s:
-        product, about = _parse_product_about(s)
+        product = product_parser._parse_text(s.get_file("PRODUCT.MD"))
     else:
         product = product_parser.parse(settings.product_md)
-        about   = about_parser.parse(settings.about_md)
 
     all_features = product.all_features
     sub_areas    = [sa for area in product.wbs_areas for sa in area.sub_areas]
-
-    # Sub-areas that belong to the most recent completed release and the in-progress release
-    review_prefixes: set[str] = set()
-    found_completed = False
-    for entry in about.changelog:
-        if entry.in_progress or not found_completed:
-            for group in entry.groups:
-                review_prefixes.add(group.label.split(" ", 1)[0])
-            if not entry.in_progress:
-                found_completed = True
 
     ideas       = [f for f in all_features if f.stage in ("Gap", "Idea")]
     prioritized = sorted(
@@ -183,11 +172,13 @@ def features_page(request: Request):
         key=lambda f: (-(f.priority_score or 0), 0 if f.stage == "Scored" else 1),
     )
     in_progress = [f for f in all_features if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)]
-    review      = [
-        f for f in all_features
-        if f.status == FeatureStatus.live
-        and any(f.wbs.startswith(p + ".") for p in review_prefixes)
-    ]
+    # Review = every completed (Live) feature awaiting UAT. Released is the
+    # post-UAT accepted state, reached via the panel's "Approve -> Released"
+    # (mirrors the bug lifecycle: Resolved awaits UAT, Closed is accepted).
+    # No changelog gate here: a completed feature must never fall off the board
+    # just because its sub-area isn't named in a release entry. Matches the
+    # dashboard's Review count (product.live_count).
+    review      = [f for f in all_features if f.status == FeatureStatus.live]
     released    = [f for f in all_features if f.status == FeatureStatus.released]
 
     features_json = json.dumps([
