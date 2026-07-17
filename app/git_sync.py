@@ -118,24 +118,27 @@ def _sync_locked(repo_dir: Path, reason: str) -> bool:
     if not paths:
         return False
 
-    # Best-effort fetch - the branch may not exist yet on the remote (first run).
+    # Best-effort fetch, used only for the no-op check below - content-sync is
+    # a rolling single-commit snapshot of the latest state, never an
+    # append-only log (nobody reads its history; only its current file
+    # contents matter - see t3-renewals-manager's reconcile-content-sync.yml),
+    # so a sync never builds on a previous commit as a parent. A missing or
+    # unfetchable remote branch (deleted, never created, this fetch failing)
+    # just means we can't skip a no-op push; it can no longer produce a
+    # silent orphan; every sync already replaces the branch outright on purpose.
     _git(repo_dir, ["fetch", remote, branch], check=False)
-
-    parent: str | None = None
+    current_tip_tree: str | None = None
     rev = subprocess.run(
-        ["git", "rev-parse", f"{remote}/{branch}"],
+        ["git", "rev-parse", f"{remote}/{branch}^{{tree}}"],
         cwd=repo_dir, capture_output=True, text=True,
     )
     if rev.returncode == 0:
-        parent = rev.stdout.strip()
+        current_tip_tree = rev.stdout.strip()
 
     scratch_index = repo_dir / ".git" / "content-sync-index"
     env = {**os.environ, "GIT_INDEX_FILE": str(scratch_index)}
     try:
-        if parent:
-            _git(repo_dir, ["read-tree", parent], env=env)
-        else:
-            _git(repo_dir, ["read-tree", "--empty"], env=env)
+        _git(repo_dir, ["read-tree", "--empty"], env=env)
 
         for rel_path in paths:
             if (repo_dir / rel_path).exists():
@@ -145,18 +148,13 @@ def _sync_locked(repo_dir: Path, reason: str) -> bool:
 
         tree = _git(repo_dir, ["write-tree"], env=env)
 
-        if parent:
-            parent_tree = _git(repo_dir, ["rev-parse", f"{parent}^{{tree}}"])
-            if tree == parent_tree:
-                return False  # nothing changed since last sync
+        if tree == current_tip_tree:
+            return False  # nothing changed since last sync
 
-        commit_args = ["commit-tree", tree, "-m", f"content-sync: {reason}"]
-        if parent:
-            commit_args += ["-p", parent]
-        commit = _git(repo_dir, commit_args)
+        commit = _git(repo_dir, ["commit-tree", tree, "-m", f"content-sync: {reason}"])
 
-        _git(repo_dir, ["push", remote, f"{commit}:refs/heads/{branch}"])
-        logger.info("git-sync: pushed %s to %s/%s (reason=%s)", commit[:8], remote, branch, reason)
+        _git(repo_dir, ["push", "--force", remote, f"{commit}:refs/heads/{branch}"])
+        logger.info("git-sync: replaced %s/%s with %s (reason=%s)", remote, branch, commit[:8], reason)
         return True
     finally:
         scratch_index.unlink(missing_ok=True)
