@@ -210,6 +210,48 @@ class TestTransformFeatureNotes:
         assert "line1<br>line2" in result
 
 
+CORRUPTED_PRODUCT = """\
+# Corrupted Product
+
+## Features
+
+### 1. Core
+
+#### 1.1 Auth
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 1.1.1 | Login | Live | 8 | 3 | First part of the note explaining the issue.
+
+AM Tested: still broken, more detail here. |
+| 1.1.2 | Logout | Scoped | | | Fine |
+"""
+
+
+class TestCorruptedRowRecovery:
+    def test_parse_recovers_row_split_by_a_raw_line_break(self):
+        # Simulates a file saved before notes were escaped: 1.1.1's note has
+        # a literal blank-line break, splitting its row across 3 lines.
+        doc = parser._parse_text(CORRUPTED_PRODUCT)
+        wbs_codes = [f.wbs for f in doc.all_features]
+        assert "1.1.1" in wbs_codes
+        assert "1.1.2" in wbs_codes  # the row after the corrupted one must not be swallowed
+        login = next(f for f in doc.all_features if f.wbs == "1.1.1")
+        assert "First part of the note" in login.notes
+        assert "AM Tested" in login.notes
+
+    def test_update_self_heals_a_previously_corrupted_row(self):
+        # Before the fix this raised ValueError("Expected 1 match for WBS
+        # '1.1.1', got 0") because the corrupted row spans 3 raw lines and
+        # the update regex only matches a single line.
+        result = parser.transform_feature_status(CORRUPTED_PRODUCT, "1.1.1", FeatureStatus.released)
+        doc = parser._parse_text(result)
+        login = next(f for f in doc.all_features if f.wbs == "1.1.1")
+        assert login.status == FeatureStatus.released
+        assert "First part of the note" in login.notes
+        assert "\n\nAM Tested" not in result  # rejoined onto a single physical line
+
+
 class TestTransformFeatureScore:
     def test_sets_both_values(self):
         result = parser.transform_feature_score(MINIMAL_PRODUCT, "1.1.2", 6, 3)

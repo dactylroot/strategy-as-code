@@ -21,6 +21,71 @@ def _normalize_status_str(status_str: str) -> str:
     return _LEGACY_STATUS_ALIASES.get(status_str, status_str)
 
 
+# Cap on how many physical lines a single row can be recovered from - guards
+# against a row whose closing "|" was itself lost (or never existed) eating
+# every following row for the rest of the block.
+_MAX_ROW_RECOVERY_LINES = 50
+
+
+def _parse_feature_rows(block: str) -> list[list[str]]:
+    """Split a feature table block into rows. Normally one row is one
+    physical line, but a note saved before newlines were escaped (see
+    transform_feature_notes) can still have literal line breaks sitting in
+    an old file, splitting its row across several lines. Recover those by
+    buffering lines - starting at one that opens with "|" but doesn't close
+    with it - until a line closes the row, rejoining the buffered lines with
+    "<br>" so the recovered cell reads the same as a properly-escaped one.
+    This makes already-corrupted rows reappear instead of being silently
+    dropped."""
+    rows = []
+    buf: list[str] | None = None
+    for raw_line in block.splitlines():
+        line = raw_line.strip()
+        if buf is None:
+            if not line.startswith("|"):
+                continue
+            if line.endswith("|"):
+                row_text = line
+            else:
+                buf = [line]
+                continue
+        else:
+            buf.append(line)
+            if not line.endswith("|") and len(buf) < _MAX_ROW_RECOVERY_LINES:
+                continue
+            row_text = "<br>".join(buf)
+            buf = None
+        cells = [c.strip() for c in row_text.split("|")[1:-1]]
+        rows.append(cells)
+    return rows
+
+
+def _normalize_corrupted_rows(text: str) -> str:
+    """Rejoin any table row split across multiple physical lines by an
+    unescaped line break saved before notes were escaped (see
+    transform_feature_notes), so the single-line regexes below (status/name/
+    notes/score updates) can find and replace it. Applied at the start of
+    every write so touching the file for any reason self-heals rows
+    corrupted by older versions of this code."""
+    out_lines = []
+    buf: list[str] | None = None
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        if buf is None:
+            if not line.startswith("|") or line.endswith("|"):
+                out_lines.append(raw_line)
+            else:
+                buf = [line]
+            continue
+        buf.append(line)
+        if line.endswith("|") or len(buf) >= _MAX_ROW_RECOVERY_LINES:
+            out_lines.append("<br>".join(buf))
+            buf = None
+    if buf is not None:
+        out_lines.extend(buf)
+    return "\n".join(out_lines)
+
+
 def parse(path: Path) -> ProductDoc:
     text = path.read_text(encoding="utf-8")
     return _parse_text(text)
@@ -95,11 +160,7 @@ def _parse_text(text: str) -> ProductDoc:
             sub_block = area_block[sub_start:sub_end]
 
             features: list[Feature] = []
-            for row in sub_block.splitlines():
-                row = row.strip()
-                if not row.startswith("|") or not row.endswith("|"):
-                    continue
-                cells = [c.strip() for c in row.split("|")[1:-1]]
+            for cells in _parse_feature_rows(sub_block):
                 if len(cells) < 3:
                     continue
                 wbs_code, feat_name, status_str = cells[0], cells[1], cells[2]
@@ -225,6 +286,7 @@ def add_feature(path: Path, req: NewFeature) -> Feature:
 # ── Pure transform functions (text-in / text-out, no I/O) ────────────────────
 
 def transform_feature_status(text: str, wbs: str, new_status: FeatureStatus) -> str:
+    text = _normalize_corrupted_rows(text)
     pattern = rf"^(\| {re.escape(wbs)} \| [^|]+ \|)[ ]+{_STATUS_PAT}[ ]+(\| .*)$"
     new_text, n = re.subn(pattern, rf"\1 {new_status.value} \2", text, flags=re.MULTILINE)
     if n != 1:
@@ -233,6 +295,7 @@ def transform_feature_status(text: str, wbs: str, new_status: FeatureStatus) -> 
 
 
 def transform_feature_name(text: str, wbs: str, new_name: str) -> str:
+    text = _normalize_corrupted_rows(text)
     pattern = re.compile(
         rf"^(\| {re.escape(wbs)} \| )[^|]+(\| {_STATUS_PAT} \| .*\|)$",
         re.MULTILINE,
@@ -244,6 +307,7 @@ def transform_feature_name(text: str, wbs: str, new_name: str) -> str:
 
 
 def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
+    text = _normalize_corrupted_rows(text)
     new_notes = new_notes.replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
     # Match 6-column rows; any trailing columns (Flag/Owner/UAT Confirmed)
     # captured in group 3 and preserved as-is, however many there are.
@@ -281,6 +345,7 @@ def _set_feature_trailing_cell(text: str, wbs: str, index: int, value: str) -> s
     Confirmed) on a feature row, padding with empty columns as needed and
     preserving every other trailing column untouched. Drops the trailing
     columns entirely if none of them end up populated."""
+    text = _normalize_corrupted_rows(text)
     pattern = re.compile(
         rf"^\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|.*\|$",
         re.MULTILINE,
@@ -334,6 +399,7 @@ def transform_feature_score(text: str, wbs: str, value: int | None, effort: int 
     """Update value and effort columns; pass None to clear a column.
 
     Normalises legacy 4-col rows to 6-col."""
+    text = _normalize_corrupted_rows(text)
     v_str = f" {value} " if value is not None else "  "
     e_str = f" {effort} " if effort is not None else " "
     # 6-column row; any trailing columns (Flag/Owner/UAT Confirmed) preserved
@@ -369,6 +435,7 @@ def transform_scope(text: str, new_markdown: str) -> str:
 
 
 def transform_add_feature(text: str, req: NewFeature) -> tuple[str, Feature]:
+    text = _normalize_corrupted_rows(text)
     sub_pattern = re.compile(rf"^#### {re.escape(req.wbs_prefix)} .+$", re.MULTILINE)
     sub_m = sub_pattern.search(text)
     if not sub_m:
@@ -404,6 +471,7 @@ def transform_add_feature(text: str, req: NewFeature) -> tuple[str, Feature]:
 
 
 def transform_delete_feature(text: str, wbs: str) -> str:
+    text = _normalize_corrupted_rows(text)
     row_pat = re.compile(rf"^\| {re.escape(wbs)} \|[^\n]+\|$\n?", re.MULTILINE)
     new_text, n = row_pat.subn("", text)
     if n == 0:
@@ -419,6 +487,7 @@ def delete_feature(path: Path, wbs: str) -> None:
 
 
 def transform_move_feature(text: str, wbs: str, target_prefix: str) -> tuple[str, Feature]:
+    text = _normalize_corrupted_rows(text)
     row_pat = re.compile(rf"^\| {re.escape(wbs)} \|[^\n]+\|$", re.MULTILINE)
     row_m = row_pat.search(text)
     if not row_m:

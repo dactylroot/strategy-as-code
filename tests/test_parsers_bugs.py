@@ -137,6 +137,81 @@ class TestTransformUpdateBug:
             parser.transform_update_bug(BUGS_WITH_DATA, 99, BugUpdate())
 
 
+class TestNoteLineBreaks:
+    def test_add_bug_with_multiline_notes_is_escaped_and_round_trips(self):
+        req = BugCreate(title="Multiline bug", notes="Line one\nLine two\n\nLine three")
+        result, bug = parser.transform_add_bug(BUGS_WITH_DATA, req)
+        # The stored row must stay on one physical line per bug.
+        assert "Line one\nLine two" not in result
+        doc = parser._parse_text(result)
+        added = next(b for b in doc.active if b.title == "Multiline bug")
+        assert added.notes == "Line one<br>Line two<br><br>Line three"
+        # Every other existing row must still parse untouched.
+        assert len(doc.active) == 3
+
+    def test_update_bug_with_multiline_notes_is_escaped_and_round_trips(self):
+        req = BugUpdate(notes="Repro:\nStep 1\nStep 2")
+        result, bug = parser.transform_update_bug(BUGS_WITH_DATA, 1, req)
+        assert "Repro:\nStep 1" not in result
+        doc = parser._parse_text(result)
+        assert doc.active[0].notes == "Repro:<br>Step 1<br>Step 2"
+
+    def test_parse_recovers_row_already_corrupted_by_a_raw_line_break(self):
+        # Simulates a file saved before notes were escaped: bug 16's note has
+        # a literal blank-line break, splitting its row across 3 lines.
+        corrupted = """\
+# Bugs
+
+## Active
+
+| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |
+|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|
+| 16 | Vendor mis-mapped | Medium | Resolved | First part of the note explaining the bug.
+
+AM Tested: still broken, more detail here. |  |  |  |  |  |
+| 17 | Unrelated later bug | Low | Open | Fine | 1.2.3 |  |  |  |  |
+
+## Closed
+
+| ID | Title | Resolved In | Date | GH Issue |
+|----|-------|-------------|------|----------|
+"""
+        doc = parser._parse_text(corrupted)
+        ids = [b.id for b in doc.active]
+        assert 16 in ids
+        assert 17 in ids  # the row after the corrupted one must not be swallowed
+        bug16 = next(b for b in doc.active if b.id == 16)
+        assert "First part of the note" in bug16.notes
+        assert "AM Tested" in bug16.notes
+
+    def test_update_self_heals_a_previously_corrupted_row(self):
+        corrupted = """\
+# Bugs
+
+## Active
+
+| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |
+|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|
+| 16 | Vendor mis-mapped | Medium | Resolved | First part of the note.
+
+AM Tested: still broken. |  |  |  |  |  |
+
+## Closed
+
+| ID | Title | Resolved In | Date | GH Issue |
+|----|-------|-------------|------|----------|
+"""
+        # Before the fix this raised ValueError("Expected 1 match for bug 16, got 0")
+        # because the corrupted row spans 3 raw lines and the update regex only
+        # matches a single line.
+        result, bug = parser.transform_update_bug(corrupted, 16, BugUpdate(owner="Alex"))
+        assert bug.owner == "Alex"
+        doc = parser._parse_text(result)
+        healed = next(b for b in doc.active if b.id == 16)
+        assert healed.owner == "Alex"
+        assert "First part of the note" in healed.notes
+
+
 class TestTransformCloseBug:
     def test_moves_to_closed_and_leaves_active(self):
         # transform_close_bug removes the bug from the active board entirely

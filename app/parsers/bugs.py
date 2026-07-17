@@ -36,13 +36,41 @@ def _ensure_exists(path: Path) -> None:
         path.write_text(_EMPTY_BUGS, encoding="utf-8")
 
 
+# Cap on how many physical lines a single row can be recovered from - guards
+# against a row whose closing "|" was itself lost (or never existed) eating
+# every following row for the rest of the section.
+_MAX_ROW_RECOVERY_LINES = 50
+
+
 def _parse_table_rows(block: str) -> list[list[str]]:
+    """Split a table section into rows. Normally one row is one physical line,
+    but a note saved before newlines were escaped (see _encode_notes) can
+    still have literal line breaks sitting in an old file, splitting its row
+    across several lines. Recover those by buffering lines - starting at one
+    that opens with "|" but doesn't close with it - until a line closes the
+    row, rejoining the buffered lines with "<br>" so the recovered cell reads
+    the same as a properly-escaped one. This makes already-corrupted rows
+    reappear (and self-heal on their next save) instead of being silently
+    dropped."""
     rows = []
-    for line in block.splitlines():
-        line = line.strip()
-        if not line.startswith("|") or not line.endswith("|"):
-            continue
-        cells = [c.strip() for c in line.split("|")[1:-1]]
+    buf: list[str] | None = None
+    for raw_line in block.splitlines():
+        line = raw_line.strip()
+        if buf is None:
+            if not line.startswith("|"):
+                continue
+            if line.endswith("|"):
+                row_text = line
+            else:
+                buf = [line]
+                continue
+        else:
+            buf.append(line)
+            if not line.endswith("|") and len(buf) < _MAX_ROW_RECOVERY_LINES:
+                continue
+            row_text = "<br>".join(buf)
+            buf = None
+        cells = [c.strip() for c in row_text.split("|")[1:-1]]
         if not cells or not cells[0] or set(cells[0]) <= {"-", " "}:
             continue
         if cells[0].lower() in ("id",):
@@ -134,6 +162,39 @@ def _parse_text(text: str):
     return BugDoc(raw_text=text, active=active, closed=closed)
 
 
+def _normalize_corrupted_rows(text: str) -> str:
+    """Rejoin any table row split across multiple physical lines by an
+    unescaped line break saved before notes were escaped (see _encode_notes),
+    so the single-line regexes below (title/status/notes updates) can find
+    and replace it. Applied at the start of every write so touching the file
+    for any reason self-heals rows corrupted by older versions of this code."""
+    out_lines = []
+    buf: list[str] | None = None
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        if buf is None:
+            if not line.startswith("|") or line.endswith("|"):
+                out_lines.append(raw_line)
+            else:
+                buf = [line]
+            continue
+        buf.append(line)
+        if line.endswith("|") or len(buf) >= _MAX_ROW_RECOVERY_LINES:
+            out_lines.append("<br>".join(buf))
+            buf = None
+    if buf is not None:
+        out_lines.extend(buf)
+    return "\n".join(out_lines)
+
+
+def _encode_notes(notes: str) -> str:
+    """Escape literal line breaks so a multi-line note can't split a table
+    row across multiple lines - the row parser requires each row to be a
+    single line starting and ending with '|'. Mirrors product.py's feature
+    notes encoding."""
+    return notes.replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
+
+
 def _next_id(active, closed) -> int:
     all_ids = [b.id for b in active] + [r.id for r in closed]
     return max(all_ids, default=0) + 1
@@ -187,11 +248,13 @@ def set_gh_issue(path: Path, bug_id: int, issue_ref: str) -> bool:
 def transform_add_bug(text: str, req: BugCreate) -> tuple[str, BugItem]:
     if not text.strip():
         text = _EMPTY_BUGS
+    text = _normalize_corrupted_rows(text)
     doc = _parse_text(text)
     new_id = _next_id(doc.active, doc.closed)
     wbs_col = req.wbs_ref or ""
     owner_col = req.owner or ""
-    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {req.notes} | {wbs_col} |  | {owner_col} |  |  |"
+    notes_col = _encode_notes(req.notes)
+    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {notes_col} | {wbs_col} |  | {owner_col} |  |  |"
     insert_pos = _find_section_last_row(text, "## Active")
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
     return new_text, BugItem(id=new_id, title=req.title, severity=req.severity,
@@ -202,6 +265,7 @@ def transform_add_bug(text: str, req: BugCreate) -> tuple[str, BugItem]:
 def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, BugItem]:
     if not text.strip():
         text = _EMPTY_BUGS
+    text = _normalize_corrupted_rows(text)
     doc = _parse_text(text)
     bug = next((b for b in doc.active if b.id == bug_id), None)
     if bug is None:
@@ -218,8 +282,9 @@ def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, B
     owner_col    = new_owner or ""
     uat_col      = "Yes" if new_uat else ""
     gh_issue_col = bug.gh_issue or ""
+    notes_col    = _encode_notes(new_notes)
     pattern  = rf"^\| {bug_id} \|[^\n]+\|$"
-    new_row  = (f"| {bug_id} | {new_title} | {new_severity.value} | {new_status.value} | {new_notes} | "
+    new_row  = (f"| {bug_id} | {new_title} | {new_severity.value} | {new_status.value} | {notes_col} | "
                 f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {gh_issue_col} |")
     new_text, n = re.subn(pattern, new_row, text, flags=re.MULTILINE)
     if n != 1:
@@ -233,6 +298,7 @@ def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, B
 def transform_close_bug(text: str, bug_id: int, resolved_in: str = "", today: str | None = None) -> str:
     if not text.strip():
         text = _EMPTY_BUGS
+    text = _normalize_corrupted_rows(text)
     doc = _parse_text(text)
     bug = next((b for b in doc.active if b.id == bug_id), None)
     if bug is None:
@@ -256,6 +322,7 @@ def transform_close_bug(text: str, bug_id: int, resolved_in: str = "", today: st
 
 
 def transform_set_gh_issue(text: str, bug_id: int, issue_ref: str) -> tuple[str, bool]:
+    text = _normalize_corrupted_rows(text)
     doc = _parse_text(text)
     bug = next((b for b in doc.active if b.id == bug_id), None)
     if bug is None:
@@ -264,8 +331,9 @@ def transform_set_gh_issue(text: str, bug_id: int, issue_ref: str) -> tuple[str,
     fix_ver_col = bug.fix_version or ""
     owner_col = bug.owner or ""
     uat_col = "Yes" if bug.uat_confirmed else ""
+    notes_col = _encode_notes(bug.notes)
     pattern = rf"^\| {bug_id} \|[^\n]+\|$"
-    new_row = (f"| {bug_id} | {bug.title} | {bug.severity.value} | {bug.status.value} | {bug.notes} | "
+    new_row = (f"| {bug_id} | {bug.title} | {bug.severity.value} | {bug.status.value} | {notes_col} | "
                f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {issue_ref} |")
     new_text, n = re.subn(pattern, new_row, text, count=1, flags=re.MULTILINE)
     return new_text, n == 1
