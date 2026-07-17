@@ -171,7 +171,10 @@ def features_page(request: Request):
         [f for f in all_features if f.stage in ("Scoped", "Scored")],
         key=lambda f: (-(f.priority_score or 0), 0 if f.stage == "Scored" else 1),
     )
-    in_progress = [f for f in all_features if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)]
+    in_progress = sorted(
+        [f for f in all_features if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)],
+        key=lambda f: (f.priority_score is None, -(f.priority_score or 0)),
+    )
     # Review = every completed (Live) feature awaiting UAT. Released is the
     # post-UAT accepted state, reached via the panel's "Approve -> Released"
     # (mirrors the bug lifecycle: Resolved awaits UAT, Closed is accepted).
