@@ -429,7 +429,15 @@ function _renderStatusActions(stage) {
   if (stage === 'Gap' || stage === 'Idea') {
     el.innerHTML = '<span class="text-muted" style="font-size:0.72rem;">Add notes above and save to mark as Scoped</span>';
   } else if (stage === 'Scoped' || stage === 'Scored') {
-    el.innerHTML = `<button class="btn btn-primary btn-sm" onclick="advanceFdpStatus('In-Progress')">→ In Progress</button>`;
+    el.innerHTML = `<button class="btn btn-primary btn-sm" onclick="advanceFdpStatus('In-Progress')">→ In Progress</button>
+      <button class="btn btn-ghost btn-sm" onclick="fdpBackToIdea()" style="color:var(--color-amber-text);border-color:var(--color-amber-border);">↩ Back to Idea</button>`;
+  } else if (stage === 'In-Progress' || stage === 'Planned') {
+    // 'Planned' is a legacy alias for In-Progress (see FeatureStatus) - the
+    // board already groups it into the In Progress column, so its panel
+    // actions must match. Both buttons write a canonical status, so using
+    // them naturally migrates the row off the deprecated alias.
+    el.innerHTML = `<button class="btn btn-success btn-sm" onclick="advanceFdpStatus('Live')">→ Complete</button>
+      <button class="btn btn-ghost btn-sm" onclick="advanceFdpStatus('Idea')" style="color:var(--color-amber-text);border-color:var(--color-amber-border);">↩ Back to Prioritized</button>`;
   } else {
     el.innerHTML = '';
   }
@@ -444,17 +452,54 @@ function advanceFdpStatus(newStatus) {
     body: JSON.stringify({status: newStatus})
   }).then(r => {
     if (r.ok) {
-      statusEl.textContent = newStatus === 'Released' ? '✓ Approved' : newStatus === 'In-Progress' ? '✓ Rejected' : '✓ Done';
-      _fdp.stage = newStatus;
+      statusEl.textContent = newStatus === 'Released' ? '✓ Approved' : newStatus === 'In-Progress' ? '✓ Rejected' : newStatus === 'Idea' ? '↩ Moved back' : '✓ Done';
       _fdp.rawStatus = newStatus;
+      const notes = document.getElementById('fdp-notes').value.trim();
+      const vRaw = document.getElementById('fdp-value').value;
+      const eRaw = document.getElementById('fdp-effort').value;
+      const hasScores = vRaw !== '' && eRaw !== '' && !isNaN(parseInt(vRaw)) && !isNaN(parseInt(eRaw));
+      const displayStage = _deriveStage(newStatus, !!notes, hasScores);
+      _fdp.stage = displayStage;
       const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
-      if (metaSpan) { const c={'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','In-Progress':'var(--color-amber)'}; metaSpan.textContent=newStatus; metaSpan.style.color=c[newStatus]||'var(--color-text-secondary)'; }
-      const isReleased = newStatus === 'Released';
-      const isReview   = newStatus === 'Live';
+      if (metaSpan) {
+        const colors = {'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','Scoped':'var(--color-purple-text)','Scored':'var(--color-purple-text)','In-Progress':'var(--color-amber)','Live':'var(--live)','Released':'var(--live)','Planned':'var(--planned)'};
+        metaSpan.textContent = displayStage;
+        metaSpan.style.color = colors[displayStage] || 'var(--color-text-secondary)';
+      }
+      const isReleased = displayStage === 'Released';
+      const isReview   = displayStage === 'Live';
       document.getElementById('fdp-score-card').style.display  = (isReleased || isReview) ? 'none' : '';
       document.getElementById('fdp-live-card').style.display   = isReleased ? '' : 'none';
       document.getElementById('fdp-review-card').style.display = isReview ? '' : 'none';
-      _renderStatusActions(newStatus);
+      _renderStatusActions(displayStage);
+      _fdpDirty = true;
+    } else {
+      r.json().then(d => { statusEl.textContent = d.detail||'Error'; }).catch(()=>{ statusEl.textContent='Error'; });
+    }
+  }).catch(() => { statusEl.textContent = 'Error'; });
+}
+
+// Scoped/Scored aren't stored statuses (see _deriveStage) - they're just
+// Gap/Idea with Notes and/or scores set. So "moving back" from Prioritized
+// to the Ideas column means clearing those fields, not flipping status.
+function fdpBackToIdea() {
+  if (!_fdp.wbs) return;
+  if (!confirm(`Move "${_fdp.name}" back to Idea?\nThis clears its notes, value, and effort.`)) return;
+  const statusEl = document.getElementById('fdp-save-status');
+  statusEl.textContent = 'Saving…';
+  fetch('{{ base_path }}/api/features/'+encodeURIComponent(_fdp.wbs), {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({notes: '', value: null, effort: null})
+  }).then(r => {
+    if (r.ok) {
+      document.getElementById('fdp-notes').value = '';
+      fdpNotesMode('edit');
+      document.getElementById('fdp-value').value = '';
+      document.getElementById('fdp-effort').value = '';
+      _refreshScoreDisplay();
+      document.getElementById('fdp-score-action').innerHTML = '';
+      statusEl.textContent = '↩ Moved back';
+      _refreshFdpStage();
       _fdpDirty = true;
     } else {
       r.json().then(d => { statusEl.textContent = d.detail||'Error'; }).catch(()=>{ statusEl.textContent='Error'; });

@@ -12,6 +12,22 @@
 @media (max-width: 1200px) { .lifecycle-board { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 800px)  { .lifecycle-board { grid-template-columns: 1fr; } }
 
+/* Embedded mode: the host iframe width is fixed and usually narrower than
+   1200px, so the grid breakpoints above would stack the 5 stages instead of
+   letting them sit side by side. Keep all 5 columns in a single row at a
+   readable minimum width and let the board scroll horizontally instead. */
+.lifecycle-board.embedded {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+.lifecycle-board.embedded .lc-col {
+  flex: 0 0 270px;
+  min-width: 270px;
+}
+
 .lc-col {}
 .lc-header {
   padding: 0.55rem 0.875rem;
@@ -185,7 +201,7 @@
 </div>
 
 <!-- 5-column lifecycle board -->
-<div class="lifecycle-board">
+<div class="lifecycle-board{{ ' embedded' if embed_chrome else '' }}">
 
   <!-- ── Ideas ── -->
   <div class="lc-col col-ideas">
