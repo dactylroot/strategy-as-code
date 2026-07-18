@@ -29,29 +29,30 @@ I will organize, prioritize, and document everything.
 All features live in PRODUCT.MD. There is no separate backlog file.
 
 ```
-Gap / Idea → [Scoped] → [Scored] → In-Progress → Live → Released
+Idea → [Scoped] → [Scored] → In-Progress → Live → Released
 ```
 
-`Scoped` and `Scored` are **derived, not stored** - never write them into the Status column. A Gap or Idea *displays* as Scoped once it has real Notes, and as Scored once Value and Effort are also both set. This is computed at read time from the row's own Notes/Value/Effort - there's nothing to keep in sync, which eliminates the drift that used to happen between the stored status and the actual score/notes data.
+`Scoped` and `Scored` are **derived, not stored** - never write them into the Status column. An Idea *displays* as Scoped once it has real Notes, and as Scored once Value and Effort are also both set. This is computed at read time from the row's own Notes/Value/Effort - there's nothing to keep in sync, which eliminates the drift that used to happen between the stored status and the actual score/notes data.
 
 | Stage | Stored? | Meaning |
 |-------|---------|---------|
-| **Gap** | Yes | Identified need in the WBS - not yet defined or prioritized |
 | **Idea** | Yes | Captured idea assigned to a WBS area - raw, unstructured |
-| **Scoped** | Derived | Gap/Idea with non-empty Notes - defined and ready for scoring |
+| **Scoped** | Derived | Idea with non-empty Notes - defined and ready for scoring |
 | **Scored** | Derived | Scoped, with Value & Effort also both set - ready to start work |
 | **In-Progress** | Yes | Work has started |
 | **Live** | Yes | Shipped and in production; awaiting UAT sign-off |
 | **Released** | Yes | Approved after UAT; final state |
 
+**`Gap` is a flag, not a workflow stage.** A newly captured feature always starts at `Idea` (see below) - `Gap` is not something you write into a fresh feature's Status. Flagging a feature "this is a gap/concern" is a separate boolean tag (the trailing **Flag** column, see Feature table format) that can be set on a feature at *any* Status - Idea, In-Progress, even Live - independent of its workflow stage. `Gap` still exists as a legacy literal Status value (older files may have it on unscoped, pre-WBS needs); treat it exactly like `Planned` - read-compatible, never written for new features, and normalized to `Idea` for scoring/display purposes. The **Known Gaps for Team Discussion** section is the narrative complement: write a subsection for a flagged feature or for a problem that spans an entire Level 2 sub-area (e.g. `WBS 1.2`) when it doesn't map to one single feature row.
+
 **All features require a WBS code.** When capturing a new idea, assign it to a WBS sub-area immediately. It gets a full WBS code (e.g. 1.3.4) and status `Idea`.
 
-**Scoring uses Value and Effort (1–10 each).** Priority score = Value ÷ Effort. Writing Notes on a Gap/Idea feature is what makes it read as Scoped; adding both scores on top of that is what makes it read as Scored. Clearing the scores (or the Notes) reverts the display automatically - there is no separate status to set or revert.
+**Scoring uses Value and Effort (1–10 each).** Priority score = Value ÷ Effort. Writing Notes on an Idea feature is what makes it read as Scoped; adding both scores on top of that is what makes it read as Scored. Clearing the scores (or the Notes) reverts the display automatically - there is no separate status to set or revert.
 
 **Status transitions actually written to the Status column:**
-- Gap → Idea (captured to WBS area) → In-Progress (work started) → Live (shipped, awaiting UAT) → Released (UAT approved)
+- Idea (captured to WBS area) → In-Progress (work started) → Live (shipped, awaiting UAT) → Released (UAT approved)
 
-Scoped and Scored never appear as literal transitions - they just happen to be how a Gap/Idea row currently reads based on its Notes/Value/Effort.
+Scoped and Scored never appear as literal transitions - they just happen to be how an Idea row currently reads based on its Notes/Value/Effort.
 
 **Review and UAT mirror the bug lifecycle.** A `Live` feature is done but not yet accepted, exactly like a `Resolved` bug; `Released` is the accepted final state, exactly like a `Closed` bug. The feature board shows this directly:
 
@@ -63,7 +64,7 @@ Scoped and Scored never appear as literal transitions - they just happen to be h
 
 Marking a feature Complete sets it to `Live`, so it lands in **Review** and stays there until a human approves it - independent of any changelog or release entry. Every `Live` feature is in Review; approving one advances it to `Released`. Never set `Released` yourself from a code change - that transition is the human UAT step (see below).
 
-**When implementation work finishes, advance the feature to `Live` immediately - do not wait to be asked.** If a code change (bug fix or new functionality) satisfies an `In-Progress` (or `Gap`/`Idea`) feature's described requirement, update PRODUCT.MD in the same pass as the code change:
+**When implementation work finishes, advance the feature to `Live` immediately - do not wait to be asked.** If a code change (bug fix or new functionality) satisfies an `In-Progress` (or `Idea`) feature's described requirement, update PRODUCT.MD in the same pass as the code change:
 - Move its `Status` to `Live`. Never set `Released` from a code change alone - that status requires a human UAT sign-off and is a separate, later, human-triggered step.
 - Rewrite the `Notes` text if it was phrased as a pending requirement (e.g. "X should do Y"). Once shipped, describe the implemented behavior instead (e.g. "X does Y"), so a `Live` row doesn't read like an open TODO.
 - If the feature has no existing WBS row, don't fabricate one - ask which existing feature it belongs to, or whether it needs a new row first.
@@ -96,8 +97,8 @@ Stakeholder and leadership-facing product overview. The canonical registry for a
    ```
    Do NOT use `<iframe>` or `<style>` tags. GitHub strips them and outputs their content as raw text.
 5. **Core Workflows** - Numbered subsection per user persona. Each workflow is a numbered step list showing the end-to-end flow.
-6. **Features** - WBS-coded tables grouped by scope area and sub-area. Columns: `WBS | Feature | Status | Value | Effort | Notes`. See status values below.
-7. **Known Gaps for Team Discussion** - One subsection per gap. Written as a short paragraph explaining the problem, what's missing, and why it matters. Gaps listed here should have a corresponding `Gap` status row in the Features table above.
+6. **Features** - WBS-coded tables grouped by scope area and sub-area. Columns: `WBS | Feature | Status | Value | Effort | Notes`, plus optional trailing `Flag | Owner | UAT Confirmed` columns. See status values and Feature table format below.
+7. **Known Gaps for Team Discussion** - One subsection per gap. Written as a short paragraph explaining the problem, what's missing, and why it matters. `Gap` is a flag/tag, not a stored Status value (see Feature Lifecycle) - a subsection here doesn't require a matching `Gap`-status row, though it commonly pairs with a flagged feature (Flag column set). Reference the relevant WBS code(s) in the heading or body: a specific feature (e.g. `1.2.9`) if one exists, or an entire Level 2 sub-area (e.g. `WBS 1.2`) if the gap doesn't map to a single feature.
 
 **WBS code format:** `{scope}.{area}.{feature}` (e.g. 1.1.3, 2.2.1)
 
@@ -105,22 +106,34 @@ Stakeholder and leadership-facing product overview. The canonical registry for a
 ```markdown
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
-| 1.1.1 | Feature name | Gap | | | Optional notes |
+| 1.1.1 | Feature name | Idea | | | Optional notes |
 | 1.1.2 | Idea with real notes and both scores set | Idea | 8 | 3 | A real description, not just a bare title |
 ```
 The second row above displays as **Scored** in the UI and skill output, even though the Status column literally says `Idea` - see Feature Lifecycle. Value and Effort columns are optional - leave both blank on a bare, undescribed idea.
 
+**Optional trailing columns** extend the same row past Notes, in this fixed order - `Flag`, then `Owner`, then `UAT Confirmed`:
+```markdown
+| WBS | Feature | Status | Value | Effort | Notes | Flag | Owner | UAT Confirmed |
+| --- | ------- | ------ | ----- | ------ | ----- | ---- | ----- | -------------- |
+| 1.3.7 | Vendor Name Mapping | In-Progress | 10 | 7 | A real description |  | Ashley Murray |  |
+```
+You only need as many trailing columns as you're using - a row can stop right after Notes, or after Flag, or after Owner; trailing empty columns are dropped rather than kept as clutter. Add a header only for the columns actually in use across the sub-area's rows (adding the header is optional but keeps the table's column count honest for Markdown renderers - see the Closed-table rendering note under BUGS.MD).
+
+- **Flag** - boolean gap/concern tag on the feature itself, independent of Status (see Feature Lifecycle). Literal on-disk value is `gap` when set (also accepted on read: `flagged`, `true`), blank when clear.
+- **Owner** - free-text name/handle of whoever owns UAT sign-off for this feature. Optional; leave blank if unassigned. Same purpose as BUGS.MD's Owner column.
+- **UAT Confirmed** - `Yes` once a human has verified a `Live` feature in production/staging - the signal that it's ready for a human to advance it to `Released`. Leave blank until then; setting it does not itself change Status. Same semantics as BUGS.MD's UAT Confirmed.
+
 **Strikethrough convention:** Use `~~text~~ 🎆` for completed Product Scope items. Apply at the scope initiative level, not at the individual feature level.
 
 **Status values written to the Status column:**
-- `Gap` - identified need; not yet scoped or prioritized
 - `Idea` - captured to a WBS area; not yet fully defined
 - `In-Progress` - work has started
 - `Live` - shipped and in production; awaiting UAT sign-off
 - `Released` - UAT approved; final state
 - `Planned` - legacy alias for In-Progress (backward compatible; do not use for new features)
+- `Gap` - legacy alias for Idea (backward compatible; do not use for new features - flag the feature instead, via the Flag column above)
 
-**`Scoped` and `Scored` are never written** - they're derived from a Gap/Idea row's Notes/Value/Effort at display time (see Feature Lifecycle above). If you encounter either literal text in an older file's Status column, treat it as `Idea` - the app normalizes it automatically on read.
+**`Scoped` and `Scored` are never written** - they're derived from an Idea row's Notes/Value/Effort at display time (see Feature Lifecycle above). If you encounter either literal text in an older file's Status column, treat it as `Idea` - the app normalizes it automatically on read.
 
 ### ABOUT.MD
 
@@ -238,7 +251,7 @@ The parser reads:
 - `#### N.N Title` → section (Level 2 sub-area)
 - `| WBS | Feature | Status |` table rows → features (Level 3)
 
-Status values in PRODUCT.MD: `Gap`, `Idea`, `In-Progress`, `Live`, `Released`, `Planned` (legacy). Legacy `Scoped`/`Scored` text from older files is normalized to `Idea`. The chart only distinguishes done (`Live`/`Released`, shown struck through) from everything else - it doesn't need the Scoped/Scored derivation, since Gap/Idea/In-Progress/Planned are all "not done" either way.
+Status values in PRODUCT.MD: `Idea`, `In-Progress`, `Live`, `Released`, `Planned` (legacy). Legacy `Gap`/`Scoped`/`Scored` text from older files is normalized to `Idea`. The chart only distinguishes done (`Live`/`Released`, shown struck through) from everything else - it doesn't need the Scoped/Scored derivation, since Idea/In-Progress/Planned are all "not done" either way.
 
 ### Chart design notes
 

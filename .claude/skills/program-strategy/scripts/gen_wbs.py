@@ -86,7 +86,9 @@ def make_lane_label(num, title):
 
 # Scoped/Scored are display-derived (see Feature.stage in app/models.py),
 # never stored - normalize any legacy literal text from older files to Idea.
-_LEGACY_STATUS = {'scoped': 'idea', 'scored': 'idea'}
+# Gap is likewise no longer a stored per-feature status (it's a Known Gaps
+# discussion tag) - normalize legacy literal Gap text to Idea too.
+_LEGACY_STATUS = {'scoped': 'idea', 'scored': 'idea', 'gap': 'idea'}
 
 
 def parse_product_md(path):
