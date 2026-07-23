@@ -16,9 +16,9 @@ BUGS_WITH_DATA = """\
 
 ## Closed
 
-| ID | Title | Resolved In | Date |
-|----|-------|-------------|------|
-| 3 | Old crash | 0.1.0 | 2024-01-15 |
+| ID | Title | Notes | Resolved In |
+|----|-------|-------|-------------|
+| 3 | Old crash | Null pointer on empty cart | 0.1.0 |
 """
 
 
@@ -35,9 +35,9 @@ BUGS_LEGACY_SCHEMA = """\
 
 ## Resolved
 
-| ID | Title | Resolved In | Date |
-|----|-------|-------------|------|
-| 2 | Old crash | 0.1.0 | 2024-01-15 |
+| ID | Title | Notes | Resolved In |
+|----|-------|-------|-------------|
+| 2 | Old crash | Null pointer on empty cart | 0.1.0 |
 """
 
 
@@ -50,6 +50,7 @@ class TestParseText:
         doc = parser._parse_text(BUGS_WITH_DATA)
         assert len(doc.closed) == 1
         assert doc.closed[0].resolved_in == "0.1.0"
+        assert doc.closed[0].notes == "Null pointer on empty cart"
 
     def test_legacy_resolved_section_parsed_as_closed(self):
         doc = parser._parse_text(BUGS_LEGACY_SCHEMA)
@@ -173,8 +174,8 @@ AM Tested: still broken, more detail here. |  |  |  |  |  |
 
 ## Closed
 
-| ID | Title | Resolved In | Date | GH Issue |
-|----|-------|-------------|------|----------|
+| ID | Title | Notes | Resolved In | GH Issue |
+|----|-------|-------|--------------|----------|
 """
         doc = parser._parse_text(corrupted)
         ids = [b.id for b in doc.active]
@@ -198,8 +199,8 @@ AM Tested: still broken. |  |  |  |  |  |
 
 ## Closed
 
-| ID | Title | Resolved In | Date | GH Issue |
-|----|-------|-------------|------|----------|
+| ID | Title | Notes | Resolved In | GH Issue |
+|----|-------|-------|--------------|----------|
 """
         # Before the fix this raised ValueError("Expected 1 match for bug 16, got 0")
         # because the corrupted row spans 3 raw lines and the update regex only
@@ -217,26 +218,29 @@ class TestTransformCloseBug:
         # transform_close_bug removes the bug from the active board entirely
         # and appends it to the Closed table (unlike the active statuses,
         # which keep their row).
-        result = parser.transform_close_bug(BUGS_WITH_DATA, 1, resolved_in="0.2.0", today="2024-06-01")
+        result = parser.transform_close_bug(BUGS_WITH_DATA, 1, resolved_in="0.2.0")
         doc = parser._parse_text(result)
         active_ids = [b.id for b in doc.active]
         assert 1 not in active_ids
         closed_ids = [r.id for r in doc.closed]
         assert 1 in closed_ids
 
-    def test_resolved_in_and_date_set(self):
-        result = parser.transform_close_bug(BUGS_WITH_DATA, 1, resolved_in="0.2.0", today="2024-06-01")
+    def test_resolved_in_set_and_notes_carried_forward(self):
+        # The active row's own Notes (bug 1: "Happens on Safari") should
+        # survive the move to Closed instead of being discarded - by the
+        # time a bug is closed, Notes typically already documents the fix.
+        result = parser.transform_close_bug(BUGS_WITH_DATA, 1, resolved_in="0.2.0")
         doc = parser._parse_text(result)
         r = next(x for x in doc.closed if x.id == 1)
         assert r.resolved_in == "0.2.0"
-        assert r.date == "2024-06-01"
+        assert r.notes == "Happens on Safari"
 
     def test_raises_on_missing_bug(self):
         with pytest.raises(ValueError, match="99"):
             parser.transform_close_bug(BUGS_WITH_DATA, 99)
 
     def test_blank_resolved_in(self):
-        result = parser.transform_close_bug(BUGS_WITH_DATA, 1, today="2024-06-01")
+        result = parser.transform_close_bug(BUGS_WITH_DATA, 1)
         doc = parser._parse_text(result)
         r = next(x for x in doc.closed if x.id == 1)
         assert r.resolved_in == ""
@@ -244,7 +248,7 @@ class TestTransformCloseBug:
     def test_closes_into_legacy_resolved_section(self):
         # A file still using the old "## Resolved" header should get the
         # closed row appended there, not a new "## Closed" section.
-        result = parser.transform_close_bug(BUGS_LEGACY_SCHEMA, 1, resolved_in="0.2.0", today="2024-06-01")
+        result = parser.transform_close_bug(BUGS_LEGACY_SCHEMA, 1, resolved_in="0.2.0")
         doc = parser._parse_text(result)
         assert 1 not in [b.id for b in doc.active]
         assert 1 in [r.id for r in doc.closed]

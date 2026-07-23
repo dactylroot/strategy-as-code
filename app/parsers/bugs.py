@@ -1,6 +1,5 @@
 from __future__ import annotations
 import re
-from datetime import date
 from pathlib import Path
 
 from ..fileio import _atomic_write, _lock_for
@@ -26,8 +25,8 @@ _EMPTY_BUGS = """\
 
 ## Closed
 
-| ID | Title | Resolved In | Date | GH Issue |
-|----|-------|-------------|------|----------|
+| ID | Title | Notes | Resolved In | GH Issue |
+|----|-------|-------|--------------|----------|
 """
 
 
@@ -157,7 +156,7 @@ def _parse_text(text: str):
             except ValueError:
                 continue
             gh_issue = row[4].strip() if len(row) > 4 and row[4].strip() else None
-            closed.append(ClosedBug(id=bug_id, title=row[1], resolved_in=row[2], date=row[3], gh_issue=gh_issue))
+            closed.append(ClosedBug(id=bug_id, title=row[1], notes=row[2], resolved_in=row[3], gh_issue=gh_issue))
 
     return BugDoc(raw_text=text, active=active, closed=closed)
 
@@ -220,12 +219,12 @@ def update_bug(path: Path, bug_id: int, req: BugUpdate) -> BugItem:
         return bug
 
 
-def close_bug(path: Path, bug_id: int, resolved_in: str = "", today: str | None = None) -> None:
+def close_bug(path: Path, bug_id: int, resolved_in: str = "") -> None:
     lock = _lock_for(path)
     with lock:
         _ensure_exists(path)
         text = path.read_text(encoding="utf-8")
-        _atomic_write(path, transform_close_bug(text, bug_id, resolved_in, today))
+        _atomic_write(path, transform_close_bug(text, bug_id, resolved_in))
 
 
 def set_gh_issue(path: Path, bug_id: int, issue_ref: str) -> bool:
@@ -295,7 +294,7 @@ def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, B
                              gh_issue=bug.gh_issue)
 
 
-def transform_close_bug(text: str, bug_id: int, resolved_in: str = "", today: str | None = None) -> str:
+def transform_close_bug(text: str, bug_id: int, resolved_in: str = "") -> str:
     if not text.strip():
         text = _EMPTY_BUGS
     text = _normalize_corrupted_rows(text)
@@ -303,8 +302,12 @@ def transform_close_bug(text: str, bug_id: int, resolved_in: str = "", today: st
     bug = next((b for b in doc.active if b.id == bug_id), None)
     if bug is None:
         raise ValueError(f"Bug {bug_id} not found")
-    date_str = today or str(date.today())
     gh_issue_col = bug.gh_issue or ""
+    # Carry the active row's own notes forward - by the time a bug is closed
+    # its Notes typically already documents the fix (root cause, what
+    # changed), so that context shouldn't be discarded just because the row
+    # moved sections.
+    notes_col = _encode_notes(bug.notes)
     # Closing removes the bug from the active board entirely (it lives only in
     # the Closed section afterwards) - unlike the active statuses, which keep
     # their row. This is what flips the mirrored GitHub Issue to closed.
@@ -312,7 +315,7 @@ def transform_close_bug(text: str, bug_id: int, resolved_in: str = "", today: st
     text, n = re.subn(pattern, "", text, count=1, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
-    closed_row = f"| {bug_id} | {bug.title} | {resolved_in} | {date_str} | {gh_issue_col} |"
+    closed_row = f"| {bug_id} | {bug.title} | {notes_col} | {resolved_in} | {gh_issue_col} |"
     try:
         insert_pos = _find_section_last_row(text, _closed_section_header(text))
         text = text[:insert_pos] + "\n" + closed_row + text[insert_pos:]

@@ -212,12 +212,14 @@ Bug tracking. Two sections: `## Active` (bugs still on the board, including code
 ```markdown
 ## Closed
 
-| ID | Title | Resolved In | Date | GH Issue |
-|----|-------|-------------|------|----------|
-| 3 | Short title | 0.2.0 | 2025-04-10 |  |
+| ID | Title | Notes | Resolved In | GH Issue |
+|----|-------|-------|-------------|----------|
+| 3 | Short title | web/routes.py — root-caused and fixed | 0.2.0 |  |
 ```
 
-When closing a bug, its row is removed from `## Active` and a new row is appended to `## Closed` with the version and date (its GH Issue number, if any, carries over). `Fix In Progress` on an old row still reads as `Resolved` (a retired status folded into the current lifecycle), and a legacy `## Resolved` header is still read as `## Closed` so old files keep working - but rename a legacy `## Resolved` header to `## Closed` the next time you touch that file, rather than perpetuating the old name.
+When closing a bug, its row is removed from `## Active` and a new row is appended to `## Closed` carrying forward the bug's own Notes (its Fix Version becomes Resolved In; its GH Issue number, if any, also carries over). There is no Date column - `close_bug`/`transform_close_bug` take no date argument. `Fix In Progress` on an old row still reads as `Resolved` (a retired status folded into the current lifecycle), and a legacy `## Resolved` header is still read as `## Closed` so old files keep working - but rename a legacy `## Resolved` header to `## Closed` the next time you touch that file, rather than perpetuating the old name.
+
+Avoid literal `|` characters anywhere in a bug's Title or Notes, even markdown-escaped (`\|`) - the parser splits table rows on raw `|` with no regard for escaping, so any literal pipe (escaped or not) shifts every field after it by one column. Use a word instead (e.g. "or") wherever a pipe would otherwise be tempting.
 
 The `WBS` column in Active is optional; leave blank if the bug has no feature association.
 

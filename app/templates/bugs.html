@@ -115,8 +115,8 @@
         <tr>
           <th style="width:2.5rem;">#</th>
           <th>Bug</th>
-          <th style="width:8rem;">Resolved In</th>
-          <th style="width:6rem;">Date</th>
+          <th>Fix</th>
+          <th style="width:6rem;">V</th>
         </tr>
       </thead>
       <tbody>
@@ -124,13 +124,13 @@
         <tr style="cursor:pointer;"
             data-id="{{ r.id }}"
             data-title="{{ r.title }}"
+            data-notes="{{ r.notes or '' }}"
             data-resolved-in="{{ r.resolved_in or '' }}"
-            data-date="{{ r.date or '' }}"
-            onclick="openResolvedPanel(this.dataset.id, this.dataset.title, this.dataset.resolvedIn, this.dataset.date)">
+            onclick="openResolvedPanel(this.dataset.id, this.dataset.title, this.dataset.notes, this.dataset.resolvedIn)">
           <td class="wbs-code">{{ r.id }}</td>
           <td style="font-size:0.875rem;text-decoration:line-through;color:var(--color-text-muted);">{{ r.title }}</td>
+          <td class="text-muted">{{ (r.notes or '').replace('<br>', ' ') | truncate(80, true, '…') }}</td>
           <td class="text-muted">{{ r.resolved_in or '-' }}</td>
-          <td class="text-muted">{{ r.date }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -147,6 +147,7 @@
       <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
         <span id="rpId" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--color-text-muted);"></span>
         <span style="font-size:0.72rem;font-weight:700;background:var(--live-bg);color:var(--live);padding:0.15rem 0.45rem;border-radius:3px;">Closed</span>
+        <span id="rpResolvedIn" style="font-size:0.72rem;font-weight:700;color:var(--color-text-muted);"></span>
       </div>
       <p id="rpTitle" style="font-size:1.05rem;font-weight:700;color:var(--color-text-primary);margin:0;"></p>
     </div>
@@ -154,15 +155,9 @@
             style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);font-size:1.2rem;padding:0.2rem 0.35rem;border-radius:4px;flex-shrink:0;">✕</button>
   </div>
   <div style="padding:1.2rem 1.4rem;">
-    <div style="display:flex;gap:1.5rem;margin-bottom:1rem;">
-      <div>
-        <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-muted);margin:0 0 0.2rem;">Resolved In</p>
-        <p id="rpResolvedIn" style="font-size:0.9rem;color:var(--color-text-primary);margin:0;"></p>
-      </div>
-      <div>
-        <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-muted);margin:0 0 0.2rem;">Date</p>
-        <p id="rpDate" style="font-size:0.9rem;color:var(--color-text-primary);margin:0;"></p>
-      </div>
+    <div style="margin-bottom:1rem;">
+      <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-muted);margin:0 0 0.3rem;">Fix</p>
+      <p id="rpNotes" style="font-size:0.9rem;color:var(--color-text-primary);margin:0;white-space:pre-wrap;line-height:1.6;"></p>
     </div>
     <div id="rpScreenshotSection" style="display:none;">
       <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-muted);margin:0 0 0.4rem;">Screenshot</p>
@@ -326,12 +321,12 @@
 let _bugId = null;
 let _rpId  = null;
 
-function openResolvedPanel(id, title, resolvedIn, date) {
+function openResolvedPanel(id, title, notes, resolvedIn) {
   _rpId = id;
   document.getElementById('rpId').textContent = '#' + id;
   document.getElementById('rpTitle').textContent = title;
-  document.getElementById('rpResolvedIn').textContent = resolvedIn || '-';
-  document.getElementById('rpDate').textContent = date || '-';
+  document.getElementById('rpNotes').textContent = (notes || '-').replace(/<br\s*\/?>/gi, '\n');
+  document.getElementById('rpResolvedIn').textContent = resolvedIn ? ('v' + resolvedIn) : '';
   const section = document.getElementById('rpScreenshotSection');
   const img = document.getElementById('rpScreenshotImg');
   section.style.display = 'none';

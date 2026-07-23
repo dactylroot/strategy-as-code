@@ -9,9 +9,9 @@
 
 ## Closed
 
-| ID | Title | Resolved In | Date |
-|----|-------|-------------|------|
-| 3 | Next Release column showed wrong version | 0.2.0 | 2025-04-10 |
-| 4 | Live features missing from Next Release after sub-area ships | 0.2.0 | 2025-04-10 |
-| 5 | Feature panel closed after score save | 0.3.0 | 2025-05-02 |
-| 6 | Strikethrough shown on Live features in Next Release column | 0.3.0 | 2025-05-02 |
+| ID | Title | Notes | Resolved In | GH Issue |
+|----|-------|-------|--------------|----------|
+| 3 | Next Release column showed wrong version |  | 0.2.0 |  |
+| 4 | Live features missing from Next Release after sub-area ships |  | 0.2.0 |  |
+| 5 | Feature panel closed after score save |  | 0.3.0 |  |
+| 6 | Strikethrough shown on Live features in Next Release column |  | 0.3.0 |  |

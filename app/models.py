@@ -236,8 +236,8 @@ class BugItem(BaseModel):
 class ClosedBug(BaseModel):
     id: int
     title: str
+    notes: str = ""
     resolved_in: str = ""
-    date: str = ""
     gh_issue: str | None = None
 
 
