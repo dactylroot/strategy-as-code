@@ -1,7 +1,7 @@
 import pytest
 from app.models import (
     Feature, FeatureStatus, WBSSubArea, WBSArea, ProductDoc,
-    AboutDoc, ChangelogEntry, ChangelogGroup, RoadmapSection,
+    AboutDoc, ChangelogEntry, ChangelogGroup, RoadmapSection, Initiative,
 )
 
 
@@ -167,16 +167,26 @@ class TestProductDocAggregates:
 class TestAboutDocRoadmapSection:
     def test_finds_section(self):
         doc = AboutDoc(raw_text="", roadmap=[
-            RoadmapSection(name="In Progress", items=["1.1 Auth"]),
-            RoadmapSection(name="Planned", items=["1.2 Dashboard"]),
+            RoadmapSection(name="Backlog", items=["1.2 Dashboard"]),
         ])
-        sec = doc.roadmap_section("In Progress")
+        sec = doc.roadmap_section("Backlog")
         assert sec is not None
-        assert sec.items == ["1.1 Auth"]
+        assert sec.items == ["1.2 Dashboard"]
 
     def test_missing_section_returns_none(self):
         doc = AboutDoc(raw_text="", roadmap=[])
         assert doc.roadmap_section("Backlog") is None
+
+
+class TestInitiative:
+    def test_defaults_to_minor(self):
+        ini = Initiative(name="Reporting Push", items=["1.1.1"])
+        assert ini.kind == "minor"
+
+    def test_major_kind(self):
+        ini = Initiative(name="Search Overhaul", kind="major", items=["1.1.1", "1.1.2"])
+        assert ini.kind == "major"
+        assert ini.items == ["1.1.1", "1.1.2"]
 
     def test_changelog_in_progress_flag(self):
         entry = ChangelogEntry(version="0.2.0", in_progress=True, groups=[

@@ -1,6 +1,9 @@
 import pytest
 from app.parsers import about as parser
-from app.models import RoadmapUpdate, NewRelease, VersionBucket
+from app.models import (
+    RoadmapUpdate, NewRelease, InitiativeUpdate,
+    ProductDoc, WBSArea, WBSSubArea, Feature, FeatureStatus,
+)
 
 
 MINIMAL_ABOUT = """\
@@ -22,19 +25,17 @@ MINIMAL_ABOUT = """\
 
 # Roadmap
 
-## In Progress
-- 1.2 Dashboard
+## Initiatives
 
-## Planned
-- 1.3 Reports
-- 1.4 Admin
+### Reporting Push (Minor)
+- 1.3.1
 
 ## Backlog
 - Dark mode
 - Mobile app
 """
 
-BUCKETED_ABOUT = """\
+INITIATIVES_ABOUT = """\
 # Changelog
 
 ## 0.1.0
@@ -44,19 +45,38 @@ BUCKETED_ABOUT = """\
 
 # Roadmap
 
-## In Progress
-- 1.1 Auth
+## Initiatives
 
-## Planned
-### v0.2.0
-- 1.2 Dashboard
+### Dashboard Revamp (Minor)
+- 1.2.1
 
-### v0.3.0
-- 1.3 Reports
+### Reporting Push (Major)
+- 1.3.1
 
 ## Backlog
 - Future items
 """
+
+NO_INITIATIVES_ABOUT = """\
+# Changelog
+
+## 0.1.0
+
+**1.1 Auth**
+- Initial setup
+
+# Roadmap
+
+## Backlog
+- Future items
+"""
+
+
+def _product(statuses: dict) -> ProductDoc:
+    features = [Feature(wbs=w, name=w, status=s) for w, s in statuses.items()]
+    sa = WBSSubArea(wbs_prefix="1.1", title="Test", features=features)
+    area = WBSArea(number=1, title="Core", sub_areas=[sa])
+    return ProductDoc(raw_text="", wbs_areas=[area])
 
 
 class TestParseText:
@@ -91,60 +111,51 @@ class TestParseText:
     def test_roadmap_sections(self):
         doc = parser._parse_text(MINIMAL_ABOUT)
         names = [s.name for s in doc.roadmap]
-        assert "In Progress" in names
-        assert "Planned" in names
         assert "Backlog" in names
-
-    def test_roadmap_in_progress_items(self):
-        doc = parser._parse_text(MINIMAL_ABOUT)
-        sec = doc.roadmap_section("In Progress")
-        assert sec is not None
-        assert "1.2 Dashboard" in sec.items
-
-    def test_roadmap_planned_items(self):
-        doc = parser._parse_text(MINIMAL_ABOUT)
-        sec = doc.roadmap_section("Planned")
-        assert "1.3 Reports" in sec.items
 
     def test_roadmap_backlog_items(self):
         doc = parser._parse_text(MINIMAL_ABOUT)
         sec = doc.roadmap_section("Backlog")
         assert "Dark mode" in sec.items
 
+    def test_initiatives_parsed(self):
+        doc = parser._parse_text(MINIMAL_ABOUT)
+        assert len(doc.initiatives) == 1
+        assert doc.initiatives[0].name == "Reporting Push"
+        assert doc.initiatives[0].kind == "minor"
+        assert doc.initiatives[0].items == ["1.3.1"]
 
-class TestParsePlannedBuckets:
-    def test_flat_planned(self):
-        body = "- 1.2 Dashboard\n- 1.3 Reports\n"
-        unassigned, buckets = parser._parse_planned_buckets(body)
-        assert unassigned == ["1.2 Dashboard", "1.3 Reports"]
-        assert buckets == []
 
-    def test_bucketed_planned(self):
-        doc = parser._parse_text(BUCKETED_ABOUT)
-        sec = doc.roadmap_section("Planned")
-        assert len(sec.buckets) == 2
-        assert sec.buckets[0].label == "v0.2.0"
-        assert "1.2 Dashboard" in sec.buckets[0].items
-        assert sec.buckets[1].label == "v0.3.0"
+class TestParseInitiatives:
+    def test_single_initiative(self):
+        body = "### Reporting Push (Minor)\n- 1.3.1\n"
+        initiatives = parser._parse_initiatives(body)
+        assert len(initiatives) == 1
+        assert initiatives[0].name == "Reporting Push"
+        assert initiatives[0].kind == "minor"
+        assert initiatives[0].items == ["1.3.1"]
 
-    def test_mixed_buckets_and_unassigned(self):
-        body = "- Unassigned item\n\n### v0.2.0\n- 1.2 Dashboard\n"
-        unassigned, buckets = parser._parse_planned_buckets(body)
-        assert "Unassigned item" in unassigned
-        assert len(buckets) == 1
+    def test_multiple_initiatives(self):
+        doc = parser._parse_text(INITIATIVES_ABOUT)
+        assert len(doc.initiatives) == 2
+        assert doc.initiatives[0].name == "Dashboard Revamp"
+        assert doc.initiatives[1].name == "Reporting Push"
+
+    def test_major_kind_parsed(self):
+        doc = parser._parse_text(INITIATIVES_ABOUT)
+        major = next(i for i in doc.initiatives if i.name == "Reporting Push")
+        assert major.kind == "major"
+        assert major.items == ["1.3.1"]
+
+    def test_defaults_to_minor_without_tag(self):
+        body = "### Untagged Initiative\n- 1.9.9\n"
+        initiatives = parser._parse_initiatives(body)
+        assert initiatives[0].kind == "minor"
 
 
 class TestTransformUpdateRoadmap:
-    def test_updates_in_progress(self):
-        update = RoadmapUpdate(in_progress=["1.3 New"], planned=[], backlog=[])
-        result = parser.transform_update_roadmap(MINIMAL_ABOUT, update)
-        doc = parser._parse_text(result)
-        sec = doc.roadmap_section("In Progress")
-        assert "1.3 New" in sec.items
-        assert "1.2 Dashboard" not in sec.items
-
     def test_updates_backlog(self):
-        update = RoadmapUpdate(in_progress=[], planned=[], backlog=["Item A", "Item B"])
+        update = RoadmapUpdate(backlog=["Item A", "Item B"])
         result = parser.transform_update_roadmap(MINIMAL_ABOUT, update)
         doc = parser._parse_text(result)
         sec = doc.roadmap_section("Backlog")
@@ -152,21 +163,48 @@ class TestTransformUpdateRoadmap:
         assert "Item B" in sec.items
 
     def test_clears_section(self):
-        update = RoadmapUpdate(in_progress=[], planned=[], backlog=[])
+        update = RoadmapUpdate(backlog=[])
         result = parser.transform_update_roadmap(MINIMAL_ABOUT, update)
         doc = parser._parse_text(result)
-        sec = doc.roadmap_section("In Progress")
+        sec = doc.roadmap_section("Backlog")
         assert sec.items == []
 
-    def test_updates_planned_with_buckets(self):
-        bucket = VersionBucket(label="v0.3.0", items=["1.3 Reports"])
-        update = RoadmapUpdate(
-            in_progress=[], planned=[], backlog=[],
-            planned_buckets=[bucket],
-        )
-        result = parser.transform_update_roadmap(MINIMAL_ABOUT, update)
-        assert "### v0.3.0" in result
-        assert "1.3 Reports" in result
+
+class TestTransformUpdateInitiatives:
+    def test_replaces_existing_initiatives(self):
+        update = [InitiativeUpdate(name="New Push", kind="major", wbs=["1.9.1"])]
+        result = parser.transform_update_initiatives(INITIATIVES_ABOUT, update)
+        doc = parser._parse_text(result)
+        assert len(doc.initiatives) == 1
+        assert doc.initiatives[0].name == "New Push"
+        assert doc.initiatives[0].kind == "major"
+        assert "Dashboard Revamp" not in [i.name for i in doc.initiatives]
+
+    def test_writes_major_minor_tags(self):
+        update = [
+            InitiativeUpdate(name="A", kind="major", wbs=["1.1.1"]),
+            InitiativeUpdate(name="B", kind="minor", wbs=["1.1.2"]),
+        ]
+        result = parser.transform_update_initiatives(MINIMAL_ABOUT, update)
+        assert "### A (Major)" in result
+        assert "### B (Minor)" in result
+
+    def test_inserts_section_when_missing(self):
+        update = [InitiativeUpdate(name="First One", kind="minor", wbs=["1.1.1"])]
+        result = parser.transform_update_initiatives(NO_INITIATIVES_ABOUT, update)
+        doc = parser._parse_text(result)
+        assert len(doc.initiatives) == 1
+        assert doc.initiatives[0].name == "First One"
+        # Backlog content must survive the insertion
+        bl = doc.roadmap_section("Backlog")
+        assert bl and "Future items" in bl.items
+
+    def test_preserves_backlog(self):
+        update = [InitiativeUpdate(name="X", kind="minor", wbs=[])]
+        result = parser.transform_update_initiatives(INITIATIVES_ABOUT, update)
+        doc = parser._parse_text(result)
+        bl = doc.roadmap_section("Backlog")
+        assert bl and "Future items" in bl.items
 
 
 class TestTransformAddChangelogEntry:
@@ -176,14 +214,7 @@ class TestTransformAddChangelogEntry:
         doc = parser._parse_text(result)
         assert doc.changelog[0].version == "0.3.0"
 
-    def test_clears_in_progress_section(self):
-        release = NewRelease(version="0.2.0")
-        result = parser.transform_add_changelog_entry(MINIMAL_ABOUT, release, [])
-        doc = parser._parse_text(result)
-        sec = doc.roadmap_section("In Progress")
-        assert sec is None or sec.items == []
-
-    def test_includes_in_progress_labels(self):
+    def test_includes_group_labels(self):
         release = NewRelease(version="0.3.0")
         result = parser.transform_add_changelog_entry(MINIMAL_ABOUT, release, ["1.2 Dashboard"])
         assert "**1.2 Dashboard**" in result
@@ -198,45 +229,39 @@ class TestTransformAddChangelogEntry:
             parser.transform_add_changelog_entry("No changelog here", NewRelease(version="1.0.0"), [])
 
 
-class TestTransformClearVersionBuckets:
-    def test_removes_bucket_lte_released_version(self):
-        result = parser.transform_clear_version_buckets(BUCKETED_ABOUT, "v0.2.0")
+class TestTransformClearCompletedInitiatives:
+    def test_removes_initiative_when_all_features_done(self):
+        product = _product({"1.2.1": FeatureStatus.live, "1.3.1": FeatureStatus.gap})
+        result = parser.transform_clear_completed_initiatives(INITIATIVES_ABOUT, product)
         doc = parser._parse_text(result)
-        sec = doc.roadmap_section("Planned")
-        labels = [b.label for b in sec.buckets] if sec else []
-        assert "v0.2.0" not in labels
-        assert "v0.3.0" in labels
+        names = [i.name for i in doc.initiatives]
+        assert "Dashboard Revamp" not in names
+        assert "Reporting Push" in names
 
-    def test_keeps_bucket_gt_released_version(self):
-        result = parser.transform_clear_version_buckets(BUCKETED_ABOUT, "v0.1.0")
+    def test_keeps_initiative_when_not_all_done(self):
+        product = _product({"1.2.1": FeatureStatus.gap, "1.3.1": FeatureStatus.gap})
+        result = parser.transform_clear_completed_initiatives(INITIATIVES_ABOUT, product)
         doc = parser._parse_text(result)
-        sec = doc.roadmap_section("Planned")
-        labels = [b.label for b in sec.buckets] if sec else []
-        assert "v0.2.0" in labels
-        assert "v0.3.0" in labels
+        names = [i.name for i in doc.initiatives]
+        assert "Dashboard Revamp" in names
+        assert "Reporting Push" in names
 
-    def test_removes_all_lte_buckets(self):
-        result = parser.transform_clear_version_buckets(BUCKETED_ABOUT, "v0.3.0")
+    def test_removes_all_when_all_done(self):
+        product = _product({"1.2.1": FeatureStatus.released, "1.3.1": FeatureStatus.live})
+        result = parser.transform_clear_completed_initiatives(INITIATIVES_ABOUT, product)
         doc = parser._parse_text(result)
-        sec = doc.roadmap_section("Planned")
-        assert not sec or not sec.buckets
+        assert doc.initiatives == []
 
-    def test_no_op_when_no_buckets(self):
-        result = parser.transform_clear_version_buckets(MINIMAL_ABOUT, "v1.0.0")
-        assert result == MINIMAL_ABOUT
+    def test_no_op_when_no_initiatives(self):
+        product = _product({})
+        result = parser.transform_clear_completed_initiatives(MINIMAL_ABOUT.replace(
+            "## Initiatives\n\n### Reporting Push (Minor)\n- 1.3.1\n\n", ""
+        ), product)
+        assert "## Backlog" in result
 
-    def test_preserves_non_semver_buckets(self):
-        about_with_freeform = BUCKETED_ABOUT.replace("### v0.3.0", "### Q2 2026")
-        result = parser.transform_clear_version_buckets(about_with_freeform, "v0.5.0")
+    def test_preserves_backlog(self):
+        product = _product({"1.2.1": FeatureStatus.live, "1.3.1": FeatureStatus.live})
+        result = parser.transform_clear_completed_initiatives(INITIATIVES_ABOUT, product)
         doc = parser._parse_text(result)
-        sec = doc.roadmap_section("Planned")
-        labels = [b.label for b in sec.buckets] if sec else []
-        assert "Q2 2026" in labels
-
-    def test_preserves_in_progress_and_backlog(self):
-        result = parser.transform_clear_version_buckets(BUCKETED_ABOUT, "v0.2.0")
-        doc = parser._parse_text(result)
-        ip = doc.roadmap_section("In Progress")
         bl = doc.roadmap_section("Backlog")
-        assert ip and "1.1 Auth" in ip.items
         assert bl and "Future items" in bl.items

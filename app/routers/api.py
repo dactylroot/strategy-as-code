@@ -13,11 +13,12 @@ from ..config import settings
 from .. import session_store
 from ..models import (
     FeatureUpdate, NewFeature, RoadmapUpdate, RoadmapFeaturesUpdate, NewRelease,
-    BugCreate, BugUpdate, FeatureStatus, VersionBucket,
+    BugCreate, BugUpdate, FeatureStatus,
 )
 from ..parsers import product as product_parser
 from ..parsers import about as about_parser
 from ..parsers import bugs as bugs_parser
+from .. import versioning
 from .. import wbs as wbs_module
 from .. import git_sync
 from ..template_env import templates
@@ -215,131 +216,19 @@ def put_roadmap(body: RoadmapUpdate, request: Request):
 
 @router.put("/roadmap/features")
 def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
-    from ..models import FeatureStatus
     s = _session(request)
-
-    all_planned_wbs = body.planned_wbs + [w for b in body.planned_buckets for w in b.wbs]
-    all_active = set(body.in_progress_wbs) | set(all_planned_wbs)
-
     if s:
-        product_text = s.get_file("PRODUCT.MD")
-        prod = product_parser._parse_text(product_text)
-        wbs_to_feature = {f.wbs: f for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
-        wbs_to_prefix  = {f.wbs: sa.wbs_prefix for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
-
-        for wbs, f in wbs_to_feature.items():
-            if f.status == FeatureStatus.planned and wbs not in all_active:
-                try:
-                    product_text = product_parser.transform_feature_status(product_text, wbs, FeatureStatus.idea)
-                except Exception:
-                    pass
-        _promotable = {FeatureStatus.gap, FeatureStatus.idea}
-        for wbs in all_active:
-            f = wbs_to_feature.get(wbs)
-            if f and f.status in _promotable:
-                try:
-                    product_text = product_parser.transform_feature_status(product_text, wbs, FeatureStatus.planned)
-                except Exception:
-                    pass
-        s.set_file("PRODUCT.MD", product_text)
-
-        prod2 = product_parser._parse_text(product_text)
-        sa_label = {sa.wbs_prefix: f"{sa.wbs_prefix} {sa.title}" for area in prod2.wbs_areas for sa in area.sub_areas}
-        ip_prefixes: set[str] = {wbs_to_prefix[w] for w in body.in_progress_wbs if w in wbs_to_prefix}
-
         about_text = s.get_file("ABOUT.MD")
-        pre_pl = about_parser._parse_text(about_text).roadmap_section("Planned")
-        existing_bucket_for_wbs: dict[str, str] = {
-            w: b.label
-            for b in (pre_pl.buckets if pre_pl else [])
-            for w in b.items
-        }
-
-        labeled_buckets_map: dict[str, list[str]] = {}
-        bucket_wbs_seen: set[str] = set()
-        for bucket in body.planned_buckets:
-            wbs_list = sorted(w for w in bucket.wbs if w not in bucket_wbs_seen)
-            bucket_wbs_seen.update(wbs_list)
-            labeled_buckets_map[bucket.label] = list(wbs_list)
-        for wbs in body.in_progress_wbs:
-            orig = existing_bucket_for_wbs.get(wbs)
-            if orig:
-                bl = labeled_buckets_map.setdefault(orig, [])
-                if wbs not in bl:
-                    bl.append(wbs)
-        labeled_buckets: list[VersionBucket] = [
-            VersionBucket(label=lbl, items=sorted(items))
-            for lbl, items in labeled_buckets_map.items()
-        ]
-        all_bucket_wbs = {w for items in labeled_buckets_map.values() for w in items}
-        bucket_sa_used = {wbs_to_prefix[w] for w in all_bucket_wbs if w in wbs_to_prefix}
-        unassigned_pl: set[str] = {wbs_to_prefix[w] for w in body.planned_wbs if w in wbs_to_prefix} - bucket_sa_used
-
-        about_text = about_parser.transform_update_roadmap(about_text, RoadmapUpdate(
-            in_progress=[sa_label.get(p, p) for p in sorted(ip_prefixes)],
-            planned=[sa_label.get(p, p) for p in sorted(unassigned_pl)],
-            planned_buckets=labeled_buckets,
-            backlog=body.freeform_backlog,
-        ))
+        about_text = about_parser.transform_update_initiatives(about_text, body.initiatives)
+        about_text = about_parser.transform_update_roadmap(about_text, RoadmapUpdate(backlog=body.freeform_backlog))
         s.set_file("ABOUT.MD", about_text)
     else:
-        prod = product_parser.parse(settings.product_md)
-        wbs_to_feature = {f.wbs: f for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
-        wbs_to_prefix  = {f.wbs: sa.wbs_prefix for area in prod.wbs_areas for sa in area.sub_areas for f in sa.features}
-
-        for wbs, f in wbs_to_feature.items():
-            if f.status == FeatureStatus.planned and wbs not in all_active:
-                try:
-                    product_parser.update_feature_status(settings.product_md, wbs, FeatureStatus.idea)
-                except Exception:
-                    pass
-        _promotable = {FeatureStatus.gap, FeatureStatus.idea}
-        for wbs in all_active:
-            f = wbs_to_feature.get(wbs)
-            if f and f.status in _promotable:
-                try:
-                    product_parser.update_feature_status(settings.product_md, wbs, FeatureStatus.planned)
-                except Exception:
-                    pass
-
-        prod2 = product_parser.parse(settings.product_md)
-        sa_label = {sa.wbs_prefix: f"{sa.wbs_prefix} {sa.title}" for area in prod2.wbs_areas for sa in area.sub_areas}
-        ip_prefixes = {wbs_to_prefix[w] for w in body.in_progress_wbs if w in wbs_to_prefix}
-
-        pre_about_text = settings.about_md.read_text(encoding="utf-8")
-        pre_pl = about_parser._parse_text(pre_about_text).roadmap_section("Planned")
-        existing_bucket_for_wbs = {
-            w: b.label
-            for b in (pre_pl.buckets if pre_pl else [])
-            for w in b.items
-        }
-
-        labeled_buckets_map: dict[str, list[str]] = {}
-        bucket_wbs_seen: set[str] = set()
-        for bucket in body.planned_buckets:
-            wbs_list = sorted(w for w in bucket.wbs if w not in bucket_wbs_seen)
-            bucket_wbs_seen.update(wbs_list)
-            labeled_buckets_map[bucket.label] = list(wbs_list)
-        for wbs in body.in_progress_wbs:
-            orig = existing_bucket_for_wbs.get(wbs)
-            if orig:
-                bl = labeled_buckets_map.setdefault(orig, [])
-                if wbs not in bl:
-                    bl.append(wbs)
-        labeled_buckets = [
-            VersionBucket(label=lbl, items=sorted(items))
-            for lbl, items in labeled_buckets_map.items()
-        ]
-        all_bucket_wbs = {w for items in labeled_buckets_map.values() for w in items}
-        bucket_sa_used = {wbs_to_prefix[w] for w in all_bucket_wbs if w in wbs_to_prefix}
-        unassigned_pl = {wbs_to_prefix[w] for w in body.planned_wbs if w in wbs_to_prefix} - bucket_sa_used
-
-        about_parser.update_roadmap(settings.about_md, RoadmapUpdate(
-            in_progress=[sa_label.get(p, p) for p in sorted(ip_prefixes)],
-            planned=[sa_label.get(p, p) for p in sorted(unassigned_pl)],
-            planned_buckets=labeled_buckets,
-            backlog=body.freeform_backlog,
-        ))
+        lock = about_parser._lock_for(settings.about_md)
+        with lock:
+            text = settings.about_md.read_text(encoding="utf-8")
+            text = about_parser.transform_update_initiatives(text, body.initiatives)
+            text = about_parser.transform_update_roadmap(text, RoadmapUpdate(backlog=body.freeform_backlog))
+            about_parser._atomic_write(settings.about_md, text)
     return {"ok": True}
 
 
@@ -347,22 +236,22 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
 def post_release(body: NewRelease, request: Request):
     s = _session(request)
     if s:
+        product = product_parser._parse_text(s.get_file("PRODUCT.MD"))
         about_text = s.get_file("ABOUT.MD")
         about = about_parser._parse_text(about_text)
-        in_progress_section = about.roadmap_section("In Progress")
-        in_progress_items = in_progress_section.items if in_progress_section else []
-        about_text = about_parser.transform_add_changelog_entry(about_text, body, in_progress_items)
-        about_text = about_parser.transform_clear_version_buckets(about_text, body.version)
+        major_done, minor_done = versioning._completed_initiatives(about, product)
+        about_text = about_parser.transform_add_changelog_entry(about_text, body, major_done + minor_done)
+        about_text = about_parser.transform_clear_completed_initiatives(about_text, product)
         s.set_file("ABOUT.MD", about_text)
     else:
         lock = about_parser._lock_for(settings.about_md)
         with lock:
+            product = product_parser.parse(settings.product_md)
             text = settings.about_md.read_text(encoding="utf-8")
             about = about_parser._parse_text(text)
-            in_progress_section = about.roadmap_section("In Progress")
-            in_progress_items = in_progress_section.items if in_progress_section else []
-            text = about_parser.transform_add_changelog_entry(text, body, in_progress_items)
-            text = about_parser.transform_clear_version_buckets(text, body.version)
+            major_done, minor_done = versioning._completed_initiatives(about, product)
+            text = about_parser.transform_add_changelog_entry(text, body, major_done + minor_done)
+            text = about_parser.transform_clear_completed_initiatives(text, product)
             about_parser._atomic_write(settings.about_md, text)
     return {"ok": True, "version": body.version}
 

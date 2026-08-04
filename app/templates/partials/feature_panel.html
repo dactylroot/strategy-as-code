@@ -217,6 +217,8 @@ function openFeaturePanelFromEl(el) {
     flagged: d.flagged === 'true',
     owner: d.owner || '',
     uatConfirmed: d.uatConfirmed === 'true',
+    initiative: d.initiative || null,
+    initiativeKind: d.initiativeKind || null,
   });
 }
 
@@ -238,7 +240,7 @@ function _refreshFdpStage() {
   _fdp.stage = newStage;
   _renderStatusActions(newStage);
   const colors = {'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','Scored':'var(--color-purple-text)','In-Progress':'var(--color-amber)','Live':'var(--live)','Released':'var(--live)','Planned':'var(--planned)'};
-  const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
+  const metaSpan = document.getElementById('fdp-stage-badge');
   if (metaSpan) { metaSpan.textContent = newStage; metaSpan.style.color = colors[newStage] || 'var(--color-text-secondary)'; }
   return true;
 }
@@ -249,7 +251,13 @@ function openFeaturePanel(opts) {
   const colors = {'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','Scored':'var(--color-purple-text)','In-Progress':'var(--color-amber)','Completed':'var(--live)','Planned':'var(--planned)'};
   let meta = '';
   if (opts.wbs)   meta += `<span style="font-family:var(--font-mono);font-size:0.72rem;background:var(--color-bg-card-hover);padding:0.15rem 0.45rem;border-radius:3px;color:var(--color-text-secondary);">${opts.wbs}</span>`;
-  if (opts.stage) meta += `<span style="font-size:0.72rem;font-weight:700;color:${colors[opts.stage]||'var(--color-text-secondary)'};">${opts.stage}</span>`;
+  if (opts.stage) meta += `<span id="fdp-stage-badge" style="font-size:0.72rem;font-weight:700;color:${colors[opts.stage]||'var(--color-text-secondary)'};">${opts.stage}</span>`;
+  if (opts.initiative) {
+    const iniColor = opts.initiativeKind === 'major' ? 'var(--color-purple-text)' : 'var(--planned)';
+    const iniBg    = opts.initiativeKind === 'major' ? 'var(--color-purple-bg)' : 'var(--planned-bg)';
+    const kindLabel = opts.initiativeKind === 'major' ? 'Major' : 'Minor';
+    meta += `<span style="font-size:0.72rem;font-weight:600;color:${iniColor};background:${iniBg};padding:0.15rem 0.5rem;border-radius:3px;">🎯 ${opts.initiative} · ${kindLabel}</span>`;
+  }
   document.getElementById('fdp-meta').innerHTML  = meta;
   document.getElementById('fdp-name').value  = opts.name  || '';
   document.getElementById('fdp-notes').value = (opts.notes || '').replace(/<br\s*\/?>/gi, '\n');
@@ -470,7 +478,7 @@ function advanceFdpStatus(newStatus) {
       const hasValue = vRaw !== '' && !isNaN(parseInt(vRaw));
       const displayStage = _deriveStage(newStatus, hasValue);
       _fdp.stage = displayStage;
-      const metaSpan = document.getElementById('fdp-meta').querySelector('span:last-child');
+      const metaSpan = document.getElementById('fdp-stage-badge');
       if (metaSpan) {
         const colors = {'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','Scored':'var(--color-purple-text)','In-Progress':'var(--color-amber)','Live':'var(--live)','Released':'var(--live)','Planned':'var(--planned)'};
         metaSpan.textContent = displayStage;

@@ -72,15 +72,12 @@
 
 # Roadmap
 
-## In Progress
-- 3.2 Authentication
-
-## Planned
-### v0.5.0
+## Initiatives
+### PRD & OKR Generation (Minor)
 - 2.1.5
 - 2.1.6
 
-### v0.6.0
+### Board & Bug Tracker Polish (Minor)
 - 1.2.6
 - 1.4.4
 

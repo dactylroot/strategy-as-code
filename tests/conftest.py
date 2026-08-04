@@ -82,12 +82,10 @@ ABOUT_MD = """\
 
 # Roadmap
 
-## In Progress
-- 1.2 Dashboard
+## Initiatives
 
-## Planned
-- 1.3 Reporting
-- 1.4 Admin Tools
+### Reporting Push (Minor)
+- 1.2.2
 
 ## Backlog
 - Dark mode

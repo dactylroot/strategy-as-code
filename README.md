@@ -17,7 +17,7 @@ Interface with:
 
 ## Screenshots
 
-**Summary** - feature counts, completion progress, and recent changelog
+**Summary** - feature counts, lifecycle pipeline, flagged gaps, and WBS completion
 
 ![Summary](sample-project/screenshots/dashboard.png)
 
@@ -25,7 +25,7 @@ Interface with:
 
 ![Features](sample-project/screenshots/features.png)
 
-**Roadmap** - Next Release, In Progress, Planned buckets, and Backlog
+**Roadmap** - Backlog, named Major/Minor Initiatives, and Next Release
 
 ![Roadmap](sample-project/screenshots/roadmap.png)
 

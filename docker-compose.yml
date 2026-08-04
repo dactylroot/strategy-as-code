@@ -1,5 +1,5 @@
 services:
-  docs:
+  sample:
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -12,6 +12,21 @@ services:
       - ./scripts:/app/scripts
     environment:
       PROJECT_DIR: /project
-      APP_TITLE: Renewals Manager
       SOURCE_PATH: ${PROJECT_SOURCE_PATH}
+    restart: unless-stopped
+
+  self:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: strategy-self
+    ports:
+      - "8766:8000"
+    volumes:
+      - ./self-project:/project
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+    environment:
+      PROJECT_DIR: /project
+      APP_TITLE: strategy-as-code (self)
     restart: unless-stopped

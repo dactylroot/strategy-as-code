@@ -5,9 +5,9 @@ from pathlib import Path
 from ..fileio import _atomic_write, _lock_for
 from ..models import (
     AboutDoc, ChangelogEntry, ChangelogGroup,
-    RoadmapSection, NewRelease, RoadmapUpdate, VersionBucket,
+    RoadmapSection, NewRelease, RoadmapUpdate, Initiative, InitiativeUpdate,
+    FeatureStatus, ProductDoc,
 )
-from ..versioning import _ver
 
 
 def parse(path: Path) -> AboutDoc:
@@ -69,13 +69,13 @@ def _parse_text(text: str) -> AboutDoc:
 
     # Parse roadmap sections
     roadmap_text = top_sections.get("Roadmap", "")
+    initiatives: list[Initiative] = []
     # Skip any preamble before first ## heading
     for sm in re.finditer(r"\n## ([^\n]+)\n(.*?)(?=\n## |\Z)", "\n" + roadmap_text, re.DOTALL):
         name = sm.group(1).strip()
         body = sm.group(2)
-        if name == "Planned":
-            unassigned, buckets = _parse_planned_buckets(body)
-            roadmap.append(RoadmapSection(name=name, items=unassigned, buckets=buckets))
+        if name == "Initiatives":
+            initiatives = _parse_initiatives(body)
         else:
             items = [
                 m.group(1).strip()
@@ -88,7 +88,7 @@ def _parse_text(text: str) -> AboutDoc:
                     items = [plain]
             roadmap.append(RoadmapSection(name=name, items=items))
 
-    return AboutDoc(raw_text=text, changelog=changelog, roadmap=roadmap)
+    return AboutDoc(raw_text=text, changelog=changelog, roadmap=roadmap, initiatives=initiatives)
 
 
 def update_roadmap(path: Path, update: RoadmapUpdate) -> None:
@@ -107,38 +107,34 @@ def add_changelog_entry(path: Path, release: NewRelease, in_progress_items: list
 
 # ── Pure transform functions (text-in / text-out, no I/O) ────────────────────
 
-def _parse_planned_buckets(body: str) -> tuple[list[str], list[VersionBucket]]:
-    """Parse the Planned section body, which may use ### version-bucket sub-sections."""
-    if not re.search(r"^### ", body, re.MULTILINE):
-        items = [m.group(1).strip() for m in re.finditer(r"^[-*]\s+(.+)", body, re.MULTILINE)]
-        return items, []
+_INITIATIVE_HEADING_RE = re.compile(r"^(.*?)\s*\((Major|Minor)\)\s*$")
 
-    # Split on ### headers; captured group appears between parts
+
+def _parse_initiatives(body: str) -> list[Initiative]:
+    """Parse the Initiatives section body: one ### heading per initiative,
+    tagged (Major) or (Minor), with WBS feature codes as bullet items."""
     parts = re.split(r"^### ([^\n]+)\n", body, flags=re.MULTILINE)
-    # parts[0] = preamble (unassigned), then (label, body) pairs
-    preamble = parts[0]
-    unassigned = [m.group(1).strip() for m in re.finditer(r"^[-*]\s+(.+)", preamble, re.MULTILINE)]
-
-    buckets: list[VersionBucket] = []
+    # parts[0] is any preamble before the first heading - ignored, every
+    # initiative must be named.
+    initiatives: list[Initiative] = []
     for i in range(1, len(parts) - 1, 2):
-        label = parts[i].strip()
-        bucket_body = parts[i + 1]
-        bucket_items = [m.group(1).strip() for m in re.finditer(r"^[-*]\s+(.+)", bucket_body, re.MULTILINE)]
-        buckets.append(VersionBucket(label=label, items=bucket_items))
+        heading = parts[i].strip()
+        m = _INITIATIVE_HEADING_RE.match(heading)
+        name = m.group(1).strip() if m else heading
+        kind = m.group(2).lower() if m else "minor"
+        ini_body = parts[i + 1]
+        items = [mm.group(1).strip() for mm in re.finditer(r"^[-*]\s+(.+)", ini_body, re.MULTILINE)]
+        initiatives.append(Initiative(name=name, kind=kind, items=items))
+    return initiatives
 
-    return unassigned, buckets
 
-
-def _format_planned_with_buckets(unassigned: list[str], buckets: list[VersionBucket]) -> str:
+def _format_initiatives(initiatives: list[Initiative] | list[InitiativeUpdate]) -> str:
     lines: list[str] = []
-    for bucket in buckets:
-        lines.append(f"### {bucket.label}")
-        lines.extend(f"- {item}" for item in bucket.items)
-        lines.append("")
-    if unassigned:
-        if buckets:
-            lines.append("### Unassigned")
-        lines.extend(f"- {item}" for item in unassigned)
+    for ini in initiatives:
+        label = "Major" if ini.kind == "major" else "Minor"
+        items = ini.items if hasattr(ini, "items") else ini.wbs
+        lines.append(f"### {ini.name} ({label})")
+        lines.extend(f"- {item}" for item in items)
         lines.append("")
     return "\n".join(lines)
 
@@ -154,41 +150,45 @@ def _replace_roadmap_section(src: str, section_name: str, new_items: list[str]) 
 
 
 def transform_update_roadmap(text: str, update: RoadmapUpdate) -> str:
-    text = _replace_roadmap_section(text, "In Progress", update.in_progress)
-    if update.planned_buckets or any(update.planned):
-        planned_content = _format_planned_with_buckets(update.planned, update.planned_buckets)
-        pattern = rf"(## {re.escape('Planned')}\n)(.*?)(?=\n## |\n# |\Z)"
-        text, _ = re.subn(pattern, rf"\g<1>{planned_content}", text, flags=re.DOTALL)
-    else:
-        text = _replace_roadmap_section(text, "Planned", update.planned)
-    text = _replace_roadmap_section(text, "Backlog", update.backlog)
-    return text
+    return _replace_roadmap_section(text, "Backlog", update.backlog)
 
 
-def transform_clear_version_buckets(text: str, released_version: str) -> str:
-    """Remove planned version buckets whose version label is <= released_version.
+def transform_update_initiatives(text: str, initiatives: list[InitiativeUpdate]) -> str:
+    content = _format_initiatives(initiatives)
+    pattern = rf"(## {re.escape('Initiatives')}\n)(.*?)(?=\n## |\n# |\Z)"
+    result, n = re.subn(pattern, rf"\g<1>{content}", text, flags=re.DOTALL)
+    if n == 0:
+        # No existing "## Initiatives" heading - insert one before "## Backlog",
+        # or at the end of the Roadmap section if there's no Backlog either.
+        insertion = f"## Initiatives\n\n{content}"
+        pattern = r"(\n## Backlog\n)"
+        result, n = re.subn(pattern, f"\n{insertion}\\1", text, count=1)
+        if n == 0:
+            result = text.rstrip("\n") + f"\n\n{insertion}".rstrip("\n") + "\n"
+    return result
 
-    Buckets whose labels are not parseable as semver are always preserved.
-    """
+
+def transform_clear_completed_initiatives(text: str, product: ProductDoc) -> str:
+    """Remove initiatives whose every listed feature is Live/Released."""
     about = _parse_text(text)
-    planned = about.roadmap_section("Planned")
-    if not planned or not planned.buckets:
+    if not about.initiatives:
         return text
-    rel_tuple = _ver(released_version)
+    all_features = {
+        f.wbs: f
+        for area in product.wbs_areas
+        for sa in area.sub_areas
+        for f in sa.features
+    }
+    done = {FeatureStatus.live, FeatureStatus.released}
     remaining = [
-        b for b in planned.buckets
-        if _ver(b.label) == (0, 0, 0) or _ver(b.label) > rel_tuple
+        ini for ini in about.initiatives
+        if not (ini.items and all(all_features.get(w) is not None and all_features[w].status in done for w in ini.items))
     ]
-    if len(remaining) == len(planned.buckets):
+    if len(remaining) == len(about.initiatives):
         return text
-    ip = about.roadmap_section("In Progress")
-    bl = about.roadmap_section("Backlog")
-    return transform_update_roadmap(text, RoadmapUpdate(
-        in_progress=ip.items if ip else [],
-        planned=planned.items,
-        planned_buckets=remaining,
-        backlog=bl.items if bl else [],
-    ))
+    return transform_update_initiatives(text, [
+        InitiativeUpdate(name=ini.name, kind=ini.kind, wbs=ini.items) for ini in remaining
+    ])
 
 
 def transform_add_changelog_entry(text: str, release: NewRelease, in_progress_items: list[str]) -> str:
@@ -210,7 +210,4 @@ def transform_add_changelog_entry(text: str, release: NewRelease, in_progress_it
 
     insert_at = changelog_pos + len("# Changelog\n") + 1
     new_text = text[:insert_at] + entry_text + "\n" + text[insert_at:]
-
-    pattern = rf"(## {re.escape('In Progress')}\n)(.*?)(?=\n## |\n# |\Z)"
-    new_text, _ = re.subn(pattern, rf"\g<1>", new_text, flags=re.DOTALL)
     return new_text

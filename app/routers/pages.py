@@ -16,11 +16,6 @@ from ..auth import enabled as auth_enabled
 
 router = APIRouter()
 
-
-def _bucket_sort_key(label: str) -> tuple:
-    parts = re.split(r"[.\-_]", label)
-    return tuple((0, int(p)) if p.isdigit() else (1, p) for p in parts)
-
 _EMPTY_BUGS = bugs_parser._EMPTY_BUGS
 
 
@@ -81,7 +76,6 @@ def dashboard(request: Request):
         request, "dashboard",
         product=product,
         about=about,
-        roadmap_in_progress=about.roadmap_section("In Progress"),
         recent_changelog=about.changelog[:3],
         ideas=ideas,
         scored=scored,
@@ -216,23 +210,22 @@ def roadmap_page(request: Request):
     sub_area_map = {sa.wbs_prefix: sa for area in product.wbs_areas for sa in area.sub_areas}
     wbs_to_prefix = {f.wbs: sa.wbs_prefix for area in product.wbs_areas for sa in area.sub_areas for f in sa.features}
 
-    ip_section = about.roadmap_section("In Progress")
-    pl_section = about.roadmap_section("Planned")
-    ip_prefixes = {item.split(" ", 1)[0] for item in (ip_section.items if ip_section else [])}
+    wbs_to_initiative_idx: dict[str, int] = {
+        w: i for i, ini in enumerate(about.initiatives) for w in ini.items
+    }
+    _in_progress_like = (FeatureStatus.in_progress, FeatureStatus.planned)
 
-    # pl_prefixes: sub-area prefixes from flat planned items (sub-area labels) + bucket WBS codes
-    pl_flat_prefixes = {item.split(" ", 1)[0] for item in (pl_section.items if pl_section else [])}
-    pl_bucket_wbs: set[str] = {wbs for bucket in (pl_section.buckets if pl_section else []) for wbs in bucket.items}
-    pl_prefixes = pl_flat_prefixes | {wbs_to_prefix[w] for w in pl_bucket_wbs if w in wbs_to_prefix}
-
-    in_progress_features: list[dict] = []
-    planned_features: list[dict] = []
+    initiative_entries: list[list[dict]] = [[] for _ in about.initiatives]
+    other_features: list[dict] = []
     backlog_features: list[dict] = []
     next_release_features: list[dict] = []
 
-    _active    = (FeatureStatus.in_progress, FeatureStatus.planned)
-    _unstarted = (FeatureStatus.gap, FeatureStatus.idea)
-    _active_prefixes = ip_prefixes | pl_prefixes
+    # Sub-areas touched by any initiative are "actively planned" - Live features
+    # in those sub-areas belong in Next Release even if the feature itself
+    # isn't individually initiative-tagged.
+    initiative_prefixes = {
+        wbs_to_prefix[w] for ini in about.initiatives for w in ini.items if w in wbs_to_prefix
+    }
 
     # Include Live features from any sub-area named in the in-progress changelog entry.
     # These shipped as part of the pending release but are no longer in the roadmap sections.
@@ -242,7 +235,7 @@ def roadmap_page(request: Request):
         for group in ip_changelog.groups:
             prefix = group.label.split(" ", 1)[0]
             ip_changelog_sa_prefixes.add(prefix)
-    _next_release_prefixes = _active_prefixes | ip_changelog_sa_prefixes
+    _next_release_prefixes = initiative_prefixes | ip_changelog_sa_prefixes
 
     for area in product.wbs_areas:
         for sa in area.sub_areas:
@@ -252,53 +245,15 @@ def roadmap_page(request: Request):
                     if sa.wbs_prefix in _next_release_prefixes:
                         next_release_features.append(entry)
                     continue
-                if feat.status == FeatureStatus.in_progress:
-                    in_progress_features.append(entry)
-                elif feat.status == FeatureStatus.planned and sa.wbs_prefix in pl_prefixes:
-                    planned_features.append(entry)
-                elif feat.status in _active and sa.wbs_prefix in ip_prefixes:
-                    in_progress_features.append(entry)
-                elif feat.status == FeatureStatus.planned:
-                    planned_features.append(entry)
-                elif feat.status in _unstarted:
+                if feat.status == FeatureStatus.released:
+                    continue
+                idx = wbs_to_initiative_idx.get(feat.wbs)
+                if idx is not None:
+                    initiative_entries[idx].append(entry)
+                elif feat.status in _in_progress_like:
+                    other_features.append(entry)
+                else:
                     backlog_features.append(entry)
-
-    # Build version bucket display data: each bucket stores individual WBS codes
-    wbs_to_bucket: dict[str, str] = {}
-    if pl_section:
-        for bucket in pl_section.buckets:
-            for wbs in bucket.items:
-                wbs_to_bucket[wbs] = bucket.label
-
-    all_features_by_wbs = {
-        f.wbs: f
-        for area in product.wbs_areas
-        for sa in area.sub_areas
-        for f in sa.features
-    }
-    _live_done  = (FeatureStatus.live, FeatureStatus.released)
-    _in_flight  = (FeatureStatus.in_progress, FeatureStatus.planned)
-
-    version_buckets: list[dict] = []
-    if pl_section:
-        sorted_buckets = sorted(pl_section.buckets, key=lambda b: _bucket_sort_key(b.label))
-        for bucket in sorted_buckets:
-            bucket_wbs = set(bucket.items)
-            live_count      = sum(1 for w in bucket_wbs if (f := all_features_by_wbs.get(w)) and f.status in _live_done)
-            in_flight_count = sum(1 for w in bucket_wbs if (f := all_features_by_wbs.get(w)) and f.status in _in_flight)
-            total           = len(bucket_wbs)
-            version_buckets.append({
-                "label":           bucket.label,
-                "label_id":        bucket.label.lower().replace(" ", "-").replace(".", "-"),
-                "features":        [e for e in planned_features if e["f"].wbs in bucket_wbs],
-                "total":           total,
-                "live_count":      live_count,
-                "in_flight_count": in_flight_count,
-                "all_live":        total > 0 and live_count == total,
-            })
-
-    # Features with 'planned' status but no bucket fall back to backlog (demoted on next save)
-    backlog_features.extend(e for e in planned_features if e["f"].wbs not in wbs_to_bucket)
 
     # Sort backlog: descending priority score, then by stage (Scored > Idea > Gap)
     _stage_rank = {"Scored": 0, "Idea": 1, "Gap": 2}
@@ -307,19 +262,44 @@ def roadmap_page(request: Request):
         key=lambda e: (-(e["f"].priority_score or 0), _stage_rank.get(e["f"].stage, 99)),
     )
 
+    all_features_by_wbs = {
+        f.wbs: f
+        for area in product.wbs_areas
+        for sa in area.sub_areas
+        for f in sa.features
+    }
+    _live_done = (FeatureStatus.live, FeatureStatus.released)
+
+    initiatives_display: list[dict] = []
+    for idx, ini in enumerate(about.initiatives):
+        ini_wbs = set(ini.items)
+        live_count = sum(1 for w in ini_wbs if (f := all_features_by_wbs.get(w)) and f.status in _live_done)
+        total = len(ini_wbs)
+        initiatives_display.append({
+            "name":         ini.name,
+            "kind":         ini.kind,
+            "id":           re.sub(r"[^a-z0-9]+", "-", ini.name.lower()).strip("-"),
+            "features":     initiative_entries[idx],
+            "total":        total,
+            "live_count":   live_count,
+            "all_complete": total > 0 and live_count == total,
+        })
+
+    initiatives_display.sort(key=lambda d: d["name"].lower())
+
     bl_section = about.roadmap_section("Backlog")
     freeform_backlog = bl_section.items if bl_section else []
     next_ver   = next_release_version(about, product)
-    ver_reason = version_rationale(about)
+    ver_reason = version_rationale(about, product)
 
     return templates.TemplateResponse(request, "roadmap.html", _ctx(
         request, "roadmap",
         product=product,
         about=about,
         sub_area_map=sub_area_map,
-        in_progress_features=in_progress_features,
+        other_features=other_features,
         next_release_features=next_release_features,
-        version_buckets=version_buckets,
+        initiatives_display=initiatives_display,
         backlog_sorted=backlog_sorted,
         freeform_backlog=freeform_backlog,
         next_version=next_ver,

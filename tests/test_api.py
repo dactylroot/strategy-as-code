@@ -45,7 +45,42 @@ class TestAboutEndpoint:
     def test_get_about_has_roadmap(self, client):
         data = client.get("/api/about").json()
         section_names = [s["name"] for s in data["roadmap"]]
-        assert "In Progress" in section_names
+        assert "Backlog" in section_names
+
+    def test_get_about_has_initiatives(self, client):
+        data = client.get("/api/about").json()
+        assert len(data["initiatives"]) > 0
+        assert data["initiatives"][0]["name"] == "Reporting Push"
+        assert data["initiatives"][0]["kind"] == "minor"
+
+
+class TestRoadmapFeatures:
+    def test_put_initiatives(self, client):
+        r = client.put("/api/roadmap/features", json={
+            "initiatives": [
+                {"name": "New Push", "kind": "major", "wbs": ["1.2.2"]},
+            ],
+            "freeform_backlog": ["Idea from board"],
+        })
+        assert r.status_code == 200
+        data = client.get("/api/about").json()
+        names = [i["name"] for i in data["initiatives"]]
+        assert "New Push" in names
+        assert "Reporting Push" not in names
+        section_names = [s["name"] for s in data["roadmap"]]
+        assert "Backlog" in section_names
+        backlog = next(s for s in data["roadmap"] if s["name"] == "Backlog")
+        assert "Idea from board" in backlog["items"]
+
+    def test_initiative_membership_does_not_change_feature_status(self, client):
+        client.put("/api/roadmap/features", json={
+            "initiatives": [{"name": "New Push", "kind": "minor", "wbs": ["1.1.3"]}],
+            "freeform_backlog": [],
+        })
+        data = client.get("/api/product").json()
+        all_features = [f for area in data["wbs_areas"] for sa in area["sub_areas"] for f in sa["features"]]
+        f = next(x for x in all_features if x["wbs"] == "1.1.3")
+        assert f["status"] == "Gap"
 
 
 class TestPatchFeature:

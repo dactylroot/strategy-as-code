@@ -3,9 +3,13 @@ Semantic version calculation for strategy-as-code.
 
 Rules (from the program-strategy skill):
   MAJOR.MINOR.RELEASE
-  - MINOR increments once per release that ships one or more WBS Level 2 sub-areas.
-  - RELEASE increments for bug-fix / hotfix releases within a MINOR (no sub-areas shipped).
-  - MAJOR stays at 0 until all product scope is complete, then becomes 1.0.0.
+  - Each Initiative is tagged Major or Minor. When every feature in an
+    Initiative reaches Live/Released, it "completes" and drives the next
+    release's bump - Major initiatives bump MAJOR, Minor initiatives bump
+    MINOR. The highest tier among completed initiatives wins.
+  - RELEASE increments for bug-fix / hotfix releases when no Initiative completes.
+  - MAJOR also becomes 1.0.0 once all product scope is complete, regardless
+    of Initiative tags.
   - Version numbers are assigned at release time; do not pre-assign them.
 """
 
@@ -21,16 +25,35 @@ def _ver(version: str) -> tuple[int, int, int]:
     return (0, 0, 0)
 
 
+def _completed_initiatives(about: AboutDoc, product: ProductDoc | None):
+    """Initiatives whose every listed feature is Live/Released, split by tier."""
+    major, minor = [], []
+    if not product:
+        return major, minor
+    all_features = {
+        f.wbs: f
+        for area in product.wbs_areas
+        for sa in area.sub_areas
+        for f in sa.features
+    }
+    done = {FeatureStatus.live, FeatureStatus.released}
+    for ini in about.initiatives:
+        if not ini.items:
+            continue
+        if all(all_features.get(w) is not None and all_features[w].status in done for w in ini.items):
+            (major if ini.kind == "major" else minor).append(ini.name)
+    return major, minor
+
+
 def next_release_version(about: AboutDoc, product: ProductDoc | None = None) -> str:
     """
     Compute the next version number given the current changelog and product state.
 
     - If there is an in-progress changelog entry, that version IS the pending release.
-    - Otherwise: if In Progress roadmap has sub-areas → MINOR + 1, RELEASE = 0
+    - Otherwise: a completed Major initiative → MAJOR + 1, MINOR/RELEASE = 0
+    - Otherwise: a completed Minor initiative → MINOR + 1, RELEASE = 0
     - Otherwise: MINOR unchanged, RELEASE + 1 (bug-fix release)
     - If all product scope is complete → 1.0.0
-    - Floor: if all features in a planned version bucket are Live/Released,
-      the next release must be at least that version.
     """
     # An in-progress entry means a version has been opened but not yet cut.
     for entry in about.changelog:
@@ -46,47 +69,22 @@ def next_release_version(about: AboutDoc, product: ProductDoc | None = None) -> 
             if (maj, min_, rel) > (latest_major, latest_minor, latest_release):
                 latest_major, latest_minor, latest_release = maj, min_, rel
 
-    ip_section = about.roadmap_section("In Progress")
-    ip_items = ip_section.items if ip_section else []
-    has_sub_areas = any(item.strip() for item in ip_items)
+    major_done, minor_done = _completed_initiatives(about, product)
 
-    if has_sub_areas:
-        next_minor, next_release = latest_minor + 1, 0
+    if major_done:
+        computed = f"{latest_major + 1}.0.0"
+    elif minor_done:
+        computed = f"{latest_major}.{latest_minor + 1}.0"
     else:
-        next_minor, next_release = latest_minor, latest_release + 1
+        computed = f"{latest_major}.{latest_minor}.{latest_release + 1}"
 
     if product and product.overall_completion_pct >= 1.0:
         return "1.0.0"
 
-    computed = f"{latest_major}.{next_minor}.{next_release}"
-
-    # Floor: if every feature in a planned version bucket is Live or Released,
-    # the next release must be at least that planned version.
-    if product:
-        planned = about.roadmap_section("Planned")
-        if planned and planned.buckets:
-            all_features = {
-                f.wbs: f
-                for area in product.wbs_areas
-                for sa in area.sub_areas
-                for f in sa.features
-            }
-            live_or_released = {FeatureStatus.live, FeatureStatus.released}
-            for bucket in planned.buckets:
-                if not bucket.items:
-                    continue
-                if all(
-                    all_features.get(wbs) is not None
-                    and all_features[wbs].status in live_or_released
-                    for wbs in bucket.items
-                ):
-                    if _ver(bucket.label) > _ver(computed):
-                        computed = bucket.label.lstrip("v")
-
     return computed
 
 
-def version_rationale(about: AboutDoc) -> str:
+def version_rationale(about: AboutDoc, product: ProductDoc | None = None) -> str:
     """Human-readable explanation of what's going into the next release."""
     # If there's an open in-progress entry, describe its groups.
     for entry in about.changelog:
@@ -98,12 +96,12 @@ def version_rationale(about: AboutDoc) -> str:
                 return f"Shipping: {labels[0]}"
             return f"Shipping: {', '.join(labels)}"
 
-    # No open release: describe roadmap In Progress.
-    ip_section = about.roadmap_section("In Progress")
-    ip_items   = [i for i in (ip_section.items if ip_section else []) if i.strip()]
-    n = len(ip_items)
-    if n == 0:
-        return "No sub-areas in progress - this would be a bug-fix release."
-    if n == 1:
-        return f"1 sub-area shipping: {ip_items[0]}"
-    return f"{n} sub-areas shipping: {', '.join(ip_items)}"
+    # No open release: describe which initiatives are driving the bump.
+    major_done, minor_done = _completed_initiatives(about, product)
+    if major_done:
+        word = "initiative" if len(major_done) == 1 else "initiatives"
+        return f"Major {word} complete: {', '.join(major_done)}"
+    if minor_done:
+        word = "initiative" if len(minor_done) == 1 else "initiatives"
+        return f"Minor {word} complete: {', '.join(minor_done)}"
+    return "No initiatives complete - this would be a bug-fix release."

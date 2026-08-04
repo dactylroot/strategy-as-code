@@ -139,10 +139,10 @@ You only need as many trailing columns as you're using - a row can stop right af
 User-facing changelog and high-level roadmap. Should be plaintext and friendly for embedding in the application "About" page.
 
 **Versioning scheme: MAJOR.MINOR.RELEASE**
-- MINOR increments each time a WBS Level 2 sub-area ships.
-- RELEASE increments for builds and bug fixes within a minor version (e.g. hotfixes after 0.2.0 ships become 0.2.1, 0.2.2).
-- MAJOR stays at 0 until all product scope is complete, then becomes 1.0.0.
-- Version numbers are assigned at release time in completion order - do not pre-assign version numbers to WBS sub-areas, since milestones may ship out of order.
+- Work is grouped into named **Initiatives**, each tagged Major or Minor. When every feature in an Initiative reaches Live/Released, that Initiative "completes" and drives the next release's version bump - Major initiatives bump MAJOR, Minor initiatives bump MINOR. If multiple Initiatives complete before the next release, the highest tier wins.
+- RELEASE increments for builds and bug fixes when no Initiative completes (e.g. hotfixes after 0.2.0 ships become 0.2.1, 0.2.2).
+- MAJOR also becomes 1.0.0 once all product scope is complete, regardless of Initiative tags.
+- Version numbers are assigned at release time - do not pre-assign them to Initiatives, since they may complete out of order.
 
 **Changelog format:** One entry per version. Group changes under their WBS sub-area label (e.g. `**1.2 Self-Service Mapping UX**`). Bug fixes get their own unlabeled section. Most recent version first.
 
@@ -150,23 +150,23 @@ Always place a blank line between a bold sub-area label and its list items. Pyth
 
 **Roadmap format:**
 ```markdown
-## In Progress
-- {WBS sub-area label}
+## Initiatives
 
-## Planned
-### v0.5.0
-- {WBS sub-area label}
+### Search Overhaul (Major)
+- {feature WBS code}
 
-### v0.6.0
-- {WBS sub-area label}
+### Bug Bash (Minor)
+- {feature WBS code}
 
 ## Backlog
 - Items outside current product scope
 ```
 
-The `## Planned` section uses `### version-label` sub-sections to group planned sub-areas by target release. Unassigned items go under a `### Unassigned` bucket. Omit the `### Unassigned` header if all planned items are bucketed.
-
-Do not pre-assign version numbers in the roadmap. The WBS label is the identifier; the version number is only meaningful once the work ships.
+Each `### ` heading under `## Initiatives` names one initiative and tags it
+`(Major)` or `(Minor)`. Its body lists the WBS codes of member features - not
+sub-area labels; an Initiative groups individual features regardless of
+which sub-area they belong to. An Initiative completes once every listed
+feature reaches Live/Released.
 
 ### README.MD
 

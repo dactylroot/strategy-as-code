@@ -2,28 +2,18 @@
 {% block title %}Roadmap - {{ app_title }}{% endblock %}
 
 {% block extra_styles %}
-/* ── Planning board ── */
-.roadmap-board { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; align-items: start; }
-@media (max-width: 1000px) { .roadmap-board { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 650px)  { .roadmap-board { grid-template-columns: 1fr; } }
-
-.roadmap-col { display: flex; flex-direction: column; }
-.roadmap-col-header {
+/* ── Full-width stacked sections (Backlog / Initiatives / Next Release) ── */
+.rm-section { background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: var(--radius); margin-bottom: 1.5rem; overflow: hidden; }
+.rm-section-header {
+  background: var(--color-bg-card-hover); color: var(--color-text-secondary);
   font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-  padding: 0.55rem 0.75rem; border-radius: var(--radius) var(--radius) 0 0;
-  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.55rem 0.75rem; display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--color-border-subtle); gap: 0.75rem;
 }
-.roadmap-col-count { font-weight: 400; font-size: 0.78rem; opacity: 0.75; }
-.col-planned     .roadmap-col-header { background: var(--planned-bg); color: var(--planned); border: 1px solid var(--planned-border); border-bottom: none; }
-.col-inprogress  .roadmap-col-header { background: var(--color-amber-bg); color: var(--color-amber-text); border: 1px solid var(--color-amber-border); border-bottom: none; }
-.col-nextrelease .roadmap-col-header { background: var(--live-bg); color: var(--live); border: 1px solid var(--live-border); border-bottom: none; }
-
-.col-planned .roadmap-col-body {
-  background: var(--color-bg-card-hover); border: 1px solid var(--planned-border); border-radius: 0 0 var(--radius) var(--radius);
-  padding: 0.4rem; min-height: 4rem; flex: 1;
-}
-.col-inprogress  .roadmap-list { background: var(--color-bg-card-hover); border: 1px solid var(--color-border-subtle); border-radius: 0 0 var(--radius) var(--radius); padding: 0.5rem; min-height: 4rem; flex: 1; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: flex-start; border-top: none; }
-.col-nextrelease .roadmap-list { background: var(--color-bg-card-hover); border: 1px solid var(--color-border-subtle); border-radius: 0 0 var(--radius) var(--radius); padding: 0.5rem; min-height: 4rem; flex: 1; display: block; border-top: none; }
+.rm-section-header-left { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none; }
+.rm-section-count { font-weight: 400; opacity: 0.75; }
+.rm-section-chevron { font-size: 0.65rem; color: var(--color-text-muted); }
+.rm-section-body { padding: 0.75rem; }
 
 /* ── fc card styles (shared with Features page) ── */
 .fc { background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: 6px; margin-bottom: 0.5rem; overflow: hidden; transition: box-shadow 0.1s; }
@@ -52,49 +42,75 @@
 .rm-feat:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
 .rm-feat.sortable-ghost  { opacity: 0.35; }
 .rm-feat.sortable-chosen { box-shadow: 0 3px 10px rgba(0,0,0,0.14); }
-.col-inprogress  .rm-feat { border-left: 3px solid var(--color-amber); flex: 0 0 auto; max-width: 280px; }
 .rm-feat-wbs   { font-family: var(--font-mono); font-size: 0.62rem; color: var(--color-text-muted); }
 .rm-feat-title { font-size: 0.82rem; font-weight: 500; color: var(--color-text-primary); line-height: 1.4; margin: 0.1rem 0; }
 .rm-feat-sa    { font-size: 0.68rem; color: var(--color-text-muted); }
 
-/* ── Version buckets ── */
-.version-bucket { margin-bottom: 0.35rem; }
-.version-bucket-header {
+/* ── Initiative cards ── */
+.initiative-grid { display: flex; flex-direction: column; gap: 0.75rem; }
+.initiative-card {
+  border: 1px solid var(--planned-border); border-radius: 6px; overflow: hidden;
+  background: var(--color-bg-card);
+}
+.initiative-card[data-initiative-kind="major"] { border-color: var(--color-purple-border); }
+.initiative-card-header {
   display: flex; align-items: center; gap: 0.45rem;
-  padding: 0.38rem 0.65rem; cursor: pointer; border-radius: 5px 5px 0 0;
-  background: var(--planned-bg); border: 1px solid var(--planned-border); border-bottom: none;
-  font-size: 0.75rem; font-weight: 600; user-select: none;
+  padding: 0.4rem 0.65rem; cursor: pointer; user-select: none;
+  background: var(--planned-bg); border-bottom: 1px solid var(--planned-border);
+  font-size: 0.75rem; font-weight: 600;
 }
-.version-bucket-header:hover { filter: brightness(0.97); }
-.vb-chevron { font-size: 0.65rem; color: var(--planned-border); flex-shrink: 0; }
-.vb-label { color: var(--planned); font-weight: 700; letter-spacing: -0.01em; }
-.vb-count { margin-left: auto; font-weight: 400; font-size: 0.7rem; color: var(--planned-border); }
-.vb-remove { margin-left: 0.25rem; background: none; border: none; cursor: pointer; color: var(--planned-border); font-size: 0.8rem; padding: 0; line-height: 1; border-radius: 3px; }
-.vb-remove:hover { color: var(--gap); }
-.version-bucket-list {
-  background: var(--color-bg-card); border: 1px solid var(--planned-border); border-top: none;
-  border-radius: 0 0 5px 5px; padding: 0.35rem; min-height: 2.5rem;
+.initiative-card[data-initiative-kind="major"] .initiative-card-header { background: var(--color-purple-bg); border-bottom-color: var(--color-purple-border); }
+.initiative-card-header:hover { filter: brightness(0.97); }
+.ini-chevron { font-size: 0.65rem; color: var(--planned-border); flex-shrink: 0; }
+.initiative-card[data-initiative-kind="major"] .ini-chevron { color: var(--color-purple-border); }
+.ini-kind-badge { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.05rem 0.35rem; border-radius: 3px; flex-shrink: 0; cursor: pointer; border: none; }
+.ini-kind-badge:hover { filter: brightness(1.1); }
+.ini-kind-minor { background: var(--planned); color: #fff; }
+.ini-kind-major { background: var(--color-purple); color: #fff; }
+.ini-name {
+  color: var(--planned); font-weight: 700; letter-spacing: -0.01em; flex: 1; min-width: 0;
+  background: transparent; border: none; border-bottom: 1px solid transparent; outline: none;
+  font-family: inherit; font-size: inherit; padding: 0; cursor: text; transition: border-color 0.15s;
 }
-.version-bucket-list .rm-feat { border-left: 3px solid var(--planned); }
-.vb-empty { color: var(--color-text-muted); font-size: 0.72rem; padding: 0.35rem 0.25rem; margin: 0; text-align: center; }
+.ini-name:hover, .ini-name:focus { border-bottom-color: currentColor; }
+.other-card .ini-name { cursor: default; }
+.other-card .ini-name:hover { border-bottom-color: transparent; }
+.initiative-card[data-initiative-kind="major"] .ini-name { color: var(--color-purple-text); }
+.ini-count { font-weight: 400; font-size: 0.7rem; color: var(--planned-border); flex-shrink: 0; }
+.initiative-card[data-initiative-kind="major"] .ini-count { color: var(--color-purple-border); }
+.ini-remove { flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--planned-border); font-size: 0.8rem; padding: 0; line-height: 1; border-radius: 3px; }
+.ini-remove:hover { color: var(--gap); }
+.ini-complete-banner { background: var(--live-bg); border-bottom: 1px solid var(--live-border); padding: 0.35rem 0.65rem; font-size: 0.7rem; color: var(--live); font-weight: 600; }
+.initiative-list { padding: 0.5rem; min-height: 2.5rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: flex-start; }
+.initiative-list .rm-feat { flex: 0 0 auto; width: 260px; margin-bottom: 0; }
+.initiative-card[data-initiative-kind="minor"] .rm-feat { border-left: 3px solid var(--planned); }
+.initiative-card[data-initiative-kind="major"] .rm-feat { border-left: 3px solid var(--color-purple); }
+.other-card { border-color: var(--color-amber-border); }
+.other-card .initiative-card-header { background: var(--color-amber-bg); border-bottom-color: var(--color-amber-border); cursor: default; }
+.other-card .ini-name { color: var(--color-amber-text); }
+.other-card .ini-count { color: var(--color-amber-border); }
+.other-list .rm-feat { border-left: 3px solid var(--color-amber); }
+.ini-empty { color: var(--color-text-muted); font-size: 0.72rem; padding: 0.35rem 0.25rem; margin: 0; width: 100%; text-align: center; }
 
-/* ── Add version ── */
-.add-version-row {
-  display: flex; gap: 0.35rem; padding: 0.35rem 0.4rem; margin-top: 0.25rem;
-  background: var(--color-bg-card-hover); border: 1px dashed var(--planned-border); border-radius: 5px;
+/* ── Add initiative ── */
+.add-initiative-row {
+  display: flex; gap: 0.4rem; align-items: center; padding: 0.5rem 0.6rem; margin-bottom: 0.6rem;
+  background: var(--color-bg-card-hover); border: 1px dashed var(--planned-border); border-radius: 5px; flex-wrap: wrap;
 }
-.add-version-input {
-  flex: 1; padding: 0.25rem 0.5rem; border: 1px solid var(--planned-border); border-radius: 4px;
+.add-initiative-input {
+  flex: 1; min-width: 10rem; padding: 0.25rem 0.5rem; border: 1px solid var(--planned-border); border-radius: 4px;
   font-size: 0.8rem; font-family: inherit; outline: none;
 }
-.add-version-input:focus { border-color: var(--planned); }
+.add-initiative-input:focus { border-color: var(--planned); }
+.ini-kind-toggle { display: flex; border: 1px solid var(--color-border-subtle); border-radius: 4px; overflow: hidden; }
+.ini-kind-toggle label { font-size: 0.72rem; font-weight: 600; padding: 0.25rem 0.6rem; cursor: pointer; background: var(--color-bg-card); color: var(--color-text-secondary); }
+.ini-kind-toggle input { display: none; }
+.ini-kind-toggle input:checked + span { color: #fff; }
+.ini-kind-toggle label:has(input:checked) { background: var(--planned); }
+.ini-kind-toggle label:has(input[value="major"]:checked) { background: var(--color-purple); }
 
-/* ── Backlog sub-area groups ── */
-.backlog-section { background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: var(--radius); margin-bottom: 1.5rem; overflow: hidden; }
-.backlog-section-header { background: var(--color-bg-card-hover); color: var(--color-text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border-subtle); }
-.backlog-pool { padding: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.3rem; min-height: 2.5rem; }
-
-/* ── Backlog chips ── */
+/* ── Backlog / freeform chips ── */
+.backlog-pool { display: flex; flex-wrap: wrap; gap: 0.3rem; min-height: 2.5rem; }
 .rm-feat-chip {
   background: var(--color-bg-card-hover); border: 1px solid var(--color-border-subtle); border-radius: 5px;
   padding: 0.35rem 0.65rem; cursor: grab; font-size: 0.8rem; color: var(--color-text-primary);
@@ -115,8 +131,8 @@
 {% endblock %}
 
 {% block content %}
-{# ── Macro: feature card ── #}
-{% macro feat_card(entry) %}
+{# ── Macro: feature card. Pass `initiative` (dict with name/kind) when rendered inside an initiative card. ── #}
+{% macro feat_card(entry, initiative=None) %}
 <div class="rm-feat"
      data-type="feature"
      data-wbs="{{ entry.f.wbs }}"
@@ -129,6 +145,7 @@
      data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
      {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
      {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
+     {% if initiative %}data-initiative="{{ initiative.name }}" data-initiative-kind="{{ initiative.kind }}"{% endif %}
      onclick="openFeaturePanelFromEl(this)"
      title="Click to open · drag to move">
   <div class="rm-feat-wbs">{{ entry.f.wbs }}</div>
@@ -140,83 +157,32 @@
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
   <div>
     <h1>Roadmap</h1>
-    <p class="subtitle">Drag features between columns to plan. Use version buckets in Planned to target specific releases.</p>
+    <p class="subtitle">Drag features into Initiatives to plan. Completing an Initiative's features drives the next release's version bump.</p>
   </div>
 </div>
 
-<!-- ── 3-column board: Planned (with version buckets) | In Progress | Next Release ── -->
-<div class="roadmap-board">
-
-  <!-- Planned (version buckets) -->
-  <div class="roadmap-col col-planned">
-    <div class="roadmap-col-header">
-      <div>Planned <span class="roadmap-col-count">{{ version_buckets | map(attribute='features') | map('length') | sum }}</span></div>
-      <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:var(--planned-bg);color:var(--planned);border:1px solid var(--planned-border);"
-              onclick="showAddVersion()" title="Add milestone">+ version</button>
+<!-- ── Backlog: sorted by priority score, collapsible ── -->
+<div class="rm-section" id="backlog-section">
+  <div class="rm-section-header">
+    <div class="rm-section-header-left" onclick="toggleSection('backlog')">
+      <span class="rm-section-chevron" id="backlog-chevron">▾</span>
+      Backlog
+      <span class="rm-section-count">{{ backlog_sorted | length + (freeform_backlog | length) }} items</span>
     </div>
-    <div class="col-planned col-planned-body roadmap-col-body">
-      <div id="add-version-form" style="display:none;margin-bottom:0.35rem;">
-        <div class="add-version-row">
-          <input id="new-version-input" class="add-version-input" type="text"
-                 placeholder="e.g. v0.3"
-                 onkeydown="handleVersionKey(event)">
-          <button class="btn btn-sm btn-primary" onclick="addVersionBucket()">Add</button>
-          <button class="btn btn-sm btn-ghost" onclick="hideAddVersion()">✕</button>
-        </div>
-      </div>
-
-      {% for bucket in version_buckets %}
-      <div class="version-bucket" data-bucket-label="{{ bucket.label }}">
-        <div class="version-bucket-header" onclick="toggleBucket(this)">
-          <span class="vb-chevron">▾</span>
-          <span class="vb-label">{{ bucket.label }}</span>
-          {% if bucket.total > 0 %}
-          <span class="vb-count" title="{{ bucket.live_count }} live, {{ bucket.in_flight_count }} in progress, {{ bucket.total - bucket.live_count - bucket.in_flight_count }} remaining">
-            {{ bucket.live_count }}/{{ bucket.total }}
-            {% if bucket.all_live %}<span style="color:var(--live);">✓</span>{% endif %}
-          </span>
-          {% else %}
-          <span class="vb-count">0</span>
-          {% endif %}
-          <button class="vb-remove" onclick="removeBucket(event, this)" title="Remove">✕</button>
-        </div>
-        {% if bucket.all_live %}
-        <div style="background:var(--live-bg);border:1px solid var(--live-border);border-top:none;padding:0.35rem 0.65rem;font-size:0.7rem;color:var(--live);font-weight:600;">
-          All features live - ready to release
-        </div>
-        {% endif %}
-        <div class="version-bucket-list">
-          {% for entry in bucket.features %}{{ feat_card(entry) }}{% endfor %}
-          {% if not bucket.features %}
-          <p class="vb-empty">
-            {% if bucket.in_flight_count or bucket.live_count %}
-              {{ bucket.in_flight_count }} in progress · {{ bucket.live_count }} live
-            {% else %}
-              Drop features here
-            {% endif %}
-          </p>
-          {% endif %}
-        </div>
-      </div>
-      {% endfor %}
-
-    </div>
+    <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:var(--color-purple-bg);color:var(--color-purple-text);border:1px solid var(--color-purple-border);"
+            onclick="document.getElementById('captureModal').showModal()">+ Capture Idea</button>
   </div>
-
-  <!-- In Progress -->
-  <div class="roadmap-col col-inprogress">
-    <div class="roadmap-col-header">
-      In Progress
-      <span class="roadmap-col-count">{{ in_progress_features | length }}</span>
-    </div>
-    <div class="roadmap-list" id="col-in-progress">
-      {% for entry in in_progress_features %}
-      <div class="rm-feat"
+  <div class="rm-section-body" id="backlog-body">
+    {% if backlog_sorted or freeform_backlog %}
+    <div class="backlog-pool" id="col-backlog-wbs" data-pool="backlog">
+      {% for entry in backlog_sorted %}
+      <div class="rm-feat-chip"
            data-type="feature" data-wbs="{{ entry.f.wbs }}"
            data-source="product"
            data-name="{{ entry.f.name }}"
            data-notes="{{ entry.f.notes }}"
-           data-stage="{{ entry.f.status.value }}"
+           data-stage="{{ entry.f.stage }}"
+           data-raw-status="{{ entry.f.status.value }}"
            data-flagged="{{ entry.f.flagged | lower }}"
            data-owner="{{ entry.f.owner or '' }}"
            data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
@@ -224,129 +190,152 @@
            {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
            onclick="openFeaturePanelFromEl(this)"
            title="Click to open · drag to move">
-        <div class="rm-feat-wbs">{{ entry.f.wbs }}</div>
-        <div class="rm-feat-title">{{ entry.f.name }}</div>
-        <div class="rm-feat-sa">{{ entry.sa_prefix }} {{ entry.sa_title | truncate(30, true, '…') }}</div>
+        <span class="rm-feat-wbs">{{ entry.f.wbs }}</span>
+        {{ entry.f.name | truncate(40, true, '…') }}
       </div>
       {% endfor %}
-      {% if not in_progress_features %}
-      <p class="text-muted" style="font-size:0.75rem;align-self:center;">Drag features here to start work.</p>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Next Release (read-only) -->
-  <div class="roadmap-col col-nextrelease">
-    <div class="roadmap-col-header">
-      <div>
-        Next Release
-        <span class="roadmap-col-count" style="margin-left:0.35rem;">{{ next_release_features | length }}</span>
+      {% for item in freeform_backlog %}
+      <div class="rm-feat-chip rm-freeform-chip" data-type="freeform" data-item="{{ item }}">
+        {{ item | truncate(50, true, '…') }}
       </div>
-      {% if next_version %}
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.1rem;">
-        <span style="font-size:0.62rem;color:var(--live);opacity:0.8;font-weight:400;">version</span>
-        <span style="font-size:0.78rem;font-weight:800;color:var(--live);letter-spacing:-0.02em;">v{{ next_version }}</span>
-      </div>
-      {% endif %}
+      {% endfor %}
     </div>
-    {% if version_rationale %}
-    <div style="padding:0.35rem 0.75rem;font-size:0.7rem;color:var(--live);background:var(--live-bg);border:1px solid var(--live-border);border-top:none;border-bottom:none;">
-      {{ version_rationale }}
-    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:0.78rem;">Backlog is clear.</p>
     {% endif %}
-    <div class="roadmap-list">
-      {% for sa in sub_areas %}
-        {% set sa_entries = [] %}
-        {% for entry in next_release_features %}
-          {% if entry.sa_prefix == sa.wbs_prefix %}
-            {% if sa_entries.append(entry) %}{% endif %}
-          {% endif %}
-        {% endfor %}
-        {% if sa_entries %}
-        <details class="fc-group">
-          <summary>
-            <div class="fc">
-              <div class="fc-head">
-                <div class="fc-meta">
-                  <span class="fc-wbs" style="background:var(--live-bg);color:var(--live);">{{ sa.wbs_prefix }}</span>
-                  <span class="fc-stage-badge" style="color:var(--live);">{{ sa_entries|length }} live</span>
-                </div>
-                <div class="fc-title">{{ sa.title }}</div>
-              </div>
-            </div>
-          </summary>
-          {% for entry in sa_entries %}
-          <div class="fc fc-live-item"
-               data-wbs="{{ entry.f.wbs }}"
-               data-name="{{ entry.f.name }}"
-               data-notes="{{ entry.f.notes }}"
-               data-stage="{{ entry.f.status.value }}"
-               data-flagged="{{ entry.f.flagged | lower }}"
-               data-owner="{{ entry.f.owner or '' }}"
-               data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
-               {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
-               {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
-               onclick="openFeaturePanelFromEl(this)">
-            <div class="fc-head" style="padding:0.4rem 0.65rem;">
-              <div class="fc-meta">
-                <span class="fc-wbs" style="background:var(--live-bg);color:var(--live);">{{ entry.f.wbs }}</span>
-              </div>
-              <div class="fc-title" style="color:var(--color-text-muted);font-size:0.8rem;">{{ entry.f.name }}</div>
-            </div>
-          </div>
-          {% endfor %}
-        </details>
-        {% endif %}
-      {% endfor %}
-      {% if not next_release_features %}
-      <p class="text-muted" style="font-size:0.75rem;">No completed features yet.</p>
-      {% endif %}
-    </div>
   </div>
-
 </div>
 
-<!-- ── Backlog: sorted by priority score ── -->
-<div class="backlog-section">
-  <div class="backlog-section-header">
-    Backlog
-    <div style="display:flex;align-items:center;gap:0.75rem;">
-      <span style="font-weight:400;">{{ backlog_sorted | length + (freeform_backlog | length) }} items</span>
-      <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:var(--color-purple-bg);color:var(--color-purple-text);border:1px solid var(--color-purple-border);"
-              onclick="document.getElementById('captureModal').showModal()">+ Capture Idea</button>
-    </div>
+<!-- ── Initiatives: named feature collections, tagged Major/Minor ── -->
+<div class="rm-section" id="initiatives-section">
+  <div class="rm-section-header">
+    <div>Initiatives <span class="rm-section-count">{{ initiatives_display | map(attribute='features') | map('length') | sum }}</span></div>
+    <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:var(--planned-bg);color:var(--planned);border:1px solid var(--planned-border);"
+            onclick="showAddInitiative()" title="Add initiative">+ Initiative</button>
   </div>
+  <div class="rm-section-body">
+    <div id="add-initiative-form" style="display:none;">
+      <div class="add-initiative-row">
+        <input id="new-initiative-input" class="add-initiative-input" type="text"
+               placeholder="Initiative name, e.g. Search Overhaul"
+               onkeydown="handleInitiativeKey(event)">
+        <div class="ini-kind-toggle">
+          <label><input type="radio" name="new-initiative-kind" value="minor" checked><span>Minor</span></label>
+          <label><input type="radio" name="new-initiative-kind" value="major"><span>Major</span></label>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="addInitiative()">Add</button>
+        <button class="btn btn-sm btn-ghost" onclick="hideAddInitiative()">✕</button>
+      </div>
+    </div>
 
-  {% if backlog_sorted or freeform_backlog %}
-  <div class="backlog-pool" id="col-backlog-wbs" data-pool="backlog">
-    {% for entry in backlog_sorted %}
-    <div class="rm-feat-chip"
-         data-type="feature" data-wbs="{{ entry.f.wbs }}"
-         data-source="product"
-         data-name="{{ entry.f.name }}"
-         data-notes="{{ entry.f.notes }}"
-         data-stage="{{ entry.f.stage }}"
-         data-raw-status="{{ entry.f.status.value }}"
-         data-flagged="{{ entry.f.flagged | lower }}"
-         data-owner="{{ entry.f.owner or '' }}"
-         data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
-         {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
-         {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
-         onclick="openFeaturePanelFromEl(this)"
-         title="Click to open · drag to move">
-      <span class="rm-feat-wbs">{{ entry.f.wbs }}</span>
-      {{ entry.f.name | truncate(40, true, '…') }}
+    <div class="initiative-grid" id="initiative-grid">
+      {% for ini in initiatives_display %}
+      <div class="initiative-card" data-initiative-name="{{ ini.name }}" data-initiative-kind="{{ ini.kind }}">
+        <div class="initiative-card-header" onclick="toggleInitiative(this)">
+          <span class="ini-chevron">▾</span>
+          <button type="button" class="ini-kind-badge ini-kind-{{ ini.kind }}" onclick="event.stopPropagation();toggleInitiativeKind(this)" title="Click to toggle Major/Minor">{{ 'Major' if ini.kind == 'major' else 'Minor' }}</button>
+          <input type="text" class="ini-name" value="{{ ini.name }}" onclick="event.stopPropagation()" onchange="renameInitiative(this)" onkeydown="if(event.key==='Enter')this.blur();">
+          {% if ini.total > 0 %}
+          <span class="ini-count" title="{{ ini.live_count }} live/released, {{ ini.total - ini.live_count }} remaining">
+            {{ ini.live_count }}/{{ ini.total }}{% if ini.all_complete %} ✓{% endif %}
+          </span>
+          {% else %}
+          <span class="ini-count">0</span>
+          {% endif %}
+          <button class="ini-remove" onclick="removeInitiative(event, this)" title="Remove">✕</button>
+        </div>
+        {% if ini.all_complete %}
+        <div class="ini-complete-banner">All features complete - ready to release ({{ 'Major' if ini.kind == 'major' else 'Minor' }} bump)</div>
+        {% endif %}
+        <div class="initiative-list" data-pool="initiative">
+          {% for entry in ini.features %}{{ feat_card(entry, ini) }}{% endfor %}
+          {% if not ini.features %}<p class="ini-empty">Drop features here</p>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+
+      <!-- Other: in-progress features with no initiative assigned -->
+      <div class="initiative-card other-card">
+        <div class="initiative-card-header">
+          <span class="ini-name">Other</span>
+          <span class="ini-count">{{ other_features | length }}</span>
+        </div>
+        <div class="initiative-list other-list" data-pool="other">
+          {% for entry in other_features %}{{ feat_card(entry) }}{% endfor %}
+          {% if not other_features %}<p class="ini-empty">No unassigned in-progress features.</p>{% endif %}
+        </div>
+      </div>
     </div>
-    {% endfor %}
-    {% for item in freeform_backlog %}
-    <div class="rm-feat-chip rm-freeform-chip" data-type="freeform" data-item="{{ item }}">
-      {{ item | truncate(50, true, '…') }}
-    </div>
-    {% endfor %}
   </div>
-  {% else %}
-  <p class="text-muted" style="padding:0.75rem 1rem;font-size:0.78rem;">Backlog is clear.</p>
+</div>
+
+<!-- ── Next Release (read-only) ── -->
+<div class="rm-section" id="next-release-section">
+  <div class="rm-section-header">
+    <div>
+      Next Release
+      <span class="rm-section-count">{{ next_release_features | length }}</span>
+    </div>
+    {% if next_version %}
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.1rem;">
+      <span style="font-size:0.62rem;color:var(--live);opacity:0.8;font-weight:400;">version</span>
+      <span style="font-size:0.78rem;font-weight:800;color:var(--live);letter-spacing:-0.02em;">v{{ next_version }}</span>
+    </div>
+    {% endif %}
+  </div>
+  {% if version_rationale %}
+  <div style="padding:0.35rem 0.75rem;font-size:0.7rem;color:var(--live);background:var(--live-bg);border-bottom:1px solid var(--live-border);">
+    {{ version_rationale }}
+  </div>
   {% endif %}
+  <div class="rm-section-body">
+    {% for sa in sub_areas %}
+      {% set sa_entries = [] %}
+      {% for entry in next_release_features %}
+        {% if entry.sa_prefix == sa.wbs_prefix %}
+          {% if sa_entries.append(entry) %}{% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if sa_entries %}
+      <details class="fc-group">
+        <summary>
+          <div class="fc">
+            <div class="fc-head">
+              <div class="fc-meta">
+                <span class="fc-wbs" style="background:var(--live-bg);color:var(--live);">{{ sa.wbs_prefix }}</span>
+                <span class="fc-stage-badge" style="color:var(--live);">{{ sa_entries|length }} live</span>
+              </div>
+              <div class="fc-title">{{ sa.title }}</div>
+            </div>
+          </div>
+        </summary>
+        {% for entry in sa_entries %}
+        <div class="fc fc-live-item"
+             data-wbs="{{ entry.f.wbs }}"
+             data-name="{{ entry.f.name }}"
+             data-notes="{{ entry.f.notes }}"
+             data-stage="{{ entry.f.status.value }}"
+             data-flagged="{{ entry.f.flagged | lower }}"
+             data-owner="{{ entry.f.owner or '' }}"
+             data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
+             {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
+             {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
+             onclick="openFeaturePanelFromEl(this)">
+          <div class="fc-head" style="padding:0.4rem 0.65rem;">
+            <div class="fc-meta">
+              <span class="fc-wbs" style="background:var(--live-bg);color:var(--live);">{{ entry.f.wbs }}</span>
+            </div>
+            <div class="fc-title" style="color:var(--color-text-muted);font-size:0.8rem;">{{ entry.f.name }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </details>
+      {% endif %}
+    {% endfor %}
+    {% if not next_release_features %}
+    <p class="text-muted" style="font-size:0.75rem;">No completed features yet.</p>
+    {% endif %}
+  </div>
 </div>
 
 <!-- ── Release History ── -->
@@ -405,27 +394,18 @@ const DRAG_GROUP = 'roadmap-features';
 function saveRoadmap(evt, forceReload) {
   const crossList = forceReload || (evt && evt.from !== evt.to);
 
-  // In Progress
-  const ipEl = document.getElementById('col-in-progress');
-  const ip_wbs    = ipEl ? [...ipEl.querySelectorAll('[data-type="feature"]')].map(c => c.dataset.wbs) : [];
-  const ip_free   = ipEl ? [...ipEl.querySelectorAll('[data-type="freeform"]')].map(c => c.dataset.item) : [];
-
-  // Version buckets (named + unassigned)
-  const planned_buckets = [];
-  const planned_wbs = [];
-  document.querySelectorAll('[data-bucket-label]').forEach(bucket => {
-    const label = bucket.dataset.bucketLabel;
-    const list = bucket.querySelector('.version-bucket-list');
+  // Initiatives (name + kind read off the card, WBS codes read off the list)
+  const initiatives = [];
+  document.querySelectorAll('.initiative-card[data-initiative-name]').forEach(card => {
+    const list = card.querySelector('.initiative-list');
     if (!list) return;
     const wbs = [...list.querySelectorAll('[data-type="feature"]')].map(c => c.dataset.wbs);
-    if (label) planned_buckets.push({ label, wbs });
-    else planned_wbs.push(...wbs);
+    initiatives.push({ name: card.dataset.initiativeName, kind: card.dataset.initiativeKind, wbs });
   });
 
-  // Backlog (all sub-area pools)
-  const backlog_wbs = [], backlog_free = [];
+  // Backlog (freeform items only - WBS backlog membership is derived server-side)
+  const backlog_free = [];
   document.querySelectorAll('[data-pool="backlog"]').forEach(pool => {
-    pool.querySelectorAll('[data-type="feature"]').forEach(c => backlog_wbs.push(c.dataset.wbs));
     pool.querySelectorAll('[data-type="freeform"]').forEach(c => backlog_free.push(c.dataset.item));
   });
 
@@ -433,11 +413,8 @@ function saveRoadmap(evt, forceReload) {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      in_progress_wbs:  ip_wbs,
-      planned_wbs,
-      planned_buckets,
-      backlog_wbs,
-      freeform_backlog: [...backlog_free, ...ip_free],
+      initiatives,
+      freeform_backlog: backlog_free,
     }),
   }).then(() => { if (crossList) location.reload(); });
 }
@@ -455,73 +432,104 @@ function makeSortable(el) {
   });
 }
 
-makeSortable(document.getElementById('col-in-progress'));
-document.querySelectorAll('.version-bucket-list').forEach(makeSortable);
+document.querySelectorAll('.initiative-list').forEach(makeSortable);
 document.querySelectorAll('[data-pool="backlog"]').forEach(makeSortable);
 
-/* ── Version bucket UI ── */
-function showAddVersion() {
-  document.getElementById('add-version-form').style.display = '';
-  document.getElementById('new-version-input').focus();
+/* ── Initiative UI ── */
+function showAddInitiative() {
+  document.getElementById('add-initiative-form').style.display = '';
+  document.getElementById('new-initiative-input').focus();
 }
-function hideAddVersion() {
-  document.getElementById('add-version-form').style.display = 'none';
-  document.getElementById('new-version-input').value = '';
+function hideAddInitiative() {
+  document.getElementById('add-initiative-form').style.display = 'none';
+  document.getElementById('new-initiative-input').value = '';
 }
-function handleVersionKey(e) {
-  if (e.key === 'Enter')  addVersionBucket();
-  if (e.key === 'Escape') hideAddVersion();
+function handleInitiativeKey(e) {
+  if (e.key === 'Enter')  addInitiative();
+  if (e.key === 'Escape') hideAddInitiative();
 }
 
-function addVersionBucket() {
-  const input = document.getElementById('new-version-input');
-  let label = input.value.trim();
-  if (!label) return;
-  if (!label.startsWith('v')) label = 'v' + label;
+function addInitiative() {
+  const input = document.getElementById('new-initiative-input');
+  const name = input.value.trim();
+  if (!name) return;
+  const kind = document.querySelector('input[name="new-initiative-kind"]:checked').value;
 
-  const body = document.querySelector('.col-planned-body');
+  const grid = document.getElementById('initiative-grid');
+  const otherCard = grid.querySelector('.other-card');
   const div = document.createElement('div');
-  div.className = 'version-bucket';
-  div.dataset.bucketLabel = label;
+  div.className = 'initiative-card';
+  div.dataset.initiativeName = name;
+  div.dataset.initiativeKind = kind;
+  const kindLabel = kind === 'major' ? 'Major' : 'Minor';
   div.innerHTML = `
-    <div class="version-bucket-header" onclick="toggleBucket(this)">
-      <span class="vb-chevron">▾</span>
-      <span class="vb-label">${label}</span>
-      <span class="vb-count">0</span>
-      <button class="vb-remove" onclick="removeBucket(event, this)" title="Remove">✕</button>
+    <div class="initiative-card-header" onclick="toggleInitiative(this)">
+      <span class="ini-chevron">▾</span>
+      <button type="button" class="ini-kind-badge ini-kind-${kind}" onclick="event.stopPropagation();toggleInitiativeKind(this)" title="Click to toggle Major/Minor">${kindLabel}</button>
+      <input type="text" class="ini-name" value="${name}" onclick="event.stopPropagation()" onchange="renameInitiative(this)" onkeydown="if(event.key==='Enter')this.blur();">
+      <span class="ini-count">0</span>
+      <button class="ini-remove" onclick="removeInitiative(event, this)" title="Remove">✕</button>
     </div>
-    <div class="version-bucket-list">
-      <p class="vb-empty">Drop features here</p>
+    <div class="initiative-list" data-pool="initiative">
+      <p class="ini-empty">Drop features here</p>
     </div>`;
-  body.appendChild(div);
-  makeSortable(div.querySelector('.version-bucket-list'));
-  hideAddVersion();
+  // Keep initiative cards alphabetical by name, "Other" always last.
+  const existing = [...grid.querySelectorAll('.initiative-card[data-initiative-name]')];
+  const insertBefore = existing.find(card => card.dataset.initiativeName.toLowerCase() > name.toLowerCase()) || otherCard;
+  grid.insertBefore(div, insertBefore);
+  makeSortable(div.querySelector('.initiative-list'));
+  hideAddInitiative();
   saveRoadmap();
 }
 
-function removeBucket(e, btn) {
+function removeInitiative(e, btn) {
   e.stopPropagation();
-  const bucket = btn.closest('[data-bucket-label]');
-  const label = bucket.querySelector('.vb-label').textContent;
-  appConfirm(`Delete version "${label}"? Its features will be returned to the backlog.`, () => {
-    const backlog = document.getElementById('col-backlog-wbs');
-    if (backlog) {
-      bucket.querySelectorAll('[data-type="feature"]').forEach(card => backlog.appendChild(card));
-    }
-    bucket.remove();
+  const card = btn.closest('[data-initiative-name]');
+  const name = card.dataset.initiativeName;
+  appConfirm(`Delete initiative "${name}"? In-progress features move to Other; everything else returns to the Backlog.`, () => {
+    card.remove();
     saveRoadmap(null, true);
   }, { danger: true, confirmLabel: 'Delete' });
 }
 
-function toggleBucket(header) {
-  const list = header.nextElementSibling;
-  const chevron = header.querySelector('.vb-chevron');
+function renameInitiative(input) {
+  const card = input.closest('[data-initiative-name]');
+  const name = input.value.trim();
+  if (!name) { input.value = card.dataset.initiativeName; return; }
+  card.dataset.initiativeName = name;
+  card.querySelectorAll('[data-initiative]').forEach(el => el.dataset.initiative = name);
+  saveRoadmap();
+}
+
+function toggleInitiativeKind(badge) {
+  const card = badge.closest('[data-initiative-name]');
+  const kind = card.dataset.initiativeKind === 'major' ? 'minor' : 'major';
+  card.dataset.initiativeKind = kind;
+  badge.classList.remove('ini-kind-major', 'ini-kind-minor');
+  badge.classList.add('ini-kind-' + kind);
+  badge.textContent = kind === 'major' ? 'Major' : 'Minor';
+  card.querySelectorAll('[data-initiative-kind]').forEach(el => { el.dataset.initiativeKind = kind; });
+  saveRoadmap();
+}
+
+function toggleInitiative(header) {
+  const list = header.nextElementSibling.classList.contains('ini-complete-banner')
+    ? header.nextElementSibling.nextElementSibling
+    : header.nextElementSibling;
+  const chevron = header.querySelector('.ini-chevron');
   const collapsed = list.style.display === 'none';
   list.style.display = collapsed ? '' : 'none';
   chevron.textContent = collapsed ? '▾' : '▸';
 }
 
-/* ── Backlog sub-area toggle ── */
+/* ── Backlog collapse ── */
+function toggleSection(name) {
+  const body = document.getElementById(name + '-body');
+  const chevron = document.getElementById(name + '-chevron');
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  chevron.textContent = collapsed ? '▾' : '▸';
+}
 
 /* ── Capture idea ── */
 function submitCapture() {

@@ -19,16 +19,18 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 ### Core Functionality
 - ~~Four-file markdown schema (PRODUCT, ABOUT, README, BUGS)~~ 🎆
 - ~~Web UI with live-reload on file changes~~ 🎆
-- ~~Feature lifecycle (Gap / Idea → [Scoped] → [Scored] → In-Progress → Live → Released, with Scoped/Scored derived from Notes and Value/Effort rather than stored)~~ 🎆
+- ~~Feature lifecycle (Idea → [Scored] → In-Progress → Live → Released, with Scored derived from Value alone rather than stored)~~ 🎆
 - ~~Value / Effort scoring with priority score calculation~~ 🎆
 - ~~Feature panel with inline editing~~ 🎆
 - ~~Release workflow with changelog automation~~ 🎆
+- ~~Feature Registry and Flagged Gaps consolidated onto the Summary dashboard~~ 🎆
+- ~~Shared themed confirm/alert dialogs~~ 🎆
 - WBS chart generation (PNG + interactive HTML)
 
 ### Planning & Roadmap
-- ~~Roadmap page with Next Release, In Progress, and Backlog columns~~ 🎆
-- ~~Version bucket grouping in the Planned section~~ 🎆
-- ~~Semantic versioning derived from WBS sub-area completion~~ 🎆
+- ~~Roadmap page with Backlog, Initiatives, and Next Release sections~~ 🎆
+- ~~Named, renamable Major/Minor Initiatives replacing pre-planned version buckets~~ 🎆
+- ~~Semantic versioning driven by completed Major/Minor Initiatives~~ 🎆
 - ~~Review column for Live features awaiting UAT sign-off~~ 🎆
 
 ### Collaboration
@@ -38,10 +40,16 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 - ~~Session-based project upload for hosted deployments~~ 🎆
 
 ### Bug Tracking
-- ~~Bug lifecycle (Open → Investigating → Fix In Progress → Resolved)~~ 🎆
+- ~~Bug lifecycle (Open → Investigating → Resolved → Closed)~~ 🎆
 - ~~Severity tiers (Critical / High / Medium / Low)~~ 🎆
 - ~~Bug screenshot attachments~~ 🎆
 - ~~WBS cross-reference for bugs~~ 🎆
+
+## WBS Chart
+
+[Interactive version](docs/wbs.html)
+
+![Product Work Breakdown Structure](docs/wbs.png)
 
 ## Core Workflows
 
@@ -67,10 +75,13 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
-| 1.1.1 | Feature status summary cards | Live | 8 | 2 | Gap / Planned / Live counts with progress bar |
-| 1.1.2 | Recent changelog panel | Live | 6 | 1 | Last 3 changelog entries |
-| 1.1.3 | In-progress features list | Live | 7 | 2 | Features currently being built |
+| 1.1.1 | Feature status summary cards | Live | 8 | 2 | Total / Live / Planned / Not Started counts with overall completion % |
+| 1.1.2 | Recent Releases panel | Live | 6 | 1 | Last 3 versions' changelog entries grouped by WBS sub-area, with an In Progress badge on the unreleased version |
+| 1.1.3 | Feature Lifecycle Pipeline | Live | 7 | 2 | Ideas / Prioritized / In Progress / Review / Released counts as a five-stage pipeline; supersedes the old in-progress features list |
 | 1.1.4 | Sub-area completion chart | Idea | 5 | 4 | Burndown by WBS sub-area |
+| 1.1.5 | Flagged Gaps | Live | 7 | 2 | List of Flag-tagged features shown above the WBS chart; replaces the old free-text Known Gaps card |
+| 1.1.6 | Work Breakdown Structure chart | Live | 8 | 4 | Swimlane view of WBS completion embedded in Summary; features are clickable to open the feature panel |
+| 1.1.7 | Feature Registry | Live | 7 | 3 | WBS-area feature table with inline status/value/effort editing and an Add Feature form; consolidated here from the removed Registry page (`/registry` and `/product` now redirect to `/dashboard`) |
 
 #### 1.2 Features Board
 
@@ -92,11 +103,10 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
-| 1.3.1 | Next Release column | Live | 9 | 3 | Shows pending version with Live features grouped by sub-area |
-| 1.3.2 | In Progress column | Live | 8 | 2 | Features currently in flight |
-| 1.3.3 | Planned version buckets | Live | 7 | 3 | Group planned sub-areas under target versions |
-| 1.3.4 | Backlog sorted by priority | Live | 7 | 2 | Flat list ordered by descending priority score |
-| 1.3.5 | Freeform backlog items | Live | 5 | 1 | Free-text items from ABOUT.MD backlog section |
+| 1.3.1 | Backlog section | Live | 7 | 2 | Collapsible; flat list of scored ideas ordered by descending priority score plus freeform items from ABOUT.MD's Backlog list |
+| 1.3.2 | Named Major/Minor Initiatives | Live | 9 | 5 | Features grouped into user-named, renamable Initiatives with a clickable Major/Minor toggle; alphabetical order with a bottom-pinned "Other" bucket for unassigned in-progress features; completing every feature in an Initiative drives the next release's semver bump |
+| 1.3.3 | Next Release section | Live | 8 | 2 | Read-only; shows the pending version with Live features grouped by sub-area |
+| 1.3.4 | Release History section | Live | 6 | 2 | Read-only list of shipped versions and their changelog entries, below Next Release |
 
 #### 1.4 Bug Tracker
 
@@ -104,7 +114,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 | --- | ------- | ------ | ----- | ------ | ----- |
 | 1.4.1 | Active bug board | Live | 8 | 3 | Columns for Open, Investigating, Resolved |
 | 1.4.2 | Bug severity badges | Live | 6 | 1 | Critical / High / Medium / Low color-coded |
-| 1.4.3 | Resolve to history | Live | 7 | 2 | Move bug to resolved table with version and date |
+| 1.4.3 | Resolve to history | Live | 7 | 2 | Move bug to Closed table with a Resolved In version; Notes carry forward automatically (no Date column) |
 | 1.4.4 | Screenshot attachment | Live | 6 | 3 | Upload, preview, and lightbox view per bug |
 | 1.4.5 | WBS cross-reference | Live | 5 | 1 | Link bug to a feature WBS code |
 
@@ -121,8 +131,8 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
-| 2.1.1 | Feature lifecycle management | Live | 9 | 3 | Gap through Released via Claude Code |
-| 2.1.2 | Roadmap section editing | Live | 8 | 3 | In Progress / Planned / Backlog via conversation |
+| 2.1.1 | Feature lifecycle management | Live | 9 | 3 | Idea through Released via Claude Code |
+| 2.1.2 | Roadmap section editing | Live | 8 | 3 | Backlog / Initiatives / Next Release via conversation |
 | 2.1.3 | Changelog entry generation | Live | 8 | 2 | Drafts release notes from in-progress items |
 | 2.1.4 | WBS chart regeneration | Live | 6 | 2 | Triggers PNG and HTML chart rebuild |
 | 2.1.5 | PRD generation | Idea | 7 | 4 | Generate structured PRD docs from feature descriptions |

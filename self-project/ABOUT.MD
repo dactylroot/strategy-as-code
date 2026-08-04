@@ -2,14 +2,34 @@
 
 ## 0.6.0 (in progress)
 
+**1.1 Dashboard**
+- Feature Registry and Flagged Gaps consolidated onto the Summary page; the standalone Registry page is gone (`/registry` and `/product` redirect to `/dashboard`)
+- Feature Lifecycle Pipeline stat row (Ideas / Prioritized / In Progress / Review / Released) replaces the old in-progress features list
+- Recent Releases panel groups the last 3 versions' entries instead of showing a flat last-3-entries list
+
 **1.2 Features Board**
 - Feature deletion with strict name-confirmation dialog
 - Feature search query preserved across page reloads via sessionStorage
-- → In Progress action visible on Scoped and Scored cards and in feature panel
-- Scoped and Scored are now derived from a Gap/Idea's Notes and Value/Effort instead of being separately-set statuses, removing the drift that could occur between the two
+- → In Progress action visible on Idea and Scored cards and in feature panel
+- Idea now advances to Scored on Value alone (Effort defaults to 5 for priority scoring if left blank); Notes no longer promote a feature out of Ideas, and the derived Scoped stage is removed
+- Name/Notes auto-save on blur like every other panel field; the separate Save button is gone
+- A feature's gap flag auto-clears when it ships (Live) or is released, unless the same request explicitly re-flags it
+- Replaced all browser confirm()/alert() popups with a themed in-app dialog matching the rest of the UI
+
+**1.3 Roadmap**
+- Replaced pre-planned version buckets with named, renamable Initiatives tagged Major or Minor via a clickable toggle; completing every feature in an Initiative drives the next release's semver bump
+- Removed the old In Progress column; added a collapsible Backlog section and a read-only Release History section
+- "Other" bucket holds in-progress features not yet assigned to an Initiative
 
 **3.4 Authorization**
 - Okta SSO Integration: serve the app inline under a host's URL via a path prefix (`BASE_PATH`), and trust the host's session via a session-introspection callback (`AUTH_INTROSPECT_URL`) instead of a separate login; works with Okta, SAML, or local host auth, and fails closed if the host is unreachable
+
+**Bug fixes**
+- A feature's flagged/owner/UAT-confirmed/raw-status were missing from several elements that open the feature panel (Feature Explorer results, Feature Registry, Roadmap's card types, Summary's WBS chart and Flagged Gaps list), so the panel could show stale defaults depending on which page opened it - every path now carries the same data
+- The panel's Complete/Approve/Reject buttons now re-render the Flag button immediately after a status change instead of showing stale state until reload
+- Structure page: renaming or removing a persona now cascades to any workflow that references it, instead of silently orphaning the reference
+- Structure page: fixed dirty-tracking so the app-wide auto-reload no longer wipes out an unsaved section while another section is being saved
+- Structure page: fixed a formatting bug where every section save collapsed the file's usual blank-line spacing around headings
 
 ## 0.5.0
 
@@ -97,16 +117,13 @@
 
 # Roadmap
 
-## In Progress
-- 1.2 Features Board
+## Initiatives
 
-## Planned
-
-### v0.7.0
+### PRD & OKR Tooling (Minor)
 - 2.1.5
 - 2.1.6
 
-### v0.8.0
+### Dashboard & Board Polish (Minor)
 - 1.1.4
 - 1.2.11
 

@@ -43,6 +43,12 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 - Bug screenshot attachments
 - WBS cross-reference for bugs
 
+## WBS Chart
+
+[Interactive version](docs/wbs.html)
+
+![Product Work Breakdown Structure](docs/wbs.png)
+
 ## Core Workflows
 
 ### Product Manager Workflow
