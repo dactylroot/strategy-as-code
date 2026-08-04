@@ -212,6 +212,15 @@
 }
 
 .rp-cut-card { padding: 1rem 1.25rem; }
+
+/* Feature registry (moved here from the removed Registry page) */
+details > summary { cursor: pointer; list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details[open] .chevron { transform: rotate(90deg); }
+.chevron { display: inline-block; transition: transform 0.15s; margin-right: 0.4rem; color: var(--color-text-muted); }
+.notes-cell { max-width: 20rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-text-secondary); font-size: 0.8rem; }
+.add-form { display: none; margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-bg-card-hover); }
+.add-form.open { display: block; }
 {% endblock %}
 
 {% block content %}
@@ -235,7 +244,7 @@
     <p class="stat-value planned">{{ product.planned_count }}</p>
   </div>
   <div class="stat-card">
-    <p class="stat-label">Gaps</p>
+    <p class="stat-label">Not Started</p>
     <p class="stat-value gap">{{ product.gap_count }}</p>
   </div>
   <div class="stat-card">
@@ -246,7 +255,7 @@
 
 <!-- Feature Lifecycle Pipeline -->
 {% set ideas_count       = ideas | length %}
-{% set prioritized_count = (scoped | length) + (scored | length) %}
+{% set prioritized_count = scored | length %}
 {% set in_progress_count = in_progress_items | length %}
 {% set review_count      = product.live_count %}
 {% set released_count    = released | length %}
@@ -291,6 +300,44 @@
   </div>
 </div>
 
+<!-- Flagged Gaps -->
+{% if known_gaps %}
+<div class="card" style="margin-bottom:1.5rem;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+    <p class="card-title" style="margin:0;">Flagged Gaps</p>
+    <span style="font-size:0.75rem;color:var(--color-amber-text);background:var(--color-amber-bg);padding:0.2rem 0.6rem;border-radius:999px;font-weight:600;">{{ known_gaps | length }} gap{% if known_gaps | length != 1 %}s{% endif %}</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:0.35rem;">
+    {% for entry in known_gaps %}
+    {% set f = entry.f %}
+    {% set sa = entry.sa %}
+    <div style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.65rem;border-radius:6px;border:1px solid var(--color-amber-border);background:var(--color-amber-bg);cursor:pointer;transition:background 0.1s;"
+         data-source="product"
+         data-wbs="{{ f.wbs }}"
+         data-name="{{ f.name }}"
+         data-notes="{{ f.notes }}"
+         data-stage="{{ f.stage }}"
+         data-raw-status="{{ f.status.value }}"
+         data-flagged="{{ f.flagged | lower }}"
+         data-owner="{{ f.owner or '' }}"
+         data-uat-confirmed="{{ f.uat_confirmed | lower }}"
+         {% if f.value %}data-value="{{ f.value }}"{% endif %}
+         {% if f.effort %}data-effort="{{ f.effort }}"{% endif %}
+         onclick="openFeaturePanelFromEl(this)"
+         onmouseover="this.style.background='var(--color-bg-card-hover)'"
+         onmouseout="this.style.background='var(--color-amber-bg)'">
+      <span style="font-family:var(--font-mono);font-size:0.65rem;background:var(--color-amber-border);color:var(--color-amber-text);padding:0.1rem 0.35rem;border-radius:3px;white-space:nowrap;flex-shrink:0;">{{ f.wbs }}</span>
+      {% if f.stage != 'Gap' %}
+      <span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-amber-text);flex-shrink:0;">{{ f.stage }}</span>
+      {% endif %}
+      <span style="font-size:0.85rem;font-weight:500;color:var(--color-text-primary);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ f.name }}</span>
+      <span style="font-size:0.72rem;color:var(--color-text-muted);flex-shrink:0;">{{ sa.wbs_prefix }} {{ sa.title | truncate(28, true, '…') }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <!-- WBS Chart - inline render so features are clickable -->
 <div style="margin-bottom:1.5rem;">
   <p class="card-title" style="margin-bottom:0.5rem;">Work Breakdown Structure</p>
@@ -332,6 +379,8 @@
                   {% if feature.value %}data-value="{{ feature.value }}"{% endif %}
                   {% if feature.effort %}data-effort="{{ feature.effort }}"{% endif %}
                   data-flagged="{{ feature.flagged | lower }}"
+                  data-owner="{{ feature.owner or '' }}"
+                  data-uat-confirmed="{{ feature.uat_confirmed | lower }}"
                   onclick="openFeaturePanelFromEl(this)"
                   style="cursor:pointer;padding:0 0 0 0.5rem;border-radius:3px;transition:background 0.1s;
                          {% if feature.status.value in ('Live', 'Released') %}text-decoration:line-through;color:var(--color-text-muted);{% endif %}"
@@ -352,48 +401,11 @@
 
 {% include "partials/feature_panel.html" %}
 
-<!-- Known Gaps for Team Discussion -->
-{% if known_gaps %}
-<div class="card" style="margin-bottom:1.5rem;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-    <p class="card-title" style="margin:0;">Known Gaps for Team Discussion</p>
-    <span style="font-size:0.75rem;color:var(--color-amber-text);background:var(--color-amber-bg);padding:0.2rem 0.6rem;border-radius:999px;font-weight:600;">{{ known_gaps | length }} gap{% if known_gaps | length != 1 %}s{% endif %}</span>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:0.35rem;">
-    {% for entry in known_gaps %}
-    {% set f = entry.f %}
-    {% set sa = entry.sa %}
-    <div style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.65rem;border-radius:6px;border:1px solid var(--color-amber-border);background:var(--color-amber-bg);cursor:pointer;transition:background 0.1s;"
-         data-source="product"
-         data-wbs="{{ f.wbs }}"
-         data-name="{{ f.name }}"
-         data-notes="{{ f.notes }}"
-         data-stage="{{ f.stage }}"
-         data-raw-status="{{ f.status.value }}"
-         data-flagged="{{ f.flagged | lower }}"
-         {% if f.value %}data-value="{{ f.value }}"{% endif %}
-         {% if f.effort %}data-effort="{{ f.effort }}"{% endif %}
-         onclick="openFeaturePanelFromEl(this)"
-         onmouseover="this.style.background='var(--color-bg-card-hover)'"
-         onmouseout="this.style.background='var(--color-amber-bg)'">
-      <span style="font-family:var(--font-mono);font-size:0.65rem;background:var(--color-amber-border);color:var(--color-amber-text);padding:0.1rem 0.35rem;border-radius:3px;white-space:nowrap;flex-shrink:0;">{{ f.wbs }}</span>
-      {% if f.stage != 'Gap' %}
-      <span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-amber-text);flex-shrink:0;">{{ f.stage }}</span>
-      {% endif %}
-      <span style="font-size:0.85rem;font-weight:500;color:var(--color-text-primary);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ f.name }}</span>
-      <span style="font-size:0.72rem;color:var(--color-text-muted);flex-shrink:0;">{{ sa.wbs_prefix }} {{ sa.title | truncate(28, true, '…') }}</span>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
 <!-- Recent Releases -->
 {% if recent_changelog %}
 <div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+  <div style="margin-bottom:0.75rem;">
     <p class="card-title" style="margin:0;">Recent Releases</p>
-    <a href="{{ base_path }}/roadmap" class="btn btn-ghost btn-sm">View Roadmap</a>
   </div>
   {% for entry in recent_changelog %}
   <div style="padding:0.75rem 0;border-bottom:1px solid var(--color-border-subtle);{% if loop.last %}border-bottom:none;{% endif %}">
@@ -418,5 +430,137 @@
   {% endfor %}
 </div>
 {% endif %}
+
+<!-- Feature Registry - moved here from the removed Registry page -->
+<div style="margin-top:1.5rem;">
+  <div style="margin-bottom:0.75rem;">
+    <p class="card-title" style="margin:0 0 0.25rem;">Feature Registry</p>
+    <p class="text-muted" style="margin:0;">{{ product.total_features }} total &middot;
+      <span style="color:var(--live);">{{ product.live_count }} live</span> &middot;
+      <span style="color:var(--planned);">{{ product.planned_count }} planned</span> &middot;
+      <span style="color:var(--gap);">{{ product.gap_count }} not started</span>
+    </p>
+  </div>
+
+  {% for area in product.wbs_areas %}
+  <details style="margin-bottom:1rem;">
+    <summary>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1.25rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <span class="chevron">&#9654;</span>
+          <span style="font-weight:600;">{{ area.number }}. {{ area.title }}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;">
+          <div style="width:8rem;">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:{{ (area.completion_pct * 100)|int }}%;"></div>
+            </div>
+          </div>
+          <span style="font-size:0.78rem;color:var(--color-text-secondary);white-space:nowrap;">{{ (area.completion_pct * 100)|int }}% live</span>
+          <span style="font-size:0.78rem;color:var(--color-text-muted);white-space:nowrap;">
+            {{ area.live_count }}L / {{ area.planned_count }}P / {{ area.gap_count }}G
+          </span>
+        </div>
+      </div>
+    </summary>
+
+    {% for sa in area.sub_areas %}
+    <div class="card" style="margin-top:0.5rem;margin-left:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <div>
+          <span class="wbs-code">{{ sa.wbs_prefix }}</span>
+          <span style="font-weight:600;margin-left:0.5rem;">{{ sa.title }}</span>
+          <span class="text-muted" style="margin-left:0.5rem;">
+            {{ sa.features|length }} features &middot; {{ (sa.completion_pct * 100)|int }}% live
+          </span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="toggleAddForm('{{ sa.wbs_prefix }}')">+ Add Feature</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:5rem;">WBS</th>
+              <th>Feature</th>
+              <th style="width:7rem;">Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-{{ sa.wbs_prefix | replace('.', '-') }}">
+            {% for feature in sa.features %}
+            {% include "partials/feature_row.html" %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Add feature form -->
+      <div id="add-form-{{ sa.wbs_prefix | replace('.', '-') }}" class="add-form">
+        <form hx-post="{{ base_path }}/api/features"
+              hx-target="#tbody-{{ sa.wbs_prefix | replace('.', '-') }}"
+              hx-swap="beforeend"
+              hx-ext="json-enc"
+              onsubmit="closeAddForm('{{ sa.wbs_prefix }}')"
+              style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+          <input type="hidden" name="wbs_prefix" value="{{ sa.wbs_prefix }}">
+          <div class="form-group" style="margin:0;flex:1;min-width:10rem;">
+            <label>Feature name</label>
+            <input type="text" name="name" required placeholder="Describe the feature">
+          </div>
+          <div class="form-group" style="margin:0;width:8rem;">
+            <label>Status</label>
+            <select name="status" class="form-select">
+              <option value="Planned" selected>Planned</option>
+              <option value="Gap">Gap</option>
+              <option value="Live">Live</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:10rem;">
+            <label>Notes</label>
+            <input type="text" name="notes" placeholder="Optional notes">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Add</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="closeAddForm('{{ sa.wbs_prefix }}')">Cancel</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </details>
+  {% endfor %}
+</div>
+
+<script>
+function toggleAddForm(prefix) {
+  const form = document.getElementById('add-form-' + prefix.replace(/\./g, '-'));
+  if (form) form.classList.toggle('open');
+}
+function closeAddForm(prefix) {
+  const form = document.getElementById('add-form-' + prefix.replace(/\./g, '-'));
+  if (form) {
+    form.classList.remove('open');
+    form.querySelector('form').reset();
+  }
+}
+function updateFeatureStatus(wbs, select) {
+  const rowId = 'feature-' + wbs.replace(/\./g, '-');
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  fetch('{{ base_path }}/api/features/' + encodeURIComponent(wbs), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'HX-Request': 'true' },
+    body: JSON.stringify({ status: select.value }),
+  }).then(r => {
+    if (!r.ok) { select.value = select.querySelector('[selected]')?.value || select.value; return; }
+    return r.text();
+  }).then(html => {
+    if (!html) return;
+    const tmp = document.createElement('table');
+    tmp.innerHTML = '<tbody>' + html + '</tbody>';
+    const newRow = tmp.querySelector('tr');
+    if (newRow) row.replaceWith(newRow);
+  });
+}
+</script>
 
 {% endblock %}

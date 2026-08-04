@@ -208,7 +208,7 @@
     <div class="lc-header">Ideas <span class="lc-count">{{ ideas|length }}</span></div>
     <div class="lc-body" id="col-ideas">
       {% if not ideas %}
-      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">All gaps are scoped. Capture new ideas above.</p>
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">All ideas are scored. Capture new ideas above.</p>
       {% else %}
         {% for sa in sub_areas %}
           {% set sa_ideas = [] %}
@@ -238,19 +238,15 @@
     </div>
   </div>
 
-  <!-- ── Prioritized (Scoped + Scored, sorted by priority score) ── -->
+  <!-- ── Prioritized (Scored, sorted by priority score) ── -->
   <div class="lc-col col-scored">
     <div class="lc-header">Prioritized <span class="lc-count">{{ prioritized|length }}</span></div>
     <div class="lc-body" id="col-prioritized">
       {% for item in prioritized %}
-        {% if item.stage == 'Scored' %}
-          {% include "partials/fc_scored.html" %}
-        {% else %}
-          {% include "partials/fc_scoped.html" %}
-        {% endif %}
+        {% include "partials/fc_scored.html" %}
       {% endfor %}
       {% if not prioritized %}
-      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Scope or score an idea to see it here.</p>
+      <p class="text-muted" style="padding:0.5rem 0.25rem;font-size:0.78rem;">Assign a value score to an idea to see it here.</p>
       {% endif %}
     </div>
   </div>
@@ -304,6 +300,7 @@
                  {% if item.effort %}data-effort="{{ item.effort }}"{% endif %}
                  data-owner="{{ item.owner or '' }}"
                  data-uat-confirmed="{{ item.uat_confirmed | lower }}"
+                 data-flagged="{{ item.flagged | lower }}"
                  onclick="openFeaturePanelFromEl(this)">
               <div class="fc-head" style="padding:0.4rem 0.65rem;">
                 <div class="fc-meta">
@@ -357,6 +354,7 @@
                  {% if item.effort %}data-effort="{{ item.effort }}"{% endif %}
                  data-owner="{{ item.owner or '' }}"
                  data-uat-confirmed="{{ item.uat_confirmed | lower }}"
+                 data-flagged="{{ item.flagged | lower }}"
                  onclick="openFeaturePanelFromEl(this)">
               <div class="fc-head" style="padding:0.4rem 0.65rem;">
                 <div class="fc-meta">
@@ -404,10 +402,11 @@
     <text x="42" y="{{ 10 + (e - 1) * 28.9 }}" text-anchor="end" fill="var(--color-text-muted)" font-size="8">{{ e }}</text>
     {% endfor %}
     {% for item in scored %}
+    {% set eff = item.effort or 5 %}
     {% set cx = 50 + (item.value - 1) * 48.9 %}
-    {% set cy = 10 + (item.effort - 1) * 28.9 %}
+    {% set cy = 10 + (eff - 1) * 28.9 %}
     <circle cx="{{ cx }}" cy="{{ cy }}" r="14" fill="var(--color-purple-text)" opacity="0.8" stroke="#fff" stroke-width="2">
-      <title>{{ item.wbs }} {{ item.name }} (V:{{ item.value }}, E:{{ item.effort }}, Score:{{ '%.1f'|format(item.priority_score) }})</title>
+      <title>{{ item.wbs }} {{ item.name }} (V:{{ item.value }}, E:{{ eff }}{{ '' if item.effort else ' default' }}, Score:{{ '%.1f'|format(item.priority_score) }})</title>
     </circle>
     <text x="{{ cx }}" y="{{ cy + 4 }}" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">{{ item.wbs }}</text>
     {% endfor %}
@@ -448,7 +447,7 @@
 const FE_FEATURES = {{ features_json | safe }};
 
 const FE_STATUS_COLORS = {
-  'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','Scoped':'var(--color-purple-text)','Scored':'var(--color-purple-text)',
+  'Gap':'var(--color-amber-text)','Idea':'var(--color-amber-text)','Scored':'var(--color-purple-text)',
   'In-Progress':'var(--color-amber-text)','Planned':'var(--planned)','Live':'var(--live)'
 };
 
@@ -518,7 +517,7 @@ function onFeatureSearch(q) {
     const c     = FE_STATUS_COLORS[f.status] || 'var(--color-text-secondary)';
     const plainNotes = (f.notes || '').replace(/<br\s*\/?>/gi, ' ');
     const notes = plainNotes.length > 90 ? plainNotes.slice(0, 90) + '…' : plainNotes;
-    const score = f.value && f.effort ? `${(f.value / f.effort).toFixed(1)}` : '';
+    const score = (f.value || f.effort) ? `${((f.value || 5) / (f.effort || 5)).toFixed(1)}` : '';
 
     const el = document.createElement('div');
     el.className = 'fe-result';
@@ -526,8 +525,12 @@ function onFeatureSearch(q) {
     el.dataset.name  = f.name;
     el.dataset.notes = f.notes;
     el.dataset.stage = f.status;
+    el.dataset.rawStatus = f.raw_status;
+    el.dataset.flagged = f.flagged ? 'true' : 'false';
+    el.dataset.uatConfirmed = f.uat_confirmed ? 'true' : 'false';
     if (f.value)  el.dataset.value  = f.value;
     if (f.effort) el.dataset.effort = f.effort;
+    if (f.owner)  el.dataset.owner  = f.owner;
     el.onclick = function() { openFeaturePanelFromEl(this); };
     el.innerHTML = `
       <div class="fe-result-meta">
@@ -554,7 +557,7 @@ function submitCapture() {
   const name = document.getElementById('captureIdea').value.trim();
   const wbs  = document.getElementById('captureWbs').value;
   if (!name) return;
-  if (!wbs) { alert('Please select a WBS area.'); return; }
+  if (!wbs) { appAlert('Please select a WBS area.'); return; }
   const notes = document.getElementById('captureNotes').value.trim();
   fetch('{{ base_path }}/api/features', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -564,22 +567,24 @@ function submitCapture() {
 
 /* ── Advance scored → In-Progress ── */
 function startWork(wbs, name) {
-  if (!confirm(`Move "${name}" to In Progress?`)) return;
-  fetch('{{ base_path }}/api/features/' + encodeURIComponent(wbs), {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status: 'In-Progress' }),
-  }).then(r => { if (r.ok) _fdpReload();
-    else r.json().then(d => alert(d.detail || 'Failed')); });
+  appConfirm(`Move "${name}" to In Progress?`, () => {
+    fetch('{{ base_path }}/api/features/' + encodeURIComponent(wbs), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'In-Progress' }),
+    }).then(r => { if (r.ok) _fdpReload();
+      else r.json().then(d => appAlert(d.detail || 'Failed')); });
+  });
 }
 
 /* ── Complete → Live ── */
 function completeFeature(wbs, name) {
-  if (!confirm(`Mark "${name}" as Completed?\nThis will set it to Live in the feature registry.`)) return;
-  fetch('{{ base_path }}/api/features/' + encodeURIComponent(wbs), {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status: 'Live' }),
-  }).then(r => { if (r.ok) _fdpReload();
-    else r.json().then(d => alert(d.detail || 'Failed')); });
+  appConfirm(`Mark "${name}" as Completed?\nThis will set it to Live in the feature registry.`, () => {
+    fetch('{{ base_path }}/api/features/' + encodeURIComponent(wbs), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Live' }),
+    }).then(r => { if (r.ok) _fdpReload();
+      else r.json().then(d => appAlert(d.detail || 'Failed')); });
+  });
 }
 
 /* ── Restore search after panel-triggered reload ── */

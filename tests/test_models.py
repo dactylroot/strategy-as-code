@@ -10,13 +10,13 @@ class TestFeaturePriorityScore:
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, value=8, effort=4)
         assert f.priority_score == 2.0
 
-    def test_value_none(self):
+    def test_value_none_defaults_to_five(self):
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, value=None, effort=3)
-        assert f.priority_score is None
+        assert f.priority_score == pytest.approx(5 / 3)
 
-    def test_effort_none(self):
+    def test_effort_none_defaults_to_five(self):
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, value=8, effort=None)
-        assert f.priority_score is None
+        assert f.priority_score == 1.6
 
     def test_both_none(self):
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.gap)
@@ -32,24 +32,25 @@ class TestFeaturePriorityScore:
 
 
 class TestFeatureStage:
-    """Scoped/Scored are derived from Notes/Value/Effort, never stored - see
-    the Feature Lifecycle section of the program-strategy SKILL.md."""
+    """Scored is derived from Value alone, never stored - see the Feature
+    Lifecycle section of the program-strategy SKILL.md. Notes do not move a
+    feature out of Ideas; Effort defaults to 5 for scoring if left unset."""
 
     def test_idea_without_notes_stays_idea(self):
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea)
         assert f.stage == "Idea"
 
-    def test_idea_with_notes_becomes_scoped(self):
+    def test_idea_with_notes_but_no_value_stays_idea(self):
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, notes="A real description")
-        assert f.stage == "Scoped"
+        assert f.stage == "Idea"
 
-    def test_idea_with_notes_and_scores_becomes_scored(self):
+    def test_idea_with_notes_and_value_becomes_scored(self):
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, notes="desc", value=8, effort=4)
         assert f.stage == "Scored"
 
-    def test_idea_with_only_one_score_stays_scoped(self):
+    def test_idea_with_value_only_becomes_scored(self):
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.idea, notes="desc", value=8, effort=None)
-        assert f.stage == "Scoped"
+        assert f.stage == "Scored"
 
     def test_gap_with_notes_and_scores_becomes_scored(self):
         f = Feature(wbs="1.1.1", name="X", status=FeatureStatus.gap, notes="desc", value=8, effort=4)

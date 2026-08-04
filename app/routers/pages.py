@@ -61,7 +61,6 @@ def dashboard(request: Request):
 
     all_features = product.all_features
     ideas       = [f for f in all_features if f.stage in ("Gap", "Idea")]
-    scoped      = [f for f in all_features if f.stage == "Scoped"]
     scored      = [f for f in all_features if f.stage == "Scored"]
     in_progress = [f for f in all_features if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)]
     released    = [f for f in all_features if f.status == FeatureStatus.released]
@@ -85,7 +84,6 @@ def dashboard(request: Request):
         roadmap_in_progress=about.roadmap_section("In Progress"),
         recent_changelog=about.changelog[:3],
         ideas=ideas,
-        scoped=scoped,
         scored=scored,
         in_progress_items=in_progress,
         released=released,
@@ -137,20 +135,15 @@ def structure_page(request: Request):
 
 
 @router.get("/registry", response_class=HTMLResponse)
-def registry_page(request: Request):
-    s = _get_session(request)
-    if (r := _redirect_if_no_project(s)):
-        return r
-    if s:
-        product = product_parser._parse_text(s.get_file("PRODUCT.MD"))
-    else:
-        product = product_parser.parse(settings.product_md)
-    return templates.TemplateResponse(request, "product.html", _ctx(request, "registry", product=product))
+def registry_redirect(request: Request):
+    # Registry page was folded into the Feature Registry section at the
+    # bottom of the Summary/Dashboard page - keep old links working.
+    return RedirectResponse(url=full("/dashboard"))
 
 
 @router.get("/product", response_class=HTMLResponse)
 def product_redirect(request: Request):
-    return RedirectResponse(url=full("/registry"))
+    return RedirectResponse(url=full("/dashboard"))
 
 
 @router.get("/features", response_class=HTMLResponse)
@@ -168,8 +161,8 @@ def features_page(request: Request):
 
     ideas       = [f for f in all_features if f.stage in ("Gap", "Idea")]
     prioritized = sorted(
-        [f for f in all_features if f.stage in ("Scoped", "Scored")],
-        key=lambda f: (-(f.priority_score or 0), 0 if f.stage == "Scored" else 1),
+        [f for f in all_features if f.stage == "Scored"],
+        key=lambda f: -(f.priority_score or 0),
     )
     in_progress = sorted(
         [f for f in all_features if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)],
@@ -185,8 +178,9 @@ def features_page(request: Request):
     released    = [f for f in all_features if f.status == FeatureStatus.released]
 
     features_json = json.dumps([
-        {"wbs": f.wbs, "name": f.name, "status": f.stage,
-         "notes": f.notes or "", "value": f.value, "effort": f.effort}
+        {"wbs": f.wbs, "name": f.name, "status": f.stage, "raw_status": f.status.value,
+         "notes": f.notes or "", "value": f.value, "effort": f.effort,
+         "flagged": f.flagged, "owner": f.owner or "", "uat_confirmed": f.uat_confirmed}
         for f in all_features
     ])
 
@@ -306,8 +300,8 @@ def roadmap_page(request: Request):
     # Features with 'planned' status but no bucket fall back to backlog (demoted on next save)
     backlog_features.extend(e for e in planned_features if e["f"].wbs not in wbs_to_bucket)
 
-    # Sort backlog: descending priority score, then by stage (Scored > Scoped > Idea > Gap)
-    _stage_rank = {"Scored": 0, "Scoped": 1, "Idea": 2, "Gap": 3}
+    # Sort backlog: descending priority score, then by stage (Scored > Idea > Gap)
+    _stage_rank = {"Scored": 0, "Idea": 1, "Gap": 2}
     backlog_sorted = sorted(
         backlog_features,
         key=lambda e: (-(e["f"].priority_score or 0), _stage_rank.get(e["f"].stage, 99)),

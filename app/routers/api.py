@@ -82,6 +82,13 @@ def patch_feature(wbs: str, body: FeatureUpdate, request: Request):
             text = product_parser.transform_feature_name(text, wbs, body.name)
         if body.status is not None:
             text = product_parser.transform_feature_status(text, wbs, body.status)
+            # A gap flag means "this needs attention" - once a feature actually
+            # ships (Live) or is fully accepted (Released), that concern is
+            # resolved, so clear it automatically unless this same request is
+            # also explicitly setting the flag (e.g. flagging it again on the
+            # way to Released for a follow-up concern).
+            if body.status in (FeatureStatus.live, FeatureStatus.released) and 'flagged' not in body.model_fields_set:
+                text = product_parser.transform_feature_flagged(text, wbs, False)
         if score_explicit:
             text = product_parser.transform_feature_score(text, wbs, body.value, body.effort)
         if body.notes is not None:

@@ -3,17 +3,23 @@
     data-name="{{ feature.name }}"
     data-notes="{{ feature.notes }}"
     data-stage="{{ feature.status.value }}"
+    data-flagged="{{ feature.flagged | lower }}"
+    data-owner="{{ feature.owner or '' }}"
+    data-uat-confirmed="{{ feature.uat_confirmed | lower }}"
     {% if feature.value %}data-value="{{ feature.value }}"{% endif %}
     {% if feature.effort %}data-effort="{{ feature.effort }}"{% endif %}>
   <td class="wbs-code">{{ feature.wbs }}</td>
   <td style="font-size:0.875rem;cursor:pointer;color:var(--color-text-primary);"
       onclick="openFeaturePanelFromEl(this.closest('tr'))">{{ feature.name }}</td>
+  {% set _status = feature.status.value %}
+  {% set _display_status = {'Gap': 'Idea', 'Planned': 'In-Progress'}.get(_status, _status) %}
   <td>
-    <select class="status-select {{ feature.status.value | lower }}"
+    <select class="status-select {{ _display_status | lower }}"
             onchange="updateFeatureStatus('{{ feature.wbs }}', this)">
-      <option value="Live" {% if feature.status.value == 'Live' %}selected{% endif %}>Live</option>
-      <option value="Planned" {% if feature.status.value == 'Planned' %}selected{% endif %}>Planned</option>
-      <option value="Gap" {% if feature.status.value == 'Gap' %}selected{% endif %}>Gap</option>
+      <option value="Idea" {% if _display_status == 'Idea' %}selected{% endif %}>Idea</option>
+      <option value="In-Progress" {% if _display_status == 'In-Progress' %}selected{% endif %}>In Progress</option>
+      <option value="Live" {% if _display_status == 'Live' %}selected{% endif %}>Live</option>
+      <option value="Released" {% if _display_status == 'Released' %}selected{% endif %}>Released</option>
     </select>
   </td>
   <td class="notes-cell" title="{{ feature.notes }}">{{ feature.notes or '-' }}</td>

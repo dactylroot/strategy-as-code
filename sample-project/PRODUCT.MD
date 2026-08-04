@@ -67,7 +67,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
-| 1.1.1 | Feature status summary cards | Live | 8 | 2 | Gap / Planned / Live counts with progress bar |
+| 1.1.1 | Feature status summary cards | Released | 8 | 2 | Gap / Planned / Live counts with progress bar |
 | 1.1.2 | Recent changelog panel | Live | 6 | 1 | Last 3 changelog entries |
 | 1.1.3 | In-progress features list | Live | 7 | 2 | Features currently being built |
 | 1.1.4 | Sub-area completion chart | Idea | 5 | 4 | Burndown by WBS sub-area |
@@ -81,7 +81,7 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 | 1.2.3 | Priority score sorting | Live | 8 | 2 | Prioritized column sorted by Value/Effort |
 | 1.2.4 | Priority matrix scatter plot | Live | 6 | 3 | Visual Value vs Effort quadrant |
 | 1.2.5 | Review column with Approve button | Live | 8 | 3 | Advance Live features to Released after UAT |
-| 1.2.6 | Drag-and-drop reorder | Idea | 5 | 6 | SortableJS within column |
+| 1.2.6 | Drag-and-drop reorder | Idea |  |  | SortableJS within column |
 
 #### 1.3 Roadmap
 
@@ -100,21 +100,21 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 | 1.4.1 | Active bug board | Live | 8 | 3 | Columns for Open, Investigating, Resolved |
 | 1.4.2 | Bug severity badges | Live | 6 | 1 | Critical / High / Medium / Low color-coded |
 | 1.4.3 | Resolve to history | Live | 7 | 2 | Move bug to resolved table with version and date |
-| 1.4.4 | Screenshot attachment | Idea | 6 | 3 | Upload and store screenshots per bug |
+| 1.4.4 | Screenshot attachment | In-Progress | 6 | 3 | Upload and store screenshots per bug |
 | 1.4.5 | WBS cross-reference | Live | 5 | 1 | Link bug to a feature code |
 
 ### 2. Claude Skill
 
 #### 2.1 Program Strategy Skill
 
-| WBS | Feature | Status | Value | Effort | Notes |
-| --- | ------- | ------ | ----- | ------ | ----- |
-| 2.1.1 | Feature lifecycle management | Live | 9 | 3 | Gap through Released via Claude Code |
-| 2.1.2 | Roadmap section editing | Live | 8 | 3 | In Progress / Planned / Backlog via conversation |
-| 2.1.3 | Changelog entry generation | Live | 8 | 2 | Drafts release notes from in-progress items |
-| 2.1.4 | WBS chart regeneration | Live | 6 | 2 | Triggers PNG and HTML chart rebuild |
-| 2.1.5 | PRD generation | Idea | 7 | 4 | Generate structured PRD docs from feature descriptions |
-| 2.1.6 | OKR alignment | Idea | 6 | 5 | Map features to OKRs and surface gaps |
+| WBS | Feature | Status | Value | Effort | Notes | Flag |
+| --- | ------- | ------ | ----- | ------ | ----- | ---- |
+| 2.1.1 | Feature lifecycle management | Live | 9 | 3 | Gap through Released via Claude Code |  |
+| 2.1.2 | Roadmap section editing | Live | 8 | 3 | In Progress / Planned / Backlog via conversation |  |
+| 2.1.3 | Changelog entry generation | Live | 8 | 2 | Drafts release notes from in-progress items |  |
+| 2.1.4 | WBS chart regeneration | Live | 6 | 2 | Triggers PNG and HTML chart rebuild |  |
+| 2.1.5 | PRD generation | Idea | 7 | 4 | Generate structured PRD docs from feature descriptions | gap |
+| 2.1.6 | OKR alignment | Idea | 6 | 5 | Map features to OKRs and surface gaps | gap |
 
 #### 2.2 Install & Integration
 
@@ -146,8 +146,8 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 
 ## Known Gaps for Team Discussion
 
-### OKR Alignment
+### OKR alignment (2.1.6)
 No structured way to map features to OKRs or goals. Teams either track this in a separate tool or skip it entirely. A lightweight OKR section in PRODUCT.MD and a skill command to surface alignment gaps would close this.
 
-### PRD Generation
+### PRD generation (2.1.5)
 The skill can describe features but cannot yet produce a structured PRD document. Adding a /prd command that generates a stakeholder-ready document from PRODUCT.MD would reduce the handoff cost for feature requests.

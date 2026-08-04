@@ -493,11 +493,12 @@ function saveBugField() {
 
 function closeBug() {
   const resolved_in = document.getElementById('bpResolvedIn').value.trim();
-  if (!confirm('Mark this bug as Closed? This removes it from the active board.')) return;
-  fetch('{{ base_path }}/api/bugs/' + _bugId + '/close', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ resolved_in }),
-  }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });
+  appConfirm('Mark this bug as Closed? This removes it from the active board.', () => {
+    fetch('{{ base_path }}/api/bugs/' + _bugId + '/close', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolved_in }),
+    }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });
+  });
 }
 
 function markBugIncomplete() {
@@ -505,11 +506,12 @@ function markBugIncomplete() {
   // the resolution metadata (Fix Version, UAT confirmation) that only applies
   // to a Resolved bug. Fix Version must be sent as "" not null to actually
   // clear it (see transform_update_bug).
-  if (!confirm('Move this bug back to Investigating? This clears its Fix Version and UAT confirmation.')) return;
-  fetch('{{ base_path }}/api/bugs/' + _bugId, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status: 'Investigating', fix_version: '', uat_confirmed: false }),
-  }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });
+  appConfirm('Move this bug back to Investigating? This clears its Fix Version and UAT confirmation.', () => {
+    fetch('{{ base_path }}/api/bugs/' + _bugId, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Investigating', fix_version: '', uat_confirmed: false }),
+    }).then(r => { if (r.ok) { closeBugPanel(); location.reload(); } });
+  });
 }
 
 (function() {

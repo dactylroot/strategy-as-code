@@ -125,6 +125,10 @@
      data-notes="{{ entry.f.notes }}"
      data-stage="{{ entry.f.status.value }}"
      data-flagged="{{ entry.f.flagged | lower }}"
+     data-owner="{{ entry.f.owner or '' }}"
+     data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
+     {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
+     {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
      onclick="openFeaturePanelFromEl(this)"
      title="Click to open · drag to move">
   <div class="rm-feat-wbs">{{ entry.f.wbs }}</div>
@@ -214,6 +218,10 @@
            data-notes="{{ entry.f.notes }}"
            data-stage="{{ entry.f.status.value }}"
            data-flagged="{{ entry.f.flagged | lower }}"
+           data-owner="{{ entry.f.owner or '' }}"
+           data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
+           {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
+           {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
            onclick="openFeaturePanelFromEl(this)"
            title="Click to open · drag to move">
         <div class="rm-feat-wbs">{{ entry.f.wbs }}</div>
@@ -273,6 +281,9 @@
                data-name="{{ entry.f.name }}"
                data-notes="{{ entry.f.notes }}"
                data-stage="{{ entry.f.status.value }}"
+               data-flagged="{{ entry.f.flagged | lower }}"
+               data-owner="{{ entry.f.owner or '' }}"
+               data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
                {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
                {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
                onclick="openFeaturePanelFromEl(this)">
@@ -316,6 +327,9 @@
          data-notes="{{ entry.f.notes }}"
          data-stage="{{ entry.f.stage }}"
          data-raw-status="{{ entry.f.status.value }}"
+         data-flagged="{{ entry.f.flagged | lower }}"
+         data-owner="{{ entry.f.owner or '' }}"
+         data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
          {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
          {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
          onclick="openFeaturePanelFromEl(this)"
@@ -489,13 +503,14 @@ function removeBucket(e, btn) {
   e.stopPropagation();
   const bucket = btn.closest('[data-bucket-label]');
   const label = bucket.querySelector('.vb-label').textContent;
-  if (!confirm(`Delete version "${label}"? Its features will be returned to the backlog.`)) return;
-  const backlog = document.getElementById('col-backlog-wbs');
-  if (backlog) {
-    bucket.querySelectorAll('[data-type="feature"]').forEach(card => backlog.appendChild(card));
-  }
-  bucket.remove();
-  saveRoadmap(null, true);
+  appConfirm(`Delete version "${label}"? Its features will be returned to the backlog.`, () => {
+    const backlog = document.getElementById('col-backlog-wbs');
+    if (backlog) {
+      bucket.querySelectorAll('[data-type="feature"]').forEach(card => backlog.appendChild(card));
+    }
+    bucket.remove();
+    saveRoadmap(null, true);
+  }, { danger: true, confirmLabel: 'Delete' });
 }
 
 function toggleBucket(header) {
@@ -513,7 +528,7 @@ function submitCapture() {
   const name = document.getElementById('captureIdea').value.trim();
   const wbs  = document.getElementById('captureWbs').value;
   if (!name) return;
-  if (!wbs) { alert('Please select a WBS area.'); return; }
+  if (!wbs) { appAlert('Please select a WBS area.'); return; }
   const notes = document.getElementById('captureNotes').value.trim();
   fetch('{{ base_path }}/api/features', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

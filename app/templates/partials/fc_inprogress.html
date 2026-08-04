@@ -19,9 +19,11 @@
     <div class="fc-title">{{ item.name }}</div>
     {% if item.notes %}<div class="fc-notes">{{ item.notes | replace("<br>", " ") | truncate(120, true, "…") }}</div>{% endif %}
     <div class="fc-actions" onclick="event.stopPropagation()">
-      {% if item.value and item.effort %}
-      <span style="font-size:0.72rem;color:var(--color-text-secondary);">V:{{ item.value }} E:{{ item.effort }}</span>
+      {% if item.value or item.effort %}
+      <span style="font-size:0.72rem;color:var(--color-text-secondary);">V:{{ item.value or 5 }}{{ '' if item.value else ' (default)' }} E:{{ item.effort or 5 }}{{ '' if item.effort else ' (default)' }}</span>
+      {% if item.priority_score is not none %}
       <span class="priority-badge">{{ '%.1f'|format(item.priority_score) }}</span>
+      {% endif %}
       {% endif %}
       <button class="btn btn-success btn-sm" style="margin-left:auto;"
               onclick="event.stopPropagation();completeFeature('{{ item.wbs }}', this.closest('.fc').dataset.name)">

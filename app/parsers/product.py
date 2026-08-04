@@ -234,10 +234,18 @@ def update_feature_notes(path: Path, wbs: str, new_notes: str) -> None:
 
 
 def _replace_section(text: str, heading: str, new_content: str) -> str:
-    """Replace the content of a ## section while preserving all other sections."""
+    """Replace the content of a ## section while preserving all other sections.
+
+    Keeps the file's usual convention of one blank line between a heading and
+    its body and one blank line before the next heading - group(1) is just
+    the heading line itself, and the lookahead leaves the next section's
+    leading "\n" untouched, so the replacement supplies exactly one blank
+    line on each side (none at all if the new body is empty).
+    """
     pattern = rf"(## {re.escape(heading)}\n)(.*?)(?=\n## |\Z)"
-    body = new_content.strip() + "\n"
-    result, n = re.subn(pattern, lambda m: m.group(1) + body + "\n", text, flags=re.DOTALL)
+    body = new_content.strip()
+    replacement = f"\n{body}\n" if body else ""
+    result, n = re.subn(pattern, lambda m: m.group(1) + replacement, text, flags=re.DOTALL)
     if n == 0:
         raise ValueError(f"Section '## {heading}' not found")
     return result

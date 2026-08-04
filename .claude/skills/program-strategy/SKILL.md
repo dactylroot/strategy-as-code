@@ -29,30 +29,29 @@ I will organize, prioritize, and document everything.
 All features live in PRODUCT.MD. There is no separate backlog file.
 
 ```
-Idea → [Scoped] → [Scored] → In-Progress → Live → Released
+Idea → [Scored] → In-Progress → Live → Released
 ```
 
-`Scoped` and `Scored` are **derived, not stored** - never write them into the Status column. An Idea *displays* as Scoped once it has real Notes, and as Scored once Value and Effort are also both set. This is computed at read time from the row's own Notes/Value/Effort - there's nothing to keep in sync, which eliminates the drift that used to happen between the stored status and the actual score/notes data.
+`Scored` is **derived, not stored** - never write it into the Status column. An Idea *displays* as Scored once it has a Value score. Effort defaults to 5 for the priority-score calculation if left blank, so a Value alone is enough to move a feature out of Ideas - Effort doesn't need to be set too. Notes have no bearing on this - a feature with a full description but no Value score still reads as Idea and stays in the Ideas column. This is computed at read time from the row's own Value/Effort - there's nothing to keep in sync, which eliminates the drift that used to happen between the stored status and the actual score data.
 
 | Stage | Stored? | Meaning |
 |-------|---------|---------|
-| **Idea** | Yes | Captured idea assigned to a WBS area - raw, unstructured |
-| **Scoped** | Derived | Idea with non-empty Notes - defined and ready for scoring |
-| **Scored** | Derived | Scoped, with Value & Effort also both set - ready to start work |
+| **Idea** | Yes | Captured idea assigned to a WBS area - raw, unstructured, or described but not yet valued |
+| **Scored** | Derived | Idea with a Value score set (Effort optional - defaults to 5) - ready to start work |
 | **In-Progress** | Yes | Work has started |
 | **Live** | Yes | Shipped and in production; awaiting UAT sign-off |
 | **Released** | Yes | Approved after UAT; final state |
 
 **`Gap` is a flag, not a workflow stage.** A newly captured feature always starts at `Idea` (see below) - `Gap` is not something you write into a fresh feature's Status. Flagging a feature "this is a gap/concern" is a separate boolean tag (the trailing **Flag** column, see Feature table format) that can be set on a feature at *any* Status - Idea, In-Progress, even Live - independent of its workflow stage. `Gap` still exists as a legacy literal Status value (older files may have it on unscoped, pre-WBS needs); treat it exactly like `Planned` - read-compatible, never written for new features, and normalized to `Idea` for scoring/display purposes. The **Known Gaps for Team Discussion** section is the narrative complement: write a subsection for a flagged feature or for a problem that spans an entire Level 2 sub-area (e.g. `WBS 1.2`) when it doesn't map to one single feature row.
 
-**All features require a WBS code.** When capturing a new idea, assign it to a WBS sub-area immediately. It gets a full WBS code (e.g. 1.3.4) and status `Idea`.
+**All features require a WBS code.** When capturing a new idea, assign it to a WBS sub-area immediately. It gets a full WBS code (e.g. 1.3.4) and status `Idea`. A WBS assignment alone - even with Notes filled in - does not move a feature out of the Ideas column; only a Value score does.
 
-**Scoring uses Value and Effort (1–10 each).** Priority score = Value ÷ Effort. Writing Notes on an Idea feature is what makes it read as Scoped; adding both scores on top of that is what makes it read as Scored. Clearing the scores (or the Notes) reverts the display automatically - there is no separate status to set or revert.
+**Scoring uses Value and Effort (1–10 each).** Priority score = Value ÷ Effort. Effort defaults to 5 when left blank, so you only need to set Value to prioritize a feature - this lets users assign values quickly without also having to estimate effort up front. Setting Value (with or without an explicit Effort) is what makes an Idea read as Scored. Clearing the Value reverts the display back to Idea automatically - there is no separate status to set or revert. Notes are purely descriptive and never affect the derived stage.
 
 **Status transitions actually written to the Status column:**
 - Idea (captured to WBS area) → In-Progress (work started) → Live (shipped, awaiting UAT) → Released (UAT approved)
 
-Scoped and Scored never appear as literal transitions - they just happen to be how an Idea row currently reads based on its Notes/Value/Effort.
+Scored never appears as a literal transition - it's just how an Idea row currently reads based on its Value.
 
 **Review and UAT mirror the bug lifecycle.** A `Live` feature is done but not yet accepted, exactly like a `Resolved` bug; `Released` is the accepted final state, exactly like a `Closed` bug. The feature board shows this directly:
 
@@ -107,9 +106,9 @@ Stakeholder and leadership-facing product overview. The canonical registry for a
 | WBS | Feature | Status | Value | Effort | Notes |
 | --- | ------- | ------ | ----- | ------ | ----- |
 | 1.1.1 | Feature name | Idea | | | Optional notes |
-| 1.1.2 | Idea with real notes and both scores set | Idea | 8 | 3 | A real description, not just a bare title |
+| 1.1.2 | Idea with a value score set | Idea | 8 | 3 | A real description, not just a bare title |
 ```
-The second row above displays as **Scored** in the UI and skill output, even though the Status column literally says `Idea` - see Feature Lifecycle. Value and Effort columns are optional - leave both blank on a bare, undescribed idea.
+The second row above displays as **Scored** in the UI and skill output, even though the Status column literally says `Idea` - see Feature Lifecycle. Value and Effort columns are optional - leave both blank on a bare, undescribed idea. Effort can also be left blank even when Value is set - it defaults to 5 for the priority score.
 
 **Optional trailing columns** extend the same row past Notes, in this fixed order - `Flag`, then `Owner`, then `UAT Confirmed`:
 ```markdown
@@ -133,7 +132,7 @@ You only need as many trailing columns as you're using - a row can stop right af
 - `Planned` - legacy alias for In-Progress (backward compatible; do not use for new features)
 - `Gap` - legacy alias for Idea (backward compatible; do not use for new features - flag the feature instead, via the Flag column above)
 
-**`Scoped` and `Scored` are never written** - they're derived from an Idea row's Notes/Value/Effort at display time (see Feature Lifecycle above). If you encounter either literal text in an older file's Status column, treat it as `Idea` - the app normalizes it automatically on read.
+**`Scored` is never written** - it's derived from an Idea row's Value (and, optionally, Effort) at display time (see Feature Lifecycle above). If you encounter literal `Scoped` or `Scored` text in an older file's Status column, treat it as `Idea` - the app normalizes it automatically on read.
 
 ### ABOUT.MD
 

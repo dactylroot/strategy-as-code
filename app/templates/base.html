@@ -249,11 +249,13 @@
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: var(--color-bg-card-hover); }
 
-    /* Status select */
+    /* Status select - Gap/Planned are legacy aliases for Idea/In-Progress
+       (see FeatureStatus in app/models.py); feature_row.html maps them to
+       their canonical class here, so only the canonical four appear. */
     .status-select { font-family: var(--font-mono); padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid transparent; font-size: 0.72rem; font-weight: 600; cursor: pointer; appearance: none; text-align: center; }
-    .status-select.live { background: var(--live-bg); color: var(--live); border-color: var(--live-border); }
-    .status-select.planned { background: var(--planned-bg); color: var(--planned); border-color: var(--planned-border); }
-    .status-select.gap { background: var(--gap-bg); color: var(--gap); border-color: var(--gap-border); }
+    .status-select.idea { background: var(--color-amber-bg); color: var(--color-amber-text); border-color: var(--color-amber-border); }
+    .status-select.in-progress { background: var(--color-amber-bg); color: var(--color-amber-text); border-color: var(--color-amber-border); }
+    .status-select.live, .status-select.released { background: var(--live-bg); color: var(--live); border-color: var(--live-border); }
 
     /* Forms */
     .form-group { margin-bottom: 0.75rem; }
@@ -303,6 +305,21 @@
 <body>
 <div class="grid-bg"></div>
 
+<dialog id="appConfirmDialog" style="border:1px solid var(--color-border-muted);border-radius:8px;padding:1.5rem;min-width:22rem;max-width:28rem;background:var(--color-bg-card);color:var(--color-text-primary);">
+  <p id="appConfirmMessage" style="margin:0 0 1.25rem;font-size:0.9rem;line-height:1.5;white-space:pre-line;"></p>
+  <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+    <button type="button" class="btn btn-ghost" onclick="document.getElementById('appConfirmDialog').close()">Cancel</button>
+    <button type="button" id="appConfirmOk" class="btn btn-primary">Confirm</button>
+  </div>
+</dialog>
+
+<dialog id="appAlertDialog" style="border:1px solid var(--color-border-muted);border-radius:8px;padding:1.5rem;min-width:22rem;max-width:28rem;background:var(--color-bg-card);color:var(--color-text-primary);">
+  <p id="appAlertMessage" style="margin:0 0 1.25rem;font-size:0.9rem;line-height:1.5;white-space:pre-line;"></p>
+  <div style="display:flex;justify-content:flex-end;">
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('appAlertDialog').close()">OK</button>
+  </div>
+</dialog>
+
 {% if not embed_chrome %}
 <aside class="sidebar">
   <a href="{{ base_path }}/switch-project" class="sidebar-brand" style="text-decoration:none;display:block;"
@@ -318,7 +335,6 @@
     <a href="{{ base_path }}/structure" {% if active_page == 'structure' %}class="active"{% endif %}>Structure</a>
     <a href="{{ base_path }}/bugs" {% if active_page == 'bugs' %}class="active"{% endif %}>Bugs</a>
     <span class="nav-section">Reference</span>
-    <a href="{{ base_path }}/registry" {% if active_page == 'registry' %}class="active"{% endif %}>Registry</a>
     <a href="{{ base_path }}/about" {% if active_page == 'about' %}class="active"{% endif %}>About</a>
     <a href="{{ base_path }}/readme" {% if active_page == 'readme' %}class="active"{% endif %}>README</a>
     {% if auth_enabled %}
@@ -373,6 +389,29 @@
     if (sid) e.detail.headers['X-Session-ID'] = sid;
   });
 })();
+
+// In-app replacement for window.confirm() - native browser confirm() dialogs
+// can't be styled and block the page, so every destructive/important action
+// routes through this instead. Drop-in usage: appConfirm(message, () => { ...action... }).
+function appConfirm(message, onConfirm, opts = {}) {
+  const dlg = document.getElementById('appConfirmDialog');
+  if (!dlg) { onConfirm(); return; }
+  document.getElementById('appConfirmMessage').textContent = message;
+  const okBtn = document.getElementById('appConfirmOk');
+  okBtn.textContent = opts.confirmLabel || 'Confirm';
+  okBtn.className = 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary');
+  okBtn.onclick = () => { dlg.close(); onConfirm(); };
+  dlg.showModal();
+}
+
+// In-app replacement for window.alert() - same reasoning as appConfirm above.
+// Drop-in usage: appAlert(message) in place of alert(message).
+function appAlert(message) {
+  const dlg = document.getElementById('appAlertDialog');
+  if (!dlg) { alert(message); return; }
+  document.getElementById('appAlertMessage').textContent = message;
+  dlg.showModal();
+}
 
 function exportMarkdown() {
   const sid = sessionStorage.getItem('pac_session_id');
@@ -440,6 +479,11 @@ function exportMarkdown() {
     if (e.data !== 'changed') return;
     const panel = document.getElementById('featurePanel');
     if (panel && panel.open) return;
+    // Pages with their own local, not-yet-saved draft state (e.g. Structure's
+    // per-section Users/Workflows/Scope editors) can opt out via this hook -
+    // otherwise a save on disk (even from another section on the same page)
+    // would auto-reload and silently discard the unsaved draft.
+    if (typeof window.hasUnsavedChanges === 'function' && window.hasUnsavedChanges()) return;
     location.reload();
   };
   es.onerror = () => es.close();

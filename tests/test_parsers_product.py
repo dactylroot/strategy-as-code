@@ -139,13 +139,13 @@ class TestParseText:
         doc = parser._parse_text(MINIMAL_PRODUCT)
         logout = next(f for f in doc.all_features if f.wbs == "1.1.2")
         assert logout.status == FeatureStatus.idea
-        assert logout.stage == "Idea"  # blank notes - derivation doesn't promote it
+        assert logout.stage == "Idea"  # blank value - derivation doesn't promote it
 
     def test_legacy_scored_text_normalized_but_still_derives_scored(self):
         doc = parser._parse_text(MINIMAL_PRODUCT)
         overview = next(f for f in doc.all_features if f.wbs == "1.2.1")
         assert overview.status == FeatureStatus.idea
-        assert overview.stage == "Scored"  # has notes + both scores
+        assert overview.stage == "Scored"  # has a value score set
 
 
 class TestGetFeatureStatus:
@@ -389,3 +389,34 @@ class TestTransformMoveFeature:
     def test_raises_on_missing_wbs(self):
         with pytest.raises(ValueError):
             parser.transform_move_feature(MINIMAL_PRODUCT, "9.9.9", "1.2")
+
+
+class TestReplaceSection:
+    """Structure page editing (Users/Core Workflows/Product Scope) round-trips
+    through _replace_section - it must preserve the file's usual convention
+    of exactly one blank line between a heading and its body and exactly one
+    blank line before the next heading, and must never touch other sections."""
+
+    def test_keeps_one_blank_line_after_heading(self):
+        result = parser.transform_users(MINIMAL_PRODUCT, "### Admin\nUpdated bio.")
+        assert "## Users\n\n### Admin\nUpdated bio.\n" in result
+
+    def test_keeps_one_blank_line_before_next_heading(self):
+        result = parser.transform_users(MINIMAL_PRODUCT, "### Admin\nUpdated bio.")
+        assert "Updated bio.\n\n## Product Scope" in result
+        assert "\n\n\n" not in result
+
+    def test_empty_new_content_leaves_single_blank_line(self):
+        result = parser.transform_users(MINIMAL_PRODUCT, "")
+        assert "## Users\n\n## Product Scope" in result
+
+    def test_other_sections_untouched(self):
+        result = parser.transform_users(MINIMAL_PRODUCT, "### Admin\nUpdated bio.")
+        assert "## Features" in result
+        doc = parser._parse_text(result)
+        assert doc.total_features == 5
+
+    def test_missing_heading_raises(self):
+        text = "# Title\n\n## Summary\nHi.\n"
+        with pytest.raises(ValueError):
+            parser.transform_users(text, "### Admin\nBio.")

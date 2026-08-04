@@ -27,25 +27,30 @@ class Feature(BaseModel):
     @computed_field
     @property
     def priority_score(self) -> float | None:
-        if self.value is None or self.effort is None or self.effort == 0:
+        """Value/Effort each stay blank on disk until a user explicitly sets
+        them - this only fills in a middle value of 5 for whichever one is
+        blank at calculation time, so a lone Value or a lone Effort still
+        produces a comparable score."""
+        if self.value is None and self.effort is None:
             return None
-        return self.value / self.effort
+        value = self.value if self.value is not None else 5
+        effort = self.effort if self.effort is not None else 5
+        if effort == 0:
+            return None
+        return value / effort
 
     @computed_field
     @property
     def stage(self) -> str:
-        """Display-time lifecycle stage. Scoped and Scored are never stored -
-        a Gap or Idea reads as Scoped once it has a WBS assignment and real
-        notes, and as Scored once Value and Effort are also both set."""
+        """Display-time lifecycle stage. Scored is never stored - a Gap or
+        Idea reads as Scored once it has a Value score. Effort defaults to 5
+        for priority scoring if not explicitly set, so Value alone is enough
+        to move a feature out of Ideas; Notes alone are not."""
         if self.status not in (FeatureStatus.gap, FeatureStatus.idea):
             return self.status.value
-        has_wbs = bool(self.wbs.strip())
-        has_notes = bool(self.notes.strip())
-        if not (has_wbs and has_notes):
-            return self.status.value
-        if self.value is not None and self.effort is not None:
+        if self.value is not None:
             return "Scored"
-        return "Scoped"
+        return self.status.value
 
 
 class WBSSubArea(BaseModel):

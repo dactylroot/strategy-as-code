@@ -62,7 +62,7 @@ class TestPatchFeature:
         assert f["status"] == "In-Progress"
 
     def test_patch_scored_status_rejected(self, client):
-        """Scored/Scoped are derived, not settable - PATCHing one directly
+        """Scored is derived, not settable - PATCHing it directly
         is a validation error, not a status transition."""
         r = client.patch("/api/features/1.1.2", json={"status": "Scored"})
         assert r.status_code == 422
@@ -76,8 +76,8 @@ class TestPatchFeature:
         assert r.status_code == 200
 
     def test_patch_score_sets_scored_stage(self, client):
-        # 1.1.2 already carries notes ("Logout flow") from the fixture, so
-        # adding both scores is enough to derive Scored - no status write.
+        # Setting a Value score is enough to derive Scored - no status write,
+        # and notes have no bearing on the stage.
         r = client.patch("/api/features/1.1.2", json={"value": 7, "effort": 3})
         assert r.status_code == 200
         data = client.get("/api/product").json()
@@ -90,7 +90,22 @@ class TestPatchFeature:
         assert f["status"] == "Idea"
         assert f["stage"] == "Scored"
 
-    def test_patch_clear_score_reverts_to_scoped_stage(self, client):
+    def test_patch_score_value_only_defaults_effort_and_scores(self, client):
+        # No effort provided - priority_score and stage should still work,
+        # using a default effort of 5.
+        r = client.patch("/api/features/1.1.2", json={"value": 8})
+        assert r.status_code == 200
+        data = client.get("/api/product").json()
+        all_features = [
+            f for area in data["wbs_areas"]
+            for sa in area["sub_areas"]
+            for f in sa["features"]
+        ]
+        f = next(x for x in all_features if x["wbs"] == "1.1.2")
+        assert f["stage"] == "Scored"
+        assert f["priority_score"] == pytest.approx(8 / 5)
+
+    def test_patch_clear_score_reverts_to_idea_stage(self, client):
         client.patch("/api/features/1.1.2", json={"value": 7, "effort": 3})
         r = client.patch("/api/features/1.1.2", json={"value": None, "effort": None})
         assert r.status_code == 200
@@ -102,11 +117,50 @@ class TestPatchFeature:
         ]
         f = next(x for x in all_features if x["wbs"] == "1.1.2")
         assert f["status"] == "Idea"
-        assert f["stage"] == "Scoped"  # notes are still present, just no scores
+        assert f["stage"] == "Idea"  # notes alone don't keep it out of Ideas
 
     def test_patch_unknown_wbs_returns_404(self, client):
         r = client.patch("/api/features/9.9.9", json={"status": "Live"})
         assert r.status_code == 404
+
+    def _get_feature(self, client, wbs):
+        data = client.get("/api/product").json()
+        all_features = [
+            f for area in data["wbs_areas"]
+            for sa in area["sub_areas"]
+            for f in sa["features"]
+        ]
+        return next(x for x in all_features if x["wbs"] == wbs)
+
+    def test_patch_status_to_live_clears_flag(self, client):
+        # A gap flag means "needs attention" - once a feature ships, that
+        # concern is resolved, so completing it should auto-clear the flag.
+        client.patch("/api/features/1.1.2", json={"flagged": True})
+        assert self._get_feature(client, "1.1.2")["flagged"] is True
+        r = client.patch("/api/features/1.1.2", json={"status": "Live"})
+        assert r.status_code == 200
+        assert self._get_feature(client, "1.1.2")["flagged"] is False
+
+    def test_patch_status_to_released_clears_flag(self, client):
+        client.patch("/api/features/1.1.2", json={"flagged": True})
+        r = client.patch("/api/features/1.1.2", json={"status": "Released"})
+        assert r.status_code == 200
+        assert self._get_feature(client, "1.1.2")["flagged"] is False
+
+    def test_patch_status_to_in_progress_does_not_clear_flag(self, client):
+        # Only Live/Released ("completed") auto-clear the flag - an
+        # in-progress feature can still have an open concern.
+        client.patch("/api/features/1.1.2", json={"flagged": True})
+        r = client.patch("/api/features/1.1.2", json={"status": "In-Progress"})
+        assert r.status_code == 200
+        assert self._get_feature(client, "1.1.2")["flagged"] is True
+
+    def test_patch_status_live_with_explicit_flag_respects_explicit_value(self, client):
+        # If the same request explicitly sets flagged, that wins over the
+        # auto-clear (e.g. re-flagging on the way to Released for a new concern).
+        r = client.patch("/api/features/1.1.2", json={"status": "Live", "flagged": True})
+        assert r.status_code == 200
+        assert self._get_feature(client, "1.1.2")["flagged"] is True
 
 
 class TestCreateFeature:
@@ -194,9 +248,12 @@ class TestPageRoutes:
         r = client.get("/roadmap")
         assert r.status_code == 200
 
-    def test_registry_page(self, client):
-        r = client.get("/registry")
-        assert r.status_code == 200
+    def test_registry_page_redirects_to_dashboard(self, client):
+        # Registry page was removed - its content folded into the Feature
+        # Registry section at the bottom of the Summary/Dashboard page.
+        r = client.get("/registry", follow_redirects=False)
+        assert r.status_code in (302, 307)
+        assert r.headers["location"].endswith("/dashboard")
 
     def test_about_page(self, client):
         r = client.get("/about")

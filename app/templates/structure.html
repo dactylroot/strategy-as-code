@@ -134,14 +134,30 @@ let _scope     = {{ scope_json | safe }};
 
 let _modal = null; // {type:'u'|'w'|'s', index:number}
 
+// Each section (Users/Workflows/Scope) is an independent local draft that
+// only reaches disk when its own Save button is clicked. base.html's SSE
+// listener auto-reloads the page on any file change (e.g. another section's
+// save writing to the same PRODUCT.MD) - without this, that reload would
+// silently wipe an in-progress edit in a section that hasn't been saved yet.
+let _usersDirty = false, _workflowsDirty = false, _scopeDirty = false;
+window.hasUnsavedChanges = () => _usersDirty || _workflowsDirty || _scopeDirty;
+
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _markDirty(statusId) {
+  const el = document.getElementById(statusId);
+  if (el) { el.textContent = '● Unsaved changes'; el.style.color = 'var(--color-amber)'; }
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
 function openModal(type, i) {
   _modal = {type, index: i};
+  if (type === 'u') { _modal.origName = _users[i].name; _usersDirty = true; _markDirty('users-status'); }
+  else if (type === 'w') { _workflowsDirty = true; _markDirty('workflows-status'); }
+  else if (type === 's') { _scopeDirty = true; _markDirty('scope-status'); }
   document.getElementById('str-modal').style.display = 'flex';
   _renderModalBody();
   // Focus first input after a tick (modal content just rendered)
@@ -153,10 +169,29 @@ function closeModal() {
   _modal = null;
   document.getElementById('str-modal').style.display = 'none';
   if (prev) {
-    if (prev.type === 'u') renderUsers();
+    if (prev.type === 'u') {
+      const u = _users[prev.index];
+      if (u) _cascadePersonaRename(prev.origName, u.name);
+      renderUsers();
+      renderWorkflows(); // a workflow's persona group may have just changed
+    }
     else if (prev.type === 'w') renderWorkflows();
     else if (prev.type === 's') renderScope();
   }
+}
+
+// Workflows reference a persona by its name (plain text, not an ID) - see
+// serializeWorkflows' "Persona: X" line. Renaming a persona would otherwise
+// silently orphan any workflow pointing at the old name (it'd fall into the
+// "(No Persona)" group with no indication anything changed), so keep every
+// matching workflow's persona field in sync whenever a rename is committed.
+function _cascadePersonaRename(oldName, newName) {
+  oldName = (oldName || '').trim();
+  newName = (newName || '').trim();
+  if (!oldName || oldName === newName) return;
+  let changed = false;
+  _workflows.forEach(w => { if (w.persona === oldName) { w.persona = newName; changed = true; } });
+  if (changed) { _workflowsDirty = true; _markDirty('workflows-status'); }
 }
 
 function closeModalOverlay(e) {
@@ -262,8 +297,18 @@ function renderUsers() {
   });
 }
 
-function addPersona()     { _users.push({name:'',description:''}); renderUsers(); openModal('u', _users.length-1); }
-function removePersona(i) { _users.splice(i,1); closeModal(); }
+function addPersona() { _users.push({name:'',description:''}); renderUsers(); openModal('u', _users.length-1); }
+function removePersona(i) {
+  // Don't route through closeModal() - it re-reads _users[prev.index], which
+  // after the splice below refers to a different (or no) persona.
+  const removedName = (_users[i].name || '').trim();
+  _users.splice(i,1);
+  if (removedName) _cascadePersonaRename(removedName, '');
+  _modal = null;
+  document.getElementById('str-modal').style.display = 'none';
+  renderUsers();
+  renderWorkflows();
+}
 
 // ── Core Workflows ────────────────────────────────────────────────────────────
 
@@ -370,17 +415,20 @@ function serializeScope() {
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 
-function _save(endpoint, content, statusId) {
+function _save(endpoint, content, statusId, onSaved) {
   const st = document.getElementById(statusId);
   st.textContent = 'Saving…'; st.style.color = 'var(--color-text-secondary)';
   fetch(endpoint, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content})})
     .then(r=>r.json())
-    .then(d=>{ st.textContent=d.ok?'Saved ✓':(d.detail||'Error'); st.style.color=d.ok?'var(--live)':'var(--gap)'; if(d.ok) setTimeout(()=>st.textContent='',3000); })
+    .then(d=>{
+      st.textContent=d.ok?'Saved ✓':(d.detail||'Error'); st.style.color=d.ok?'var(--live)':'var(--gap)';
+      if(d.ok) { if (onSaved) onSaved(); setTimeout(()=>st.textContent='',3000); }
+    })
     .catch(()=>{ st.textContent='Error'; st.style.color='var(--gap)'; });
 }
-function saveUsers()     { _save('{{ base_path }}/api/structure/users',     serializeUsers(),     'users-status'); }
-function saveWorkflows() { _save('{{ base_path }}/api/structure/workflows', serializeWorkflows(), 'workflows-status'); }
-function saveScope()     { _save('{{ base_path }}/api/structure/scope',     serializeScope(),     'scope-status'); }
+function saveUsers()     { _save('{{ base_path }}/api/structure/users',     serializeUsers(),     'users-status',     () => { _usersDirty = false; }); }
+function saveWorkflows() { _save('{{ base_path }}/api/structure/workflows', serializeWorkflows(), 'workflows-status', () => { _workflowsDirty = false; }); }
+function saveScope()     { _save('{{ base_path }}/api/structure/scope',     serializeScope(),     'scope-status',     () => { _scopeDirty = false; }); }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderUsers();
