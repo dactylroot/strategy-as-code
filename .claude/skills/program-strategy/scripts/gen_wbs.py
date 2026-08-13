@@ -1,5 +1,5 @@
 """
-gen_wbs.py - Renewals Manager WBS swimlane chart generator.
+gen_wbs.py - WBS swimlane chart generator.
 
 Outputs:
   docs/wbs.png   - static PNG for embedding and sharing
@@ -68,6 +68,22 @@ CMAP = LinearSegmentedColormap.from_list('RdBl', ['#b91c1c', '#1e40af'])
 
 # ── DATA (parsed from PRODUCT.MD) ────────────────────────────────────────────
 PRODUCT_MD = os.path.join(PROJECT_DIR, 'PRODUCT.MD')
+
+def get_product_title(path):
+    """Derive the project title the same way the UI does (app/config.py
+    _title_from_product_md): PRODUCT.MD's H1, minus a trailing "Overview"
+    suffix, falling back to the project directory name."""
+    try:
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+        m = re.match(r'^# (.+)', text)
+        raw = m.group(1).strip() if m else ''
+        title = re.sub(r'\s*[-–]\s*(Product\s+)?Overview\s*$', '', raw, flags=re.IGNORECASE).strip()
+        return title or None
+    except OSError:
+        return None
+
+PRODUCT_TITLE = get_product_title(PRODUCT_MD) or os.path.basename(os.path.abspath(PROJECT_DIR))
 
 def make_lane_label(num, title):
     """Wrap title into short lines prefixed by the scope number."""
@@ -196,7 +212,7 @@ fig.patch.set_facecolor(BG)
 ax.set_facecolor(BG)
 
 ax.text(0.5, TITLE_TOP,
-        'Renewals Manager - Work Breakdown Structure',
+        f'{PRODUCT_TITLE} - Work Breakdown Structure',
         ha='center', va='top', fontsize=TITLE_FONT,
         fontweight='bold', color='#0f172a')
 
@@ -393,11 +409,11 @@ body {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Renewals Manager - Work Breakdown Structure</title>
+<title>{html_mod.escape(PRODUCT_TITLE)} - Work Breakdown Structure</title>
 <style>{CSS}</style>
 </head>
 <body>
-<p class="wbs-title">Renewals Manager - Work Breakdown Structure</p>
+<p class="wbs-title">{html_mod.escape(PRODUCT_TITLE)} - Work Breakdown Structure</p>
 {"".join(lane_blocks)}
 <div class="legend">
   <span class="ld">
