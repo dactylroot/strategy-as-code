@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re
+from datetime import date
 from pathlib import Path
 
 from ..fileio import _atomic_write, _lock_for
@@ -174,6 +175,7 @@ def _parse_text(text: str) -> ProductDoc:
                 # 6-column format: WBS | Name | Status | Value | Effort | Notes
                 # 7-column format: adds Flag
                 # 8/9-column format: adds Owner / UAT Confirmed
+                # 10/11-column format: adds Created At / Last Updated
                 # 4-column format: WBS | Name | Status | Notes (legacy)
                 if len(cells) >= 6:
                     value   = int(cells[3]) if cells[3].isdigit() else None
@@ -188,9 +190,12 @@ def _parse_text(text: str) -> ProductDoc:
                     flagged = False
                     owner = None
                     uat_confirmed = False
+                created_at = cells[9].strip() if len(cells) > 9 and cells[9].strip() else None
+                last_updated = cells[10].strip() if len(cells) > 10 and cells[10].strip() else None
                 features.append(Feature(wbs=wbs_code, name=feat_name, status=status,
                                         value=value, effort=effort, notes=notes,
-                                        flagged=flagged, owner=owner, uat_confirmed=uat_confirmed))
+                                        flagged=flagged, owner=owner, uat_confirmed=uat_confirmed,
+                                        created_at=created_at, last_updated=last_updated))
 
             sub_areas.append(WBSSubArea(wbs_prefix=sub_prefix, title=sub_title, features=features))
 
@@ -293,13 +298,20 @@ def add_feature(path: Path, req: NewFeature) -> Feature:
 
 # ── Pure transform functions (text-in / text-out, no I/O) ────────────────────
 
+def _touch_last_updated(text: str, wbs: str) -> str:
+    """Bump the Last Updated (11th) column to today - called at the end of
+    every mutating feature transform, mirroring the Created At column that's
+    stamped once at add time."""
+    return _set_feature_trailing_cell(text, wbs, 10, date.today().isoformat())
+
+
 def transform_feature_status(text: str, wbs: str, new_status: FeatureStatus) -> str:
     text = _normalize_corrupted_rows(text)
     pattern = rf"^(\| {re.escape(wbs)} \| [^|]+ \|)[ ]+{_STATUS_PAT}[ ]+(\| .*)$"
     new_text, n = re.subn(pattern, rf"\1 {new_status.value} \2", text, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
-    return new_text
+    return _touch_last_updated(new_text, wbs)
 
 
 def transform_feature_name(text: str, wbs: str, new_name: str) -> str:
@@ -311,7 +323,7 @@ def transform_feature_name(text: str, wbs: str, new_name: str) -> str:
     new_text, n = pattern.subn(lambda m: f"{m.group(1)}{new_name} {m.group(2)}", text)
     if n != 1:
         raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
-    return new_text
+    return _touch_last_updated(new_text, wbs)
 
 
 def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
@@ -325,7 +337,7 @@ def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
     )
     new_text, n = pattern.subn(lambda m: f"{m.group(1)} {new_notes} {m.group(3)}", text)
     if n == 1:
-        return new_text
+        return _touch_last_updated(new_text, wbs)
     # Fallback: legacy 4-col or missing notes column
     pattern4 = re.compile(
         rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|)(?:[^|]*\|)?$",
@@ -334,7 +346,7 @@ def transform_feature_notes(text: str, wbs: str, new_notes: str) -> str:
     new_text, n = pattern4.subn(lambda m: f"{m.group(1)}  |  | {new_notes} |", text)
     if n != 1:
         raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
-    return new_text
+    return _touch_last_updated(new_text, wbs)
 
 
 def _normalize_feature_cells(cells: list[str]) -> list[str]:
@@ -350,9 +362,10 @@ def _normalize_feature_cells(cells: list[str]) -> list[str]:
 
 def _set_feature_trailing_cell(text: str, wbs: str, index: int, value: str) -> str:
     """Set the trailing column at `index` (0-based; 6=Flag, 7=Owner, 8=UAT
-    Confirmed) on a feature row, padding with empty columns as needed and
-    preserving every other trailing column untouched. Drops the trailing
-    columns entirely if none of them end up populated."""
+    Confirmed, 9=Created At, 10=Last Updated) on a feature row, padding with
+    empty columns as needed and preserving every other trailing column
+    untouched. Drops the trailing columns entirely if none of them end up
+    populated."""
     text = _normalize_corrupted_rows(text)
     pattern = re.compile(
         rf"^\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|.*\|$",
@@ -376,17 +389,20 @@ def _set_feature_trailing_cell(text: str, wbs: str, index: int, value: str) -> s
 
 def transform_feature_flagged(text: str, wbs: str, flagged: bool) -> str:
     """Set or clear the gap flag (7th column) on a feature row."""
-    return _set_feature_trailing_cell(text, wbs, 6, "gap" if flagged else "")
+    text = _set_feature_trailing_cell(text, wbs, 6, "gap" if flagged else "")
+    return _touch_last_updated(text, wbs)
 
 
 def transform_feature_owner(text: str, wbs: str, owner: str | None) -> str:
     """Set or clear the Owner (8th column) on a feature row."""
-    return _set_feature_trailing_cell(text, wbs, 7, owner or "")
+    text = _set_feature_trailing_cell(text, wbs, 7, owner or "")
+    return _touch_last_updated(text, wbs)
 
 
 def transform_feature_uat(text: str, wbs: str, uat_confirmed: bool) -> str:
     """Set or clear the UAT Confirmed (9th column) on a feature row."""
-    return _set_feature_trailing_cell(text, wbs, 8, "Yes" if uat_confirmed else "")
+    text = _set_feature_trailing_cell(text, wbs, 8, "Yes" if uat_confirmed else "")
+    return _touch_last_updated(text, wbs)
 
 
 def get_feature_status(text: str, wbs: str) -> FeatureStatus | None:
@@ -418,7 +434,7 @@ def transform_feature_score(text: str, wbs: str, value: int | None, effort: int 
     )
     new_text, n = pat6.subn(lambda m: f"{m.group(1)}{v_str}|{e_str}{m.group(2)}", text)
     if n == 1:
-        return new_text
+        return _touch_last_updated(new_text, wbs)
     # Legacy 4-column row: expand to 6 columns by inserting value/effort before notes
     pat4 = re.compile(
         rf"^(\| {re.escape(wbs)} \| [^|]+ \| {_STATUS_PAT} \|)([^|]*)(\|)$",
@@ -427,7 +443,7 @@ def transform_feature_score(text: str, wbs: str, value: int | None, effort: int 
     new_text, n = pat4.subn(lambda m: f"{m.group(1)}{v_str}|{e_str}|{m.group(2)}{m.group(3)}", text)
     if n != 1:
         raise ValueError(f"Expected 1 match for WBS {wbs!r}, got {n}")
-    return new_text
+    return _touch_last_updated(new_text, wbs)
 
 
 def transform_users(text: str, new_markdown: str) -> str:
@@ -442,7 +458,7 @@ def transform_scope(text: str, new_markdown: str) -> str:
     return _replace_section(text, "Product Scope", new_markdown)
 
 
-def transform_add_feature(text: str, req: NewFeature) -> tuple[str, Feature]:
+def transform_add_feature(text: str, req: NewFeature, *, created_at: str | None = None) -> tuple[str, Feature]:
     text = _normalize_corrupted_rows(text)
     sub_pattern = re.compile(rf"^#### {re.escape(req.wbs_prefix)} .+$", re.MULTILINE)
     sub_m = sub_pattern.search(text)
@@ -467,14 +483,19 @@ def transform_add_feature(text: str, req: NewFeature) -> tuple[str, Feature]:
     v_str = str(req.value) if req.value is not None else ""
     e_str = str(req.effort) if req.effort is not None else ""
     encoded_notes = req.notes.replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
-    new_row = f"| {new_wbs} | {req.name} | {req.status.value} | {v_str} | {e_str} | {encoded_notes} |"
-    if req.owner:
-        new_row += f"  | {req.owner} |"  # empty Flag column, then Owner
+    # created_at is only ever passed by transform_move_feature, to carry a
+    # feature's original creation date across a WBS reassignment rather than
+    # resetting it - a brand-new feature always gets today's date.
+    created_at_col = created_at or date.today().isoformat()
+    last_updated_col = date.today().isoformat()
+    new_row = (f"| {new_wbs} | {req.name} | {req.status.value} | {v_str} | {e_str} | {encoded_notes} | "
+               f" | {req.owner or ''} |  | {created_at_col} | {last_updated_col} |")
     insert_pos = sub_m.end() + last_row_m.end()
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
     return new_text, Feature(
         wbs=new_wbs, name=req.name, status=req.status, notes=req.notes,
         value=req.value, effort=req.effort, owner=req.owner,
+        created_at=created_at_col, last_updated=last_updated_col,
     )
 
 
@@ -520,10 +541,11 @@ def transform_move_feature(text: str, wbs: str, target_prefix: str) -> tuple[str
     else:
         value, effort = None, None
         feat_notes = cells[3] if len(cells) > 3 else ""
+    created_at = cells[9].strip() if len(cells) > 9 and cells[9].strip() else None
 
     text = row_pat.sub("", text, count=1)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return transform_add_feature(text, NewFeature(
         wbs_prefix=target_prefix, name=feat_name, status=status,
         value=value, effort=effort, notes=feat_notes,
-    ))
+    ), created_at=created_at)

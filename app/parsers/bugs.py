@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re
+from datetime import date
 from pathlib import Path
 
 from ..fileio import _atomic_write, _lock_for
@@ -20,13 +21,13 @@ _EMPTY_BUGS = """\
 
 ## Active
 
-| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |
-|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|
+| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue | Created At | Last Updated |
+|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|------------|---------------|
 
 ## Closed
 
-| ID | Title | Notes | Resolved In | GH Issue |
-|----|-------|-------|--------------|----------|
+| ID | Title | Notes | Resolved In | GH Issue | Created At | Last Updated |
+|----|-------|-------|--------------|----------|------------|---------------|
 """
 
 
@@ -140,10 +141,13 @@ def _parse_text(text: str):
             owner = row[7].strip() if len(row) > 7 and row[7].strip() else None
             uat_confirmed = len(row) > 8 and row[8].strip().lower() in ("yes", "true")
             gh_issue = row[9].strip() if len(row) > 9 and row[9].strip() else None
+            created_at = row[10].strip() if len(row) > 10 and row[10].strip() else None
+            last_updated = row[11].strip() if len(row) > 11 and row[11].strip() else None
             active.append(BugItem(
                 id=bug_id, title=row[1], severity=severity,
                 status=status, notes=row[4], wbs_ref=wbs_ref, fix_version=fix_version,
                 owner=owner, uat_confirmed=uat_confirmed, gh_issue=gh_issue,
+                created_at=created_at, last_updated=last_updated,
             ))
 
     closed_m = re.search(r"\n## (?:Closed|Resolved)\n(.*?)(?=\n## |\Z)", "\n" + text, re.DOTALL)
@@ -156,7 +160,10 @@ def _parse_text(text: str):
             except ValueError:
                 continue
             gh_issue = row[4].strip() if len(row) > 4 and row[4].strip() else None
-            closed.append(ClosedBug(id=bug_id, title=row[1], notes=row[2], resolved_in=row[3], gh_issue=gh_issue))
+            created_at = row[5].strip() if len(row) > 5 and row[5].strip() else None
+            last_updated = row[6].strip() if len(row) > 6 and row[6].strip() else None
+            closed.append(ClosedBug(id=bug_id, title=row[1], notes=row[2], resolved_in=row[3], gh_issue=gh_issue,
+                                     created_at=created_at, last_updated=last_updated))
 
     return BugDoc(raw_text=text, active=active, closed=closed)
 
@@ -253,12 +260,13 @@ def transform_add_bug(text: str, req: BugCreate) -> tuple[str, BugItem]:
     wbs_col = req.wbs_ref or ""
     owner_col = req.owner or ""
     notes_col = _encode_notes(req.notes)
-    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {notes_col} | {wbs_col} |  | {owner_col} |  |  |"
+    today = date.today().isoformat()
+    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {notes_col} | {wbs_col} |  | {owner_col} |  |  | {today} | {today} |"
     insert_pos = _find_section_last_row(text, "## Active")
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
     return new_text, BugItem(id=new_id, title=req.title, severity=req.severity,
                              status=BugStatus.open, notes=req.notes, wbs_ref=req.wbs_ref,
-                             owner=req.owner)
+                             owner=req.owner, created_at=today, last_updated=today)
 
 
 def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, BugItem]:
@@ -281,17 +289,20 @@ def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, B
     owner_col    = new_owner or ""
     uat_col      = "Yes" if new_uat else ""
     gh_issue_col = bug.gh_issue or ""
+    created_at_col = bug.created_at or ""
+    last_updated   = date.today().isoformat()
     notes_col    = _encode_notes(new_notes)
     pattern  = rf"^\| {bug_id} \|[^\n]+\|$"
     new_row  = (f"| {bug_id} | {new_title} | {new_severity.value} | {new_status.value} | {notes_col} | "
-                f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {gh_issue_col} |")
+                f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {gh_issue_col} | "
+                f"{created_at_col} | {last_updated} |")
     new_text, n = re.subn(pattern, new_row, text, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
     return new_text, BugItem(id=bug_id, title=new_title, severity=new_severity,
                              status=new_status, notes=new_notes, wbs_ref=bug.wbs_ref,
                              fix_version=new_fix_ver, owner=new_owner, uat_confirmed=new_uat,
-                             gh_issue=bug.gh_issue)
+                             gh_issue=bug.gh_issue, created_at=bug.created_at, last_updated=last_updated)
 
 
 def transform_close_bug(text: str, bug_id: int, resolved_in: str = "") -> str:
@@ -308,6 +319,7 @@ def transform_close_bug(text: str, bug_id: int, resolved_in: str = "") -> str:
     # changed), so that context shouldn't be discarded just because the row
     # moved sections.
     notes_col = _encode_notes(bug.notes)
+    created_at_col = bug.created_at or ""
     # Closing removes the bug from the active board entirely (it lives only in
     # the Closed section afterwards) - unlike the active statuses, which keep
     # their row. This is what flips the mirrored GitHub Issue to closed.
@@ -315,7 +327,8 @@ def transform_close_bug(text: str, bug_id: int, resolved_in: str = "") -> str:
     text, n = re.subn(pattern, "", text, count=1, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
-    closed_row = f"| {bug_id} | {bug.title} | {notes_col} | {resolved_in} | {gh_issue_col} |"
+    closed_row = (f"| {bug_id} | {bug.title} | {notes_col} | {resolved_in} | {gh_issue_col} | "
+                  f"{created_at_col} | {date.today().isoformat()} |")
     try:
         insert_pos = _find_section_last_row(text, _closed_section_header(text))
         text = text[:insert_pos] + "\n" + closed_row + text[insert_pos:]
@@ -335,8 +348,11 @@ def transform_set_gh_issue(text: str, bug_id: int, issue_ref: str) -> tuple[str,
     owner_col = bug.owner or ""
     uat_col = "Yes" if bug.uat_confirmed else ""
     notes_col = _encode_notes(bug.notes)
+    created_at_col = bug.created_at or ""
+    last_updated_col = bug.last_updated or ""
     pattern = rf"^\| {bug_id} \|[^\n]+\|$"
     new_row = (f"| {bug_id} | {bug.title} | {bug.severity.value} | {bug.status.value} | {notes_col} | "
-               f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {issue_ref} |")
+               f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {issue_ref} | "
+               f"{created_at_col} | {last_updated_col} |")
     new_text, n = re.subn(pattern, new_row, text, count=1, flags=re.MULTILINE)
     return new_text, n == 1

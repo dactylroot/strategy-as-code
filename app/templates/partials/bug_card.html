@@ -8,6 +8,8 @@
      data-fix-version="{{ bug.fix_version or '' }}"
      data-owner="{{ bug.owner or '' }}"
      data-uat-confirmed="{{ bug.uat_confirmed | lower }}"
+     data-created-at="{{ bug.created_at or '' }}"
+     data-last-updated="{{ bug.last_updated or '' }}"
      onclick="openBugPanel(
        parseInt(this.dataset.id),
        this.dataset.title,
@@ -17,7 +19,9 @@
        this.dataset.wbs,
        this.dataset.fixVersion,
        this.dataset.owner,
-       this.dataset.uatConfirmed === 'true'
+       this.dataset.uatConfirmed === 'true',
+       this.dataset.createdAt,
+       this.dataset.lastUpdated
      )">
   <div class="bug-meta">
     <span class="bug-id">#{{ bug.id }}</span>

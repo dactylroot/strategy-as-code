@@ -174,7 +174,8 @@ def features_page(request: Request):
     features_json = json.dumps([
         {"wbs": f.wbs, "name": f.name, "status": f.stage, "raw_status": f.status.value,
          "notes": f.notes or "", "value": f.value, "effort": f.effort,
-         "flagged": f.flagged, "owner": f.owner or "", "uat_confirmed": f.uat_confirmed}
+         "flagged": f.flagged, "owner": f.owner or "", "uat_confirmed": f.uat_confirmed,
+         "created_at": f.created_at or "", "last_updated": f.last_updated or ""}
         for f in all_features
     ])
 

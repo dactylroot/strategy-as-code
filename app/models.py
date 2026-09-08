@@ -23,6 +23,8 @@ class Feature(BaseModel):
     flagged: bool = False
     owner: str | None = None
     uat_confirmed: bool = False
+    created_at: str | None = None   # ISO date - stamped once when the row is first added
+    last_updated: str | None = None  # ISO date - bumped on every field-level edit
 
     @computed_field
     @property
@@ -237,6 +239,8 @@ class BugItem(BaseModel):
     owner: str | None = None
     uat_confirmed: bool = False
     gh_issue: str | None = None  # GitHub issue number, e.g. "42" - one-way mirror, never read back
+    created_at: str | None = None   # ISO date - stamped once when the bug is first filed
+    last_updated: str | None = None  # ISO date - bumped on every field-level edit
 
 
 class ClosedBug(BaseModel):
@@ -245,6 +249,8 @@ class ClosedBug(BaseModel):
     notes: str = ""
     resolved_in: str = ""
     gh_issue: str | None = None
+    created_at: str | None = None
+    last_updated: str | None = None
 
 
 class BugDoc(BaseModel):

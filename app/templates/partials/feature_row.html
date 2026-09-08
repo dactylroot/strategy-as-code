@@ -6,6 +6,8 @@
     data-flagged="{{ feature.flagged | lower }}"
     data-owner="{{ feature.owner or '' }}"
     data-uat-confirmed="{{ feature.uat_confirmed | lower }}"
+    data-created-at="{{ feature.created_at or '' }}"
+    data-last-updated="{{ feature.last_updated or '' }}"
     {% if feature.value %}data-value="{{ feature.value }}"{% endif %}
     {% if feature.effort %}data-effort="{{ feature.effort }}"{% endif %}>
   <td class="wbs-code">{{ feature.wbs }}</td>

@@ -143,6 +143,8 @@
      data-flagged="{{ entry.f.flagged | lower }}"
      data-owner="{{ entry.f.owner or '' }}"
      data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
+     data-created-at="{{ entry.f.created_at or '' }}"
+     data-last-updated="{{ entry.f.last_updated or '' }}"
      {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
      {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
      {% if initiative %}data-initiative="{{ initiative.name }}" data-initiative-kind="{{ initiative.kind }}"{% endif %}
@@ -186,6 +188,8 @@
            data-flagged="{{ entry.f.flagged | lower }}"
            data-owner="{{ entry.f.owner or '' }}"
            data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
+           data-created-at="{{ entry.f.created_at or '' }}"
+           data-last-updated="{{ entry.f.last_updated or '' }}"
            {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
            {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
            onclick="openFeaturePanelFromEl(this)"
@@ -318,6 +322,8 @@
              data-flagged="{{ entry.f.flagged | lower }}"
              data-owner="{{ entry.f.owner or '' }}"
              data-uat-confirmed="{{ entry.f.uat_confirmed | lower }}"
+             data-created-at="{{ entry.f.created_at or '' }}"
+             data-last-updated="{{ entry.f.last_updated or '' }}"
              {% if entry.f.value %}data-value="{{ entry.f.value }}"{% endif %}
              {% if entry.f.effort %}data-effort="{{ entry.f.effort }}"{% endif %}
              onclick="openFeaturePanelFromEl(this)">

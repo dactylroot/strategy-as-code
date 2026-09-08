@@ -25,6 +25,7 @@
             onblur="this.style.borderBottomColor='transparent'"
             onchange="saveFdp()"
             placeholder="Feature name">
+          <div id="fdp-dates" style="margin-top:0.3rem;font-size:0.68rem;color:var(--color-text-muted);"></div>
         </div>
         <button onclick="closeFeaturePanel()" style="background:none;border:none;cursor:pointer;padding:0.35rem;color:var(--color-text-muted);font-size:1.25rem;line-height:1;flex-shrink:0;">✕</button>
       </div>
@@ -219,6 +220,8 @@ function openFeaturePanelFromEl(el) {
     uatConfirmed: d.uatConfirmed === 'true',
     initiative: d.initiative || null,
     initiativeKind: d.initiativeKind || null,
+    createdAt: d.createdAt || '',
+    lastUpdated: d.lastUpdated || '',
   });
 }
 
@@ -259,6 +262,10 @@ function openFeaturePanel(opts) {
     meta += `<span style="font-size:0.72rem;font-weight:600;color:${iniColor};background:${iniBg};padding:0.15rem 0.5rem;border-radius:3px;">🎯 ${opts.initiative} · ${kindLabel}</span>`;
   }
   document.getElementById('fdp-meta').innerHTML  = meta;
+  let fdpDateParts = [];
+  if (opts.createdAt) fdpDateParts.push(`Created ${opts.createdAt}`);
+  if (opts.lastUpdated) fdpDateParts.push(`Updated ${opts.lastUpdated}`);
+  document.getElementById('fdp-dates').textContent = fdpDateParts.join(' · ');
   document.getElementById('fdp-name').value  = opts.name  || '';
   document.getElementById('fdp-notes').value = (opts.notes || '').replace(/<br\s*\/?>/gi, '\n');
   fdpNotesMode('edit');

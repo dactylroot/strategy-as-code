@@ -321,6 +321,8 @@ details[open] .chevron { transform: rotate(90deg); }
          data-flagged="{{ f.flagged | lower }}"
          data-owner="{{ f.owner or '' }}"
          data-uat-confirmed="{{ f.uat_confirmed | lower }}"
+         data-created-at="{{ f.created_at or '' }}"
+         data-last-updated="{{ f.last_updated or '' }}"
          {% if f.value %}data-value="{{ f.value }}"{% endif %}
          {% if f.effort %}data-effort="{{ f.effort }}"{% endif %}
          onclick="openFeaturePanelFromEl(this)"
@@ -381,6 +383,8 @@ details[open] .chevron { transform: rotate(90deg); }
                   data-flagged="{{ feature.flagged | lower }}"
                   data-owner="{{ feature.owner or '' }}"
                   data-uat-confirmed="{{ feature.uat_confirmed | lower }}"
+                  data-created-at="{{ feature.created_at or '' }}"
+                  data-last-updated="{{ feature.last_updated or '' }}"
                   onclick="openFeaturePanelFromEl(this)"
                   style="cursor:pointer;padding:0 0 0 0.5rem;border-radius:3px;transition:background 0.1s;
                          {% if feature.status.value in ('Live', 'Released') %}text-decoration:line-through;color:var(--color-text-muted);{% endif %}"

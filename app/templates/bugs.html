@@ -126,7 +126,9 @@
             data-title="{{ r.title }}"
             data-notes="{{ r.notes or '' }}"
             data-resolved-in="{{ r.resolved_in or '' }}"
-            onclick="openResolvedPanel(this.dataset.id, this.dataset.title, this.dataset.notes, this.dataset.resolvedIn)">
+            data-created-at="{{ r.created_at or '' }}"
+            data-last-updated="{{ r.last_updated or '' }}"
+            onclick="openResolvedPanel(this.dataset.id, this.dataset.title, this.dataset.notes, this.dataset.resolvedIn, this.dataset.createdAt, this.dataset.lastUpdated)">
           <td class="wbs-code">{{ r.id }}</td>
           <td style="font-size:0.875rem;text-decoration:line-through;color:var(--color-text-muted);">{{ r.title }}</td>
           <td class="text-muted">{{ (r.notes or '').replace('<br>', ' ') | truncate(80, true, '…') }}</td>
@@ -150,6 +152,7 @@
         <span id="rpResolvedIn" style="font-size:0.72rem;font-weight:700;color:var(--color-text-muted);"></span>
       </div>
       <p id="rpTitle" style="font-size:1.05rem;font-weight:700;color:var(--color-text-primary);margin:0;"></p>
+      <div id="rpDates" style="margin-top:0.3rem;font-size:0.68rem;color:var(--color-text-muted);"></div>
     </div>
     <button onclick="document.getElementById('resolvedPanel').close()"
             style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);font-size:1.2rem;padding:0.2rem 0.35rem;border-radius:4px;flex-shrink:0;">✕</button>
@@ -234,6 +237,7 @@
                  background:transparent;transition:border-color 0.15s;"
                  onfocus="this.style.borderBottomColor='var(--gap)'"
                  onblur="this.style.borderBottomColor='transparent'">
+          <div id="bpDates" style="margin-top:0.3rem;font-size:0.68rem;color:var(--color-text-muted);"></div>
         </div>
         <button onclick="closeBugPanel()" style="background:none;border:none;cursor:pointer;padding:0.35rem;color:var(--color-text-muted);font-size:1.25rem;line-height:1;">✕</button>
       </div>
@@ -321,12 +325,16 @@
 let _bugId = null;
 let _rpId  = null;
 
-function openResolvedPanel(id, title, notes, resolvedIn) {
+function openResolvedPanel(id, title, notes, resolvedIn, createdAt, lastUpdated) {
   _rpId = id;
   document.getElementById('rpId').textContent = '#' + id;
   document.getElementById('rpTitle').textContent = title;
   document.getElementById('rpNotes').textContent = (notes || '-').replace(/<br\s*\/?>/gi, '\n');
   document.getElementById('rpResolvedIn').textContent = resolvedIn ? ('v' + resolvedIn) : '';
+  let rpDateParts = [];
+  if (createdAt) rpDateParts.push(`Filed ${createdAt}`);
+  if (lastUpdated) rpDateParts.push(`Closed ${lastUpdated}`);
+  document.getElementById('rpDates').textContent = rpDateParts.join(' · ');
   const section = document.getElementById('rpScreenshotSection');
   const img = document.getElementById('rpScreenshotImg');
   section.style.display = 'none';
@@ -394,7 +402,7 @@ function submitBug() {
   });
 }
 
-function openBugPanel(id, title, severity, status, notes, wbs, fixVersion, owner, uatConfirmed) {
+function openBugPanel(id, title, severity, status, notes, wbs, fixVersion, owner, uatConfirmed, createdAt, lastUpdated) {
   _bugId = id;
   document.getElementById('bpTitle').value    = title;
   const bpNotes = document.getElementById('bpNotes');
@@ -417,6 +425,11 @@ function openBugPanel(id, title, severity, status, notes, wbs, fixVersion, owner
   if (fixVersion) meta += `<span style="font-size:0.68rem;font-weight:700;color:var(--planned);background:var(--planned-bg);padding:0.1rem 0.35rem;border-radius:3px;">${fixVersion}</span>`;
   if (wbs) meta += `<span style="font-family:var(--font-mono);font-size:0.68rem;color:var(--color-text-muted);background:var(--color-bg-card-hover);padding:0.1rem 0.35rem;border-radius:3px;">${wbs}</span>`;
   document.getElementById('bpMeta').innerHTML = meta;
+  const datesEl = document.getElementById('bpDates');
+  let dateParts = [];
+  if (createdAt) dateParts.push(`Filed ${createdAt}`);
+  if (lastUpdated) dateParts.push(`Updated ${lastUpdated}`);
+  datesEl.textContent = dateParts.join(' · ');
   document.getElementById('bpResolvedIn').value = '';
   // Load screenshot
   const existing = document.getElementById('bpScreenshotExisting');

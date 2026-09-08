@@ -301,6 +301,8 @@
                  data-owner="{{ item.owner or '' }}"
                  data-uat-confirmed="{{ item.uat_confirmed | lower }}"
                  data-flagged="{{ item.flagged | lower }}"
+                 data-created-at="{{ item.created_at or '' }}"
+                 data-last-updated="{{ item.last_updated or '' }}"
                  onclick="openFeaturePanelFromEl(this)">
               <div class="fc-head" style="padding:0.4rem 0.65rem;">
                 <div class="fc-meta">
@@ -355,6 +357,8 @@
                  data-owner="{{ item.owner or '' }}"
                  data-uat-confirmed="{{ item.uat_confirmed | lower }}"
                  data-flagged="{{ item.flagged | lower }}"
+                 data-created-at="{{ item.created_at or '' }}"
+                 data-last-updated="{{ item.last_updated or '' }}"
                  onclick="openFeaturePanelFromEl(this)">
               <div class="fc-head" style="padding:0.4rem 0.65rem;">
                 <div class="fc-meta">
@@ -531,6 +535,8 @@ function onFeatureSearch(q) {
     if (f.value)  el.dataset.value  = f.value;
     if (f.effort) el.dataset.effort = f.effort;
     if (f.owner)  el.dataset.owner  = f.owner;
+    if (f.created_at)   el.dataset.createdAt   = f.created_at;
+    if (f.last_updated) el.dataset.lastUpdated = f.last_updated;
     el.onclick = function() { openFeaturePanelFromEl(this); };
     el.innerHTML = `
       <div class="fe-result-meta">
