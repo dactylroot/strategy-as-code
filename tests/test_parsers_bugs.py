@@ -213,7 +213,93 @@ AM Tested: still broken. |  |  |  |  |  |
         assert "First part of the note" in healed.notes
 
 
-class TestTransformCloseBug:
+class TestColumnCountMatchesHeader:
+    """2026-09: transform_update_bug always wrote a 12-column row regardless
+    of how many columns the file's own Active header declared. Renewals'
+    real BUGS.MD has a 10-column Active header - updating bug #35 there
+    (setting a UAT-confirmed date) produced a row misaligned with the
+    header, corrupting Severity/Status/Notes. These lock in the fix:
+    row-building must match the file's own declared column count, and a
+    value with a literal '|' must never silently desync the row."""
+
+    RENEWALS_SCHEMA = """\
+# Bugs
+
+## Active
+
+| ID | Title | Severity | Status | Notes | WBS | Fix Version | Owner | UAT Confirmed | GH Issue |
+|----|-------|----------|--------|-------|-----|-------------|-------|----------------|----------|
+| 35 | Renewal Data missing | Medium | Resolved | Root cause notes here. |  | 0.4.2 | Ashley Murray |  |  |
+
+## Closed
+
+| ID | Title | Notes | Resolved In | GH Issue |
+|----|-------|-------|--------------|----------|
+"""
+
+    def test_update_preserves_10_column_schema(self):
+        req = BugUpdate(uat_confirmed=True)
+        result, bug = parser.transform_update_bug(self.RENEWALS_SCHEMA, 35, req)
+        row = next(l for l in result.splitlines() if l.startswith("| 35 |"))
+        cells = [c.strip() for c in row.split("|")[1:-1]]
+        assert len(cells) == 10
+        assert cells[2] == "Medium"       # Severity preserved
+        assert cells[3] == "Resolved"     # Status preserved
+        assert cells[4] == "Root cause notes here."
+        assert cells[8] == "Yes"          # UAT Confirmed
+        doc = parser._parse_text(result)
+        assert doc.active[0].severity == BugSeverity.medium
+        assert doc.active[0].status == BugStatus.resolved
+        assert doc.active[0].uat_confirmed is True
+
+    def test_set_gh_issue_preserves_10_column_schema(self):
+        new_text, ok = parser.transform_set_gh_issue(self.RENEWALS_SCHEMA, 35, "42")
+        assert ok
+        row = next(l for l in new_text.splitlines() if l.startswith("| 35 |"))
+        cells = [c.strip() for c in row.split("|")[1:-1]]
+        assert len(cells) == 10
+        assert cells[2] == "Medium"
+        assert cells[3] == "Resolved"
+
+    def test_add_bug_matches_existing_10_column_schema(self):
+        req = BugCreate(title="New bug")
+        result, bug = parser.transform_add_bug(self.RENEWALS_SCHEMA, req)
+        rows = [l for l in result.splitlines() if l.startswith(f"| {bug.id} |")]
+        assert len(rows) == 1
+        cells = [c.strip() for c in rows[0].split("|")[1:-1]]
+        assert len(cells) == 10
+
+    def test_close_bug_matches_existing_5_column_closed_schema(self):
+        result = parser.transform_close_bug(self.RENEWALS_SCHEMA, 35, resolved_in="0.4.2")
+        doc = parser._parse_text(result)
+        closed_row = next(l for l in result.splitlines() if l.startswith("| 35 |"))
+        cells = [c.strip() for c in closed_row.split("|")[1:-1]]
+        assert len(cells) == 5
+        r = next(x for x in doc.closed if x.id == 35)
+        assert r.resolved_in == "0.4.2"
+
+    def test_literal_pipe_in_notes_is_escaped_not_left_to_corrupt_the_row(self):
+        req = BugUpdate(notes="Uses a flag | other_flag bitwise check")
+        result, bug = parser.transform_update_bug(self.RENEWALS_SCHEMA, 35, req)
+        row = next(l for l in result.splitlines() if l.startswith("| 35 |"))
+        cells = [c.strip() for c in row.split("|")[1:-1]]
+        assert len(cells) == 10
+        assert "|" not in cells[4]
+        assert "flag" in cells[4] and "other_flag" in cells[4]
+
+    def test_build_row_clamps_to_available_fields_when_header_declares_more(self):
+        # A header claiming more columns than this row type even has (e.g. a
+        # hand-edited file) must not crash - clamp to what's actually available.
+        row = parser._build_row({"id": 1, "title": "x"}, ("id", "title"), column_count=5)
+        assert len([c.strip() for c in row.split("|")[1:-1]]) == 2
+
+    def test_build_row_raises_if_a_value_still_desyncs_the_column_count(self, monkeypatch):
+        # _escape_cell always neutralizes a literal '|' before this check runs
+        # in practice, but the guard itself must still fire if that ever stops
+        # being true - simulate that by disabling escaping for this one call.
+        monkeypatch.setattr(parser, "_escape_cell", lambda v: str(v))
+        with pytest.raises(ValueError, match="unescaped"):
+            parser._build_row({"id": 1, "title": "a | b"}, ("id", "title"), column_count=2)
     def test_moves_to_closed_and_leaves_active(self):
         # transform_close_bug removes the bug from the active board entirely
         # and appends it to the Closed table (unlike the active statuses,

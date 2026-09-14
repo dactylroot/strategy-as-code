@@ -79,6 +79,76 @@ def _parse_table_rows(block: str) -> list[list[str]]:
     return rows
 
 
+# Canonical column order this app understands. A given host's BUGS.MD may
+# declare only a *prefix* of these in its own section header - e.g. renewals'
+# real file has a 10-column Active table and 5-column Closed table (no
+# Created At/Last Updated at all), and older fixtures/hosts go as low as
+# 6/4. Row-building functions below always match however many columns the
+# file's own header actually declares (see _section_column_count/_build_row)
+# instead of assuming this full set is present - that mismatch (writing a
+# 12-column row into a file whose header - and every other row - declares
+# 10) is what produced a corrupted, misaligned row in production in 2026-09.
+_ACTIVE_FIELDS = (
+    "id", "title", "severity", "status", "notes", "wbs_ref", "fix_version",
+    "owner", "uat_confirmed", "gh_issue", "created_at", "last_updated",
+)
+_CLOSED_FIELDS = ("id", "title", "notes", "resolved_in", "gh_issue", "created_at", "last_updated")
+
+
+def _section_column_count(text: str, section_header: str) -> int | None:
+    """Return how many columns `section_header`'s own header row declares in
+    this file, or None if the section/header row can't be found (e.g. a
+    brand-new file being built from _EMPTY_BUGS - callers fall back to the
+    full canonical field set in that case)."""
+    header_pos = text.find(f"\n{section_header}\n")
+    if header_pos == -1:
+        return None
+    rest = text[header_pos + len(f"\n{section_header}\n"):]
+    m = re.search(r"^\|.+\|$", rest, re.MULTILINE)
+    if not m:
+        return None
+    return len(m.group(0).split("|")) - 2
+
+
+def _escape_cell(value: str) -> str:
+    """Escape characters that would otherwise corrupt the one-row-per-line,
+    pipe-delimited format this file uses: a literal newline would split the
+    row across physical lines (see _parse_table_rows' recovery logic for
+    what that looks like), and a literal "|" would silently introduce an
+    extra column - splitting every following cell in the row into the wrong
+    slot, the same shape of corruption a production row suffered in 2026-09.
+    "&#124;" (not a backslash escape) survives the parser's plain
+    `str.split("|")` unlike "\\|" would, and any HTML-rendering frontend
+    decodes it back to "|" for free, the same way "<br>" already renders as
+    a line break without this app doing anything special on read."""
+    return (
+        str(value).replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
+        .replace("|", "&#124;")
+    )
+
+
+def _build_row(values: dict, fields: tuple[str, ...], column_count: int | None) -> str:
+    """Render one table row from `values` (keyed by names in `fields`),
+    restricted to however many columns this file's own section header
+    actually declares - `column_count`, a prefix length into `fields` (see
+    _section_column_count). Falls back to every field in `fields` when the
+    header can't be found. Validates the rendered row round-trips to exactly
+    that many cells before returning it, so a value that still carries an
+    unescaped "|" aborts the write instead of silently desyncing the row
+    from the header."""
+    n = column_count if column_count is not None else len(fields)
+    n = max(1, min(n, len(fields)))
+    cells = [_escape_cell(values.get(f, "") or "") for f in fields[:n]]
+    row = "| " + " | ".join(cells) + " |"
+    check = row.split("|")[1:-1]
+    if len(check) != n:
+        raise ValueError(
+            f"Built a {len(check)}-column row but this file's header declares "
+            f"{n} columns - a field likely still contains an unescaped '|'"
+        )
+    return row
+
+
 def _closed_section_header(text: str) -> str:
     """Return whichever terminal-section header this file actually uses,
     preferring the current "## Closed" and falling back to the legacy
@@ -194,11 +264,10 @@ def _normalize_corrupted_rows(text: str) -> str:
 
 
 def _encode_notes(notes: str) -> str:
-    """Escape literal line breaks so a multi-line note can't split a table
-    row across multiple lines - the row parser requires each row to be a
-    single line starting and ending with '|'. Mirrors product.py's feature
-    notes encoding."""
-    return notes.replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
+    """Escape literal line breaks (and, via _escape_cell, literal '|'s) so a
+    multi-line or pipe-bearing note can't split a table row across multiple
+    lines or columns. Mirrors product.py's feature notes encoding."""
+    return _escape_cell(notes)
 
 
 def _next_id(active, closed) -> int:
@@ -257,11 +326,15 @@ def transform_add_bug(text: str, req: BugCreate) -> tuple[str, BugItem]:
     text = _normalize_corrupted_rows(text)
     doc = _parse_text(text)
     new_id = _next_id(doc.active, doc.closed)
-    wbs_col = req.wbs_ref or ""
-    owner_col = req.owner or ""
-    notes_col = _encode_notes(req.notes)
     today = date.today().isoformat()
-    new_row = f"| {new_id} | {req.title} | {req.severity.value} | Open | {notes_col} | {wbs_col} |  | {owner_col} |  |  | {today} | {today} |"
+    values = {
+        "id": new_id, "title": req.title, "severity": req.severity.value,
+        "status": "Open", "notes": req.notes, "wbs_ref": req.wbs_ref or "",
+        "fix_version": "", "owner": req.owner or "", "uat_confirmed": "",
+        "gh_issue": "", "created_at": today, "last_updated": today,
+    }
+    column_count = _section_column_count(text, "## Active")
+    new_row = _build_row(values, _ACTIVE_FIELDS, column_count)
     insert_pos = _find_section_last_row(text, "## Active")
     new_text = text[:insert_pos] + "\n" + new_row + text[insert_pos:]
     return new_text, BugItem(id=new_id, title=req.title, severity=req.severity,
@@ -284,19 +357,20 @@ def transform_update_bug(text: str, bug_id: int, req: BugUpdate) -> tuple[str, B
     new_fix_ver  = req.fix_version   if req.fix_version   is not None else bug.fix_version
     new_owner    = req.owner         if req.owner         is not None else bug.owner
     new_uat      = req.uat_confirmed if req.uat_confirmed is not None else bug.uat_confirmed
-    wbs_col      = bug.wbs_ref or ""
-    fix_ver_col  = new_fix_ver or ""
-    owner_col    = new_owner or ""
-    uat_col      = "Yes" if new_uat else ""
-    gh_issue_col = bug.gh_issue or ""
-    created_at_col = bug.created_at or ""
-    last_updated   = date.today().isoformat()
-    notes_col    = _encode_notes(new_notes)
+    last_updated = date.today().isoformat()
+    values = {
+        "id": bug_id, "title": new_title, "severity": new_severity.value,
+        "status": new_status.value, "notes": new_notes, "wbs_ref": bug.wbs_ref or "",
+        "fix_version": new_fix_ver or "", "owner": new_owner or "",
+        "uat_confirmed": "Yes" if new_uat else "", "gh_issue": bug.gh_issue or "",
+        "created_at": bug.created_at or "", "last_updated": last_updated,
+    }
+    column_count = _section_column_count(text, "## Active")
+    new_row = _build_row(values, _ACTIVE_FIELDS, column_count)
     pattern  = rf"^\| {bug_id} \|[^\n]+\|$"
-    new_row  = (f"| {bug_id} | {new_title} | {new_severity.value} | {new_status.value} | {notes_col} | "
-                f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {gh_issue_col} | "
-                f"{created_at_col} | {last_updated} |")
-    new_text, n = re.subn(pattern, new_row, text, flags=re.MULTILINE)
+    # A function replacement (not the raw string) so a backslash or group
+    # reference inside title/notes text is never reinterpreted by re.subn.
+    new_text, n = re.subn(pattern, lambda _m: new_row, text, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
     return new_text, BugItem(id=bug_id, title=new_title, severity=new_severity,
@@ -313,13 +387,15 @@ def transform_close_bug(text: str, bug_id: int, resolved_in: str = "") -> str:
     bug = next((b for b in doc.active if b.id == bug_id), None)
     if bug is None:
         raise ValueError(f"Bug {bug_id} not found")
-    gh_issue_col = bug.gh_issue or ""
     # Carry the active row's own notes forward - by the time a bug is closed
     # its Notes typically already documents the fix (root cause, what
     # changed), so that context shouldn't be discarded just because the row
     # moved sections.
-    notes_col = _encode_notes(bug.notes)
-    created_at_col = bug.created_at or ""
+    values = {
+        "id": bug_id, "title": bug.title, "notes": bug.notes,
+        "resolved_in": resolved_in, "gh_issue": bug.gh_issue or "",
+        "created_at": bug.created_at or "", "last_updated": date.today().isoformat(),
+    }
     # Closing removes the bug from the active board entirely (it lives only in
     # the Closed section afterwards) - unlike the active statuses, which keep
     # their row. This is what flips the mirrored GitHub Issue to closed.
@@ -327,10 +403,11 @@ def transform_close_bug(text: str, bug_id: int, resolved_in: str = "") -> str:
     text, n = re.subn(pattern, "", text, count=1, flags=re.MULTILINE)
     if n != 1:
         raise ValueError(f"Expected 1 match for bug {bug_id}, got {n}")
-    closed_row = (f"| {bug_id} | {bug.title} | {notes_col} | {resolved_in} | {gh_issue_col} | "
-                  f"{created_at_col} | {date.today().isoformat()} |")
+    closed_header = _closed_section_header(text)
+    column_count = _section_column_count(text, closed_header)
+    closed_row = _build_row(values, _CLOSED_FIELDS, column_count)
     try:
-        insert_pos = _find_section_last_row(text, _closed_section_header(text))
+        insert_pos = _find_section_last_row(text, closed_header)
         text = text[:insert_pos] + "\n" + closed_row + text[insert_pos:]
     except ValueError:
         pass
@@ -343,16 +420,18 @@ def transform_set_gh_issue(text: str, bug_id: int, issue_ref: str) -> tuple[str,
     bug = next((b for b in doc.active if b.id == bug_id), None)
     if bug is None:
         return text, False
-    wbs_col = bug.wbs_ref or ""
-    fix_ver_col = bug.fix_version or ""
-    owner_col = bug.owner or ""
-    uat_col = "Yes" if bug.uat_confirmed else ""
-    notes_col = _encode_notes(bug.notes)
-    created_at_col = bug.created_at or ""
-    last_updated_col = bug.last_updated or ""
+    values = {
+        "id": bug_id, "title": bug.title, "severity": bug.severity.value,
+        "status": bug.status.value, "notes": bug.notes, "wbs_ref": bug.wbs_ref or "",
+        "fix_version": bug.fix_version or "", "owner": bug.owner or "",
+        "uat_confirmed": "Yes" if bug.uat_confirmed else "", "gh_issue": issue_ref,
+        "created_at": bug.created_at or "", "last_updated": bug.last_updated or "",
+    }
+    column_count = _section_column_count(text, "## Active")
+    try:
+        new_row = _build_row(values, _ACTIVE_FIELDS, column_count)
+    except ValueError:
+        return text, False
     pattern = rf"^\| {bug_id} \|[^\n]+\|$"
-    new_row = (f"| {bug_id} | {bug.title} | {bug.severity.value} | {bug.status.value} | {notes_col} | "
-               f"{wbs_col} | {fix_ver_col} | {owner_col} | {uat_col} | {issue_ref} | "
-               f"{created_at_col} | {last_updated_col} |")
-    new_text, n = re.subn(pattern, new_row, text, count=1, flags=re.MULTILINE)
+    new_text, n = re.subn(pattern, lambda _m: new_row, text, count=1, flags=re.MULTILINE)
     return new_text, n == 1
