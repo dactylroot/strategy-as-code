@@ -229,30 +229,6 @@ details[open] .chevron { transform: rotate(90deg); }
   {% if product.summary %}<p style="color:var(--color-text-secondary);font-size:0.875rem;line-height:1.6;margin:0;max-width:72ch;">{{ product.summary }}</p>{% endif %}
 </div>
 
-<!-- Stats row -->
-<div class="stats-row">
-  <div class="stat-card">
-    <p class="stat-label">Total Features</p>
-    <p class="stat-value">{{ product.total_features }}</p>
-  </div>
-  <div class="stat-card">
-    <p class="stat-label">Live</p>
-    <p class="stat-value live">{{ product.live_count }}</p>
-  </div>
-  <div class="stat-card">
-    <p class="stat-label">Planned</p>
-    <p class="stat-value planned">{{ product.planned_count }}</p>
-  </div>
-  <div class="stat-card">
-    <p class="stat-label">Not Started</p>
-    <p class="stat-value gap">{{ product.gap_count }}</p>
-  </div>
-  <div class="stat-card">
-    <p class="stat-label">Overall</p>
-    <p class="stat-value" style="color:var(--color-text-primary);">{{ (product.overall_completion_pct * 100)|int }}%</p>
-  </div>
-</div>
-
 <!-- Feature Lifecycle Pipeline -->
 {% set ideas_count       = ideas | length %}
 {% set prioritized_count = scored | length %}

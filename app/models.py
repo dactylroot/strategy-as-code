@@ -323,6 +323,3 @@ class RoadmapFeaturesUpdate(BaseModel):
     freeform_backlog: list[str] = []
 
 
-class NewRelease(BaseModel):
-    version: str
-    bug_fixes: list[str] = []

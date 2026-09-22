@@ -80,6 +80,8 @@
 .initiative-card[data-initiative-kind="major"] .ini-count { color: var(--color-purple-border); }
 .ini-remove { flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--planned-border); font-size: 0.8rem; padding: 0; line-height: 1; border-radius: 3px; }
 .ini-remove:hover { color: var(--gap); }
+.ini-close { color: var(--live); font-weight: 700; }
+.ini-close:hover { color: var(--live); filter: brightness(0.8); }
 .ini-complete-banner { background: var(--live-bg); border-bottom: 1px solid var(--live-border); padding: 0.35rem 0.65rem; font-size: 0.7rem; color: var(--live); font-weight: 600; }
 .initiative-list { padding: 0.5rem; min-height: 2.5rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: flex-start; }
 .initiative-list .rm-feat { flex: 0 0 auto; width: 260px; margin-bottom: 0; }
@@ -234,7 +236,7 @@
 
     <div class="initiative-grid" id="initiative-grid">
       {% for ini in initiatives_display %}
-      <div class="initiative-card" data-initiative-name="{{ ini.name }}" data-initiative-kind="{{ ini.kind }}">
+      <div class="initiative-card" data-initiative-name="{{ ini.name }}" data-initiative-kind="{{ ini.kind }}" data-all-complete="{{ ini.all_complete | lower }}">
         <div class="initiative-card-header" onclick="toggleInitiative(this)">
           <span class="ini-chevron">▾</span>
           <button type="button" class="ini-kind-badge ini-kind-{{ ini.kind }}" onclick="event.stopPropagation();toggleInitiativeKind(this)" title="Click to toggle Major/Minor">{{ 'Major' if ini.kind == 'major' else 'Minor' }}</button>
@@ -246,10 +248,10 @@
           {% else %}
           <span class="ini-count">0</span>
           {% endif %}
-          <button class="ini-remove" onclick="removeInitiative(event, this)" title="Remove">✕</button>
+          <button class="ini-remove {% if ini.all_complete %}ini-close{% endif %}" onclick="removeInitiative(event, this)" title="{{ 'Close - all features shipped' if ini.all_complete else 'Remove' }}">{{ '✓' if ini.all_complete else '✕' }}</button>
         </div>
         {% if ini.all_complete %}
-        <div class="ini-complete-banner">All features complete - ready to release ({{ 'Major' if ini.kind == 'major' else 'Minor' }} bump)</div>
+        <div class="ini-complete-banner">All features complete - ready to release ({{ 'Major' if ini.kind == 'major' else 'Minor' }} bump). Close it out once it's shipped.</div>
         {% endif %}
         <div class="initiative-list" data-pool="initiative">
           {% for entry in ini.features %}{{ feat_card(entry, ini) }}{% endfor %}
@@ -492,10 +494,14 @@ function removeInitiative(e, btn) {
   e.stopPropagation();
   const card = btn.closest('[data-initiative-name]');
   const name = card.dataset.initiativeName;
-  appConfirm(`Delete initiative "${name}"? In-progress features move to Other; everything else returns to the Backlog.`, () => {
+  const complete = card.dataset.allComplete === 'true';
+  const msg = complete
+    ? `Close initiative "${name}"? All its features are Live/Released, so this just removes it from the roadmap - feature statuses are unaffected. Close it once the release has actually shipped, since this also clears its version-bump rationale.`
+    : `Delete initiative "${name}"? In-progress features move to Other; everything else returns to the Backlog.`;
+  appConfirm(msg, () => {
     card.remove();
     saveRoadmap(null, true);
-  }, { danger: true, confirmLabel: 'Delete' });
+  }, { danger: !complete, confirmLabel: complete ? 'Close' : 'Delete' });
 }
 
 function renameInitiative(input) {

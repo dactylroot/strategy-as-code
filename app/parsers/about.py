@@ -5,8 +5,7 @@ from pathlib import Path
 from ..fileio import _atomic_write, _lock_for
 from ..models import (
     AboutDoc, ChangelogEntry, ChangelogGroup,
-    RoadmapSection, NewRelease, RoadmapUpdate, Initiative, InitiativeUpdate,
-    FeatureStatus, ProductDoc,
+    RoadmapSection, RoadmapUpdate, Initiative, InitiativeUpdate,
 )
 
 
@@ -98,13 +97,6 @@ def update_roadmap(path: Path, update: RoadmapUpdate) -> None:
         _atomic_write(path, transform_update_roadmap(text, update))
 
 
-def add_changelog_entry(path: Path, release: NewRelease, in_progress_items: list[str]) -> None:
-    lock = _lock_for(path)
-    with lock:
-        text = path.read_text(encoding="utf-8")
-        _atomic_write(path, transform_add_changelog_entry(text, release, in_progress_items))
-
-
 # ── Pure transform functions (text-in / text-out, no I/O) ────────────────────
 
 _INITIATIVE_HEADING_RE = re.compile(r"^(.*?)\s*\((Major|Minor)\)\s*$")
@@ -168,46 +160,3 @@ def transform_update_initiatives(text: str, initiatives: list[InitiativeUpdate])
     return result
 
 
-def transform_clear_completed_initiatives(text: str, product: ProductDoc) -> str:
-    """Remove initiatives whose every listed feature is Live/Released."""
-    about = _parse_text(text)
-    if not about.initiatives:
-        return text
-    all_features = {
-        f.wbs: f
-        for area in product.wbs_areas
-        for sa in area.sub_areas
-        for f in sa.features
-    }
-    done = {FeatureStatus.live, FeatureStatus.released}
-    remaining = [
-        ini for ini in about.initiatives
-        if not (ini.items and all(all_features.get(w) is not None and all_features[w].status in done for w in ini.items))
-    ]
-    if len(remaining) == len(about.initiatives):
-        return text
-    return transform_update_initiatives(text, [
-        InitiativeUpdate(name=ini.name, kind=ini.kind, wbs=ini.items) for ini in remaining
-    ])
-
-
-def transform_add_changelog_entry(text: str, release: NewRelease, in_progress_items: list[str]) -> str:
-    lines = [f"## {release.version}", ""]
-    for label in in_progress_items:
-        lines.append(f"**{label}**")
-        lines.append("")
-    if release.bug_fixes:
-        lines.append("**Bug fixes**")
-        for fix in release.bug_fixes:
-            lines.append(f"- {fix}")
-        lines.append("")
-
-    entry_text = "\n".join(lines) + "\n"
-
-    changelog_pos = text.find("# Changelog\n")
-    if changelog_pos == -1:
-        raise ValueError("# Changelog heading not found in ABOUT.MD")
-
-    insert_at = changelog_pos + len("# Changelog\n") + 1
-    new_text = text[:insert_at] + entry_text + "\n" + text[insert_at:]
-    return new_text

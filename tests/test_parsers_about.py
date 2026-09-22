@@ -1,9 +1,5 @@
-import pytest
 from app.parsers import about as parser
-from app.models import (
-    RoadmapUpdate, NewRelease, InitiativeUpdate,
-    ProductDoc, WBSArea, WBSSubArea, Feature, FeatureStatus,
-)
+from app.models import RoadmapUpdate, InitiativeUpdate
 
 
 MINIMAL_ABOUT = """\
@@ -70,13 +66,6 @@ NO_INITIATIVES_ABOUT = """\
 ## Backlog
 - Future items
 """
-
-
-def _product(statuses: dict) -> ProductDoc:
-    features = [Feature(wbs=w, name=w, status=s) for w, s in statuses.items()]
-    sa = WBSSubArea(wbs_prefix="1.1", title="Test", features=features)
-    area = WBSArea(number=1, title="Core", sub_areas=[sa])
-    return ProductDoc(raw_text="", wbs_areas=[area])
 
 
 class TestParseText:
@@ -207,61 +196,3 @@ class TestTransformUpdateInitiatives:
         assert bl and "Future items" in bl.items
 
 
-class TestTransformAddChangelogEntry:
-    def test_adds_entry_at_top(self):
-        release = NewRelease(version="0.3.0")
-        result = parser.transform_add_changelog_entry(MINIMAL_ABOUT, release, ["1.2 Dashboard"])
-        doc = parser._parse_text(result)
-        assert doc.changelog[0].version == "0.3.0"
-
-    def test_includes_group_labels(self):
-        release = NewRelease(version="0.3.0")
-        result = parser.transform_add_changelog_entry(MINIMAL_ABOUT, release, ["1.2 Dashboard"])
-        assert "**1.2 Dashboard**" in result
-
-    def test_includes_bug_fixes(self):
-        release = NewRelease(version="0.3.0", bug_fixes=["Fixed login bug"])
-        result = parser.transform_add_changelog_entry(MINIMAL_ABOUT, release, [])
-        assert "Fixed login bug" in result
-
-    def test_raises_without_changelog_heading(self):
-        with pytest.raises(ValueError, match="Changelog"):
-            parser.transform_add_changelog_entry("No changelog here", NewRelease(version="1.0.0"), [])
-
-
-class TestTransformClearCompletedInitiatives:
-    def test_removes_initiative_when_all_features_done(self):
-        product = _product({"1.2.1": FeatureStatus.live, "1.3.1": FeatureStatus.gap})
-        result = parser.transform_clear_completed_initiatives(INITIATIVES_ABOUT, product)
-        doc = parser._parse_text(result)
-        names = [i.name for i in doc.initiatives]
-        assert "Dashboard Revamp" not in names
-        assert "Reporting Push" in names
-
-    def test_keeps_initiative_when_not_all_done(self):
-        product = _product({"1.2.1": FeatureStatus.gap, "1.3.1": FeatureStatus.gap})
-        result = parser.transform_clear_completed_initiatives(INITIATIVES_ABOUT, product)
-        doc = parser._parse_text(result)
-        names = [i.name for i in doc.initiatives]
-        assert "Dashboard Revamp" in names
-        assert "Reporting Push" in names
-
-    def test_removes_all_when_all_done(self):
-        product = _product({"1.2.1": FeatureStatus.released, "1.3.1": FeatureStatus.live})
-        result = parser.transform_clear_completed_initiatives(INITIATIVES_ABOUT, product)
-        doc = parser._parse_text(result)
-        assert doc.initiatives == []
-
-    def test_no_op_when_no_initiatives(self):
-        product = _product({})
-        result = parser.transform_clear_completed_initiatives(MINIMAL_ABOUT.replace(
-            "## Initiatives\n\n### Reporting Push (Minor)\n- 1.3.1\n\n", ""
-        ), product)
-        assert "## Backlog" in result
-
-    def test_preserves_backlog(self):
-        product = _product({"1.2.1": FeatureStatus.live, "1.3.1": FeatureStatus.live})
-        result = parser.transform_clear_completed_initiatives(INITIATIVES_ABOUT, product)
-        doc = parser._parse_text(result)
-        bl = doc.roadmap_section("Backlog")
-        assert bl and "Future items" in bl.items

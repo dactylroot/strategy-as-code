@@ -12,13 +12,12 @@ from pydantic import BaseModel
 from ..config import settings
 from .. import session_store
 from ..models import (
-    FeatureUpdate, NewFeature, RoadmapUpdate, RoadmapFeaturesUpdate, NewRelease,
+    FeatureUpdate, NewFeature, RoadmapUpdate, RoadmapFeaturesUpdate,
     BugCreate, BugUpdate, FeatureStatus,
 )
 from ..parsers import product as product_parser
 from ..parsers import about as about_parser
 from ..parsers import bugs as bugs_parser
-from .. import versioning
 from .. import wbs as wbs_module
 from .. import git_sync
 from ..template_env import templates
@@ -230,30 +229,6 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
             text = about_parser.transform_update_roadmap(text, RoadmapUpdate(backlog=body.freeform_backlog))
             about_parser._atomic_write(settings.about_md, text)
     return {"ok": True}
-
-
-@router.post("/releases")
-def post_release(body: NewRelease, request: Request):
-    s = _session(request)
-    if s:
-        product = product_parser._parse_text(s.get_file("PRODUCT.MD"))
-        about_text = s.get_file("ABOUT.MD")
-        about = about_parser._parse_text(about_text)
-        major_done, minor_done = versioning._completed_initiatives(about, product)
-        about_text = about_parser.transform_add_changelog_entry(about_text, body, major_done + minor_done)
-        about_text = about_parser.transform_clear_completed_initiatives(about_text, product)
-        s.set_file("ABOUT.MD", about_text)
-    else:
-        lock = about_parser._lock_for(settings.about_md)
-        with lock:
-            product = product_parser.parse(settings.product_md)
-            text = settings.about_md.read_text(encoding="utf-8")
-            about = about_parser._parse_text(text)
-            major_done, minor_done = versioning._completed_initiatives(about, product)
-            text = about_parser.transform_add_changelog_entry(text, body, major_done + minor_done)
-            text = about_parser.transform_clear_completed_initiatives(text, product)
-            about_parser._atomic_write(settings.about_md, text)
-    return {"ok": True, "version": body.version}
 
 
 # ── WBS Chart ─────────────────────────────────────────────────────────────────
