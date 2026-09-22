@@ -215,7 +215,7 @@
 <!-- ── Initiatives: named feature collections, tagged Major/Minor ── -->
 <div class="rm-section" id="initiatives-section">
   <div class="rm-section-header">
-    <div>Initiatives <span class="rm-section-count">{{ initiatives_display | map(attribute='features') | map('length') | sum }}</span></div>
+    <div>Initiatives <span class="rm-section-count">{{ initiatives_display | length }}</span></div>
     <button class="btn btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:var(--planned-bg);color:var(--planned);border:1px solid var(--planned-border);"
             onclick="showAddInitiative()" title="Add initiative">+ Initiative</button>
   </div>
@@ -236,7 +236,7 @@
 
     <div class="initiative-grid" id="initiative-grid">
       {% for ini in initiatives_display %}
-      <div class="initiative-card" data-initiative-name="{{ ini.name }}" data-initiative-kind="{{ ini.kind }}" data-all-complete="{{ ini.all_complete | lower }}">
+      <div class="initiative-card" data-initiative-name="{{ ini.name }}" data-initiative-kind="{{ ini.kind }}" data-all-complete="{{ ini.all_complete | lower }}" data-completed-wbs="{{ ini.completed_wbs | join(',') }}">
         <div class="initiative-card-header" onclick="toggleInitiative(this)">
           <span class="ini-chevron">▾</span>
           <button type="button" class="ini-kind-badge ini-kind-{{ ini.kind }}" onclick="event.stopPropagation();toggleInitiativeKind(this)" title="Click to toggle Major/Minor">{{ 'Major' if ini.kind == 'major' else 'Minor' }}</button>
@@ -407,8 +407,12 @@ function saveRoadmap(evt, forceReload) {
   document.querySelectorAll('.initiative-card[data-initiative-name]').forEach(card => {
     const list = card.querySelector('.initiative-list');
     if (!list) return;
+    // Live/Released features aren't rendered inside the card (they show under
+    // Next Release instead) - carry their WBS codes forward from the page load
+    // so a save doesn't silently drop them from the initiative's membership.
+    const completed = (card.dataset.completedWbs || '').split(',').filter(Boolean);
     const wbs = [...list.querySelectorAll('[data-type="feature"]')].map(c => c.dataset.wbs);
-    initiatives.push({ name: card.dataset.initiativeName, kind: card.dataset.initiativeKind, wbs });
+    initiatives.push({ name: card.dataset.initiativeName, kind: card.dataset.initiativeKind, wbs: [...completed, ...wbs] });
   });
 
   // Backlog (freeform items only - WBS backlog membership is derived server-side)

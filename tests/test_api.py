@@ -82,6 +82,20 @@ class TestRoadmapFeatures:
         f = next(x for x in all_features if x["wbs"] == "1.1.3")
         assert f["status"] == "Gap"
 
+    def test_roadmap_page_exposes_completed_wbs_for_saved_features(self, client):
+        # 1.1.1 is Live, 1.2.3 is Idea - the card only renders the not-yet-done
+        # feature, but the Live one must still round-trip via data-completed-wbs
+        # so a later save doesn't drop it from the initiative's membership.
+        client.put("/api/roadmap/features", json={
+            "initiatives": [{"name": "New Push", "kind": "minor", "wbs": ["1.1.1", "1.2.3"]}],
+            "freeform_backlog": [],
+        })
+        html = client.get("/roadmap").text
+        assert 'data-completed-wbs="1.1.1"' in html
+        # 1.1.1 (Live) shows once, under Next Release - never as a feature
+        # card inside the initiative's own list.
+        assert html.count('data-wbs="1.1.1"') == 1
+
 
 class TestPatchFeature:
     def test_patch_status(self, client):

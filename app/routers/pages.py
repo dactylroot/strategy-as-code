@@ -274,16 +274,18 @@ def roadmap_page(request: Request):
     initiatives_display: list[dict] = []
     for idx, ini in enumerate(about.initiatives):
         ini_wbs = set(ini.items)
-        live_count = sum(1 for w in ini_wbs if (f := all_features_by_wbs.get(w)) and f.status in _live_done)
+        completed_wbs = [w for w in ini_wbs if (f := all_features_by_wbs.get(w)) and f.status in _live_done]
+        live_count = len(completed_wbs)
         total = len(ini_wbs)
         initiatives_display.append({
-            "name":         ini.name,
-            "kind":         ini.kind,
-            "id":           re.sub(r"[^a-z0-9]+", "-", ini.name.lower()).strip("-"),
-            "features":     initiative_entries[idx],
-            "total":        total,
-            "live_count":   live_count,
-            "all_complete": total > 0 and live_count == total,
+            "name":          ini.name,
+            "kind":          ini.kind,
+            "id":            re.sub(r"[^a-z0-9]+", "-", ini.name.lower()).strip("-"),
+            "features":      initiative_entries[idx],
+            "completed_wbs": completed_wbs,
+            "total":         total,
+            "live_count":    live_count,
+            "all_complete":  total > 0 and live_count == total,
         })
 
     initiatives_display.sort(key=lambda d: d["name"].lower())
