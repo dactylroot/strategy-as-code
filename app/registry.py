@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .manifest import DEFAULT_PLANNING_BRANCH, ProjectSpec, load_manifest
+from .manifest import DEFAULT_PLANNING_BRANCH, ProgramInitiative, ProjectSpec, load_initiatives, load_manifest
 
 
 class RegistryError(RuntimeError):
@@ -153,10 +153,20 @@ class Registry:
         self.committer = committer
         self.cache_dir = Path(cache_dir) if cache_dir else default_cache_dir()
         self._projects = {s.key: Project(spec=s, path=self.cache_dir / s.key) for s in specs}
+        self.manifest_path: Path | None = None
 
     @classmethod
     def from_manifest(cls, manifest_path: Path, cache_dir: Path | None = None) -> "Registry":
-        return cls(load_manifest(manifest_path), cache_dir)
+        reg = cls(load_manifest(manifest_path), cache_dir)
+        reg.manifest_path = Path(manifest_path)
+        return reg
+
+    def initiatives(self) -> list[ProgramInitiative]:
+        """Program-level initiatives, read from the manifest each call so edits
+        show without a restart. Empty when the registry was not built from a file."""
+        if self.manifest_path is None:
+            return []
+        return load_initiatives(self.manifest_path, set(self._projects))
 
     def keys(self) -> list[str]:
         return list(self._projects)

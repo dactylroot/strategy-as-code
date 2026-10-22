@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Program overview</title>
+  <style>
+    :root { --bg:#fff; --fg:#1b1f24; --muted:#59636e; --line:#d1d9e0; --card:#f6f8fa; --link:#0b5cad;
+            --bad:#b42318; --warn:#9a6700; --ok:#1a7f37; --bar:#0b5cad; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --line:#30363d;
+            --card:#151b23; --link:#58a6ff; --bad:#ff7b72; --warn:#d29922; --ok:#3fb950; --bar:#58a6ff; } }
+    body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+    main { max-width:72rem; margin:0 auto; padding:2rem 16px; }
+    h1 { font-size:1.4rem; margin:0 0 0.25rem; }
+    .sub { color:var(--muted); margin:0 0 1.5rem; font-size:0.9rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(21rem, 1fr)); gap:1rem; }
+    .card { border:1px solid var(--line); border-radius:8px; background:var(--card); padding:1rem; }
+    .card h2 { font-size:1.05rem; margin:0; display:flex; justify-content:space-between; gap:0.5rem; align-items:baseline; }
+    .card h2 a { color:var(--link); text-decoration:none; }
+    .role { color:var(--muted); font-size:0.85rem; margin:0.1rem 0 0.6rem; }
+    .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:0.4rem 0; }
+    .bar > span { display:block; height:100%; background:var(--bar); }
+    .row { display:flex; flex-wrap:wrap; gap:0.35rem 0.9rem; font-size:0.85rem; margin:0.35rem 0; }
+    .row b { font-variant-numeric:tabular-nums; }
+    .muted { color:var(--muted); font-size:0.85rem; }
+    .bad { color:var(--bad); } .warn { color:var(--warn); } .ok { color:var(--ok); }
+    h3 { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin:0.9rem 0 0.25rem; }
+    ul { margin:0; padding-left:1.1rem; font-size:0.85rem; }
+    code { background:var(--bg); padding:0 0.3em; border-radius:4px; font-size:0.8rem; }
+    h2.sec { font-size:1.05rem; margin:1.5rem 0 0.6rem; }
+    .deps a { color:var(--link); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Program overview</h1>
+  <p class="sub">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each card links to that project's own board.</p>
+  {% if initiatives_error %}<p class="bad">Program initiatives could not be read: {{ initiatives_error }}</p>{% endif %}
+  {% if initiatives %}
+  <h2 class="sec">Program initiatives</h2>
+  <div class="grid inits">
+    {% for i in initiatives %}
+    <section class="card">
+      <h2><span>{{ i.name }} <span class="muted">({{ i.kind }})</span></span>
+        <b class="{{ 'ok' if i.total and i.done == i.total else '' }}">{{ i.done }}/{{ i.total }}</b></h2>
+      <div class="bar" role="img" aria-label="{{ i.done }} of {{ i.total }} features live or released"><span style="width:{{ (100 * i.done / i.total) | round | int if i.total else 0 }}%"></span></div>
+      <ul>{% for m in i.members %}
+        <li><a href="#{{ m.project }}">{{ m.project }}</a> <code>{{ m.wbs }}</code>
+          {% if m.name %}{{ m.name }}{% endif %}
+          <span class="{{ 'ok' if m.done else ('bad' if m.missing else 'muted') }}">{{ m.stage }}</span></li>
+      {% endfor %}</ul>
+    </section>
+    {% endfor %}
+  </div>
+  <h2 class="sec">Projects</h2>
+  {% endif %}
+  <div class="grid">
+  {% for p in projects %}
+    <section class="card" id="{{ p.key }}">
+      <h2><a href="{{ projects_url() }}/{{ p.key }}/dashboard">{{ p.key }}</a>
+        {% if p.version %}<span class="muted">v{{ p.version }}</span>{% endif %}</h2>
+      <div class="role">{{ p.role or p.title }}</div>
+      {% if p.error %}
+        <div class="bad">{{ p.error }}</div>
+      {% else %}
+        <div class="row"><span><b>{{ p.done_pct }}%</b> live or released</span><span class="muted">{{ p.total }} features</span></div>
+        <div class="bar" role="img" aria-label="{{ p.done_pct }}% of features live or released"><span style="width:{{ p.done_pct }}%"></span></div>
+        <div class="row">
+          {% for st in stages %}{% if p.features.get(st) %}<span>{{ st }} <b>{{ p.features[st] }}</b></span>{% endif %}{% endfor %}
+        </div>
+        {% if p.awaiting_uat or p.flagged %}
+        <div class="row">
+          {% if p.awaiting_uat %}<span class="warn"><b>{{ p.awaiting_uat }}</b> awaiting UAT</span>{% endif %}
+          {% if p.flagged %}<span class="warn"><b>{{ p.flagged }}</b> flagged</span>{% endif %}
+        </div>
+        {% endif %}
+        <h3>Bugs</h3>
+        {% if p.bug_total %}
+          <div class="row">
+            {% for sev, n in p.bugs.items() %}{% if n %}<span class="{{ 'bad' if sev in ('Critical','High') else '' }}">{{ sev }} <b>{{ n }}</b></span>{% endif %}{% endfor %}
+          </div>
+        {% else %}<div class="muted">No active bugs</div>{% endif %}
+        {% if p.initiatives %}
+          <h3>Initiatives</h3>
+          <ul>{% for name, kind, done, total in p.initiatives %}
+            <li>{{ name }} <span class="muted">({{ kind }})</span> <b class="{{ 'ok' if total and done == total else '' }}">{{ done }}/{{ total }}</b></li>
+          {% endfor %}</ul>
+        {% endif %}
+        {% if p.in_progress %}
+          <h3>In progress</h3>
+          <ul>{% for wbs, name, owner in p.in_progress[:5] %}
+            <li><code>{{ wbs }}</code> {{ name }}{% if owner %} <span class="muted">{{ owner }}</span>{% endif %}</li>
+          {% endfor %}{% if p.in_progress | length > 5 %}<li class="muted">and {{ p.in_progress | length - 5 }} more</li>{% endif %}</ul>
+        {% endif %}
+      {% endif %}
+      {% if p.depends_on or p.required_by %}
+        <h3>Dependencies</h3>
+        <div class="row deps">
+          {% if p.depends_on %}<span>Depends on {% for d in p.depends_on %}<a href="#{{ d }}">{{ d }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
+          {% if p.required_by %}<span>Needed by {% for d in p.required_by %}<a href="#{{ d }}">{{ d }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
+        </div>
+      {% endif %}
+      <div class="muted" style="margin-top:0.7rem">
+        {{ p.mode }}{% if p.branch %} · <code>{{ p.branch }}</code>{% endif %}{% if p.sha %} · <code>{{ p.sha }}</code>{% endif %}
+        {% if p.stale %}<span class="warn"> · could not refresh, showing older data</span>{% endif %}
+      </div>
+    </section>
+  {% endfor %}
+  </div>
+</main>
+</body>
+</html>

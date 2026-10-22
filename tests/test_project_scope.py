@@ -105,6 +105,25 @@ def test_project_index_lists_projects(client, program):
     assert "Consumer" in page.text and "alpha" in page.text
 
 
+def test_overview_summarizes_each_project(client, program):
+    page = client.get("/p").text
+    assert "Program overview" in page
+    assert 'id="alpha"' in page and 'id="beta"' in page
+    assert "features" in page and "Bugs" in page
+    assert 'href="#alpha"' in page            # beta depends on alpha
+
+
+def test_overview_isolates_a_broken_project(client, program):
+    from app import scope
+    reg = scope.get_registry()
+    client.get("/p")  # clone both
+    (reg.get("beta").planning_root / "PRODUCT.MD").unlink()
+    reg.get("beta").status.last_fetch = 10**12   # skip refresh so the missing file is seen
+    page = client.get("/p")
+    assert page.status_code == 200
+    assert "no PRODUCT.MD" in page.text and 'id="alpha"' in page.text
+
+
 def origin_of(program, key):
     return Path(program.get(key).spec.repo)
 
@@ -280,3 +299,15 @@ def test_events_stream_watches_the_scoped_project(client, program):
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/event-stream")
 
+
+def test_overview_rolls_up_program_initiatives(client, program, tmp_path):
+    manifest = tmp_path / "PROGRAM.MD"
+    manifest.write_text("""## Projects\n\n| Key | Repo / Path |\n| --- | --- |\n| alpha | x |\n| beta | y |\n
+## Initiatives\n\n### Joint Goal (Major)\n- alpha:1.1.1\n- beta:1.1.2\n- beta:9.9.9\n""", encoding="utf-8")
+    program.manifest_path = manifest
+    page = client.get("/p").text
+    assert "Program initiatives" in page and "Joint Goal" in page
+    assert "1/3" in page or "2/3" in page      # fixture's 1.1.1 is Live; 9.9.9 does not exist
+    assert "Unavailable" in page               # the missing member is called out, not hidden
+    manifest.write_text("## Projects\n\n## Initiatives\n\n### X\n- nope:1.1.1\n", encoding="utf-8")
+    assert "could not be read" in client.get("/p").text

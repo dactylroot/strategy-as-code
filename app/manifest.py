@@ -1,7 +1,8 @@
 """Parse the Projects table of a program manifest (PROGRAM.MD).
 
-Only the member-project list lives here; program initiatives and cross-project
-references are a separate concern. Kept free of app settings so it can be used
+The Projects table lists the member projects. The Initiatives section groups
+features of several projects (`project:WBS` members) under program-level goals.
+Kept free of app settings so it can be used
 by the CLI and tests without importing config.
 """
 from __future__ import annotations
@@ -15,6 +16,13 @@ DEFAULT_PLANNING_BRANCH = "planning"
 
 class ManifestError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class ProgramInitiative:
+    name: str
+    kind: str                                  # "major" | "minor"
+    members: tuple[tuple[str, str], ...] = ()  # (project key, WBS code)
 
 
 @dataclass(frozen=True)
@@ -133,3 +141,46 @@ def _validate(specs: list[ProjectSpec]) -> None:
 def load_manifest(path: Path) -> list[ProjectSpec]:
     path = Path(path)
     return parse_manifest(path.read_text(encoding="utf-8"), path.parent)
+
+
+_MEMBER_RE = re.compile(r"^[-*]\s+`?([a-z0-9][a-z0-9._-]*):(\d+(?:\.\d+)*)`?\s*(?:[-–].*)?$")
+
+
+def parse_initiatives(text: str, known_projects: set[str] | None = None) -> list[ProgramInitiative]:
+    """Read `## Initiatives`: `### Name (Major|Minor)` headings with `- project:WBS` bullets.
+
+    Bullets that are not `project:WBS` are ignored, so a description line can sit
+    under a heading. A member naming a project outside `known_projects` is an error.
+    """
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    lines = text.splitlines()
+    start = next((i for i, l in enumerate(lines) if re.match(r"^##\s+Initiatives\s*$", l)), None)
+    if start is None:
+        return []
+    out: list[ProgramInitiative] = []
+    name = kind = None
+    members: list[tuple[str, str]] = []
+
+    def flush() -> None:
+        if name is not None:
+            out.append(ProgramInitiative(name, kind, tuple(members)))
+
+    for l in lines[start + 1:]:
+        if l.startswith("## "):
+            break
+        h = re.match(r"^###\s+(.+?)\s*(?:\((major|minor)\))?\s*$", l, re.IGNORECASE)
+        if h:
+            flush()
+            name, kind, members = h.group(1), (h.group(2) or "minor").lower(), []
+            continue
+        m = _MEMBER_RE.match(l.strip())
+        if m and name is not None:
+            if known_projects is not None and m.group(1) not in known_projects:
+                raise ManifestError(f"initiative {name!r} names unknown project {m.group(1)!r}")
+            members.append((m.group(1), m.group(2)))
+    flush()
+    return out
+
+
+def load_initiatives(path: Path, known_projects: set[str] | None = None) -> list[ProgramInitiative]:
+    return parse_initiatives(Path(path).read_text(encoding="utf-8"), known_projects)

@@ -239,3 +239,42 @@ def test_parse_manifest(tmp_path):
 def test_manifest_errors(tmp_path, text, msg):
     with pytest.raises(ManifestError, match=msg):
         parse_manifest(text, tmp_path)
+
+
+# ── program initiatives ───────────────────────────────────────────────────
+
+INITIATIVES = MANIFEST + """\
+### Renewal Rollout (Major)
+Cross-project goal.
+- accounts:1.1.1
+- `renewals:2.3.4` - needs the accounts API
+- not a member
+
+### Cleanup
+- accounts:1.1.2
+
+<!-- ### Hidden (Minor)
+- accounts:9.9.9 -->
+
+## Backlog
+- accounts:7.7.7
+"""
+
+
+def test_parse_initiatives():
+    from app.manifest import parse_initiatives
+    inits = parse_initiatives(INITIATIVES, {"accounts", "renewals"})
+    assert [(i.name, i.kind) for i in inits] == [("Renewal Rollout", "major"), ("Cleanup", "minor")]
+    assert inits[0].members == (("accounts", "1.1.1"), ("renewals", "2.3.4"))
+    assert inits[1].members == (("accounts", "1.1.2"),)
+
+
+def test_initiative_naming_an_unknown_project_is_an_error():
+    from app.manifest import parse_initiatives
+    with pytest.raises(ManifestError, match="unknown project 'renewals'"):
+        parse_initiatives(INITIATIVES, {"accounts"})
+
+
+def test_no_initiatives_section_is_empty():
+    from app.manifest import parse_initiatives
+    assert parse_initiatives("## Projects\n") == []

@@ -15,6 +15,7 @@ from .routers import auth_router
 from .auth import is_authenticated
 from . import git_sync
 from . import github_issues
+from . import overview
 from . import scope
 from .fileio import ProjectReadOnly
 from .registry import Registry, RegistryError, SyncConflict
@@ -149,16 +150,13 @@ def _sync_failed(_request: Request, exc: RegistryError):
 
 
 @app.get(full("/p"), include_in_schema=False)
-def projects_index(request: Request):
-    registry = scope.get_registry()
-    if registry is None:
+async def projects_index(request: Request):
+    if scope.get_registry() is None:
         raise HTTPException(status_code=404)
-    rows = []
-    for key in registry.keys():
-        project = registry.get(key)
-        st = project.status
-        rows.append({"key": key, "spec": project.spec, "sha": (st.sha or "")[:7], "error": st.last_error})
-    return templates.TemplateResponse(request, "projects.html", {"projects": rows, "app_title": "Program projects"})
+    rows = await run_in_threadpool(overview.summarize_all)
+    initiatives, initiatives_error = overview.initiative_views(rows)
+    return templates.TemplateResponse(request, "overview.html", {
+        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "stages": overview.STAGES, "app_title": "Program overview"})
 
 
 @app.get("/", include_in_schema=False)
