@@ -1,6 +1,8 @@
-
 ---
-  description: Use this skill when discussing project plans, receiving new requirements, after implementing new release-level functionality, or when requested to update documentation
+name: program-strategy
+description: "Use this skill when discussing project plans, receiving new requirements, after implementing new release-level functionality, or when requested to update documentation"
+metadata:
+  opencode/slash: "true"
 ---
 
 # SKILL: Program Strategy Manager
@@ -21,6 +23,12 @@ Manage product roadmaps, write PRDs, prioritize features, and track releases usi
 ## Usage
 Tell me your product vision, current backlog items, or strategic goals.
 I will organize, prioritize, and document everything.
+
+---
+
+## Where This Skill Lives
+
+`<skill-dir>` below means the folder containing this SKILL.md and its `scripts/`. It is found in the first of these that exists, in the project and then under the home directory: `.opencode/skills/program-strategy`, `.claude/skills/program-strategy`, `.agents/skills/program-strategy`, and `~/.config/opencode/skills/program-strategy`, `~/.claude/skills/program-strategy`, `~/.agents/skills/program-strategy`. The skill works the same in Claude Code and OpenCode; it uses only file reads, file edits and shell commands.
 
 ---
 
@@ -79,7 +87,7 @@ How a status, notes, score or bug change reaches the markdown files depends on w
 **Program mode** - a `PROGRAM.MD` manifest lists this repository. Look for it at or above the working directory, in a `program/` folder there, or at `$STRATEGY_MANIFEST`; the project's key is the manifest row whose `Repo / Path` is this repository. In program mode PRODUCT.MD and BUGS.MD are shared with other writers (the web UI, other developers), so **do not edit them in the working tree** - least of all on a feature branch, where the edit collides with the same row changed elsewhere. Use the `strategy` CLI instead. It applies the change to the latest copy of the file on the project's planning branch, commits it as you, and pushes it, so the code pull request contains only code:
 
 ```bash
-S=~/.claude/skills/program-strategy/scripts/strategy      # or .claude/skills/... in a per-project install
+S=<skill-dir>/scripts/strategy
 
 $S feature status 3.1.1 live            # idea | in-progress | live  (never 'released' from a code change)
 $S feature notes  3.1.1 "Does X now"
@@ -264,12 +272,11 @@ IDs are auto-assigned integers starting at 1. Do not reuse IDs.
 
 The chart generator script ships with the skill. Find it in order:
 
-1. `~/.claude/skills/program-strategy/scripts/gen_wbs.py` (global install)
-2. `.claude/skills/program-strategy/scripts/gen_wbs.py` relative to the project root (per-project install)
+`<skill-dir>/scripts/gen_wbs.py` (see Where This Skill Lives for `<skill-dir>`)
 
 Run it from the project root:
 ```bash
-python ~/.claude/skills/program-strategy/scripts/gen_wbs.py
+python <skill-dir>/scripts/gen_wbs.py
 ```
 
 Outputs:
@@ -302,9 +309,7 @@ Status values in PRODUCT.MD: `Idea`, `In-Progress`, `Live`, `Released`, `Planned
 
 When asked to run, open, start, or launch the UI, find the skill's launcher script and run it in the background with `PROJECT_DIR` set to the current working directory.
 
-**Locate the script** - check in order until one exists:
-1. `~/.claude/skills/program-strategy/scripts/run-ui.sh` (global install)
-2. `.claude/skills/program-strategy/scripts/run-ui.sh` relative to the project root (per-project install)
+**Locate the script** - `<skill-dir>/scripts/run-ui.sh` (see Where This Skill Lives for `<skill-dir>`).
 
 **Run it:**
 ```bash
@@ -313,13 +318,13 @@ PROJECT_DIR=$(pwd) bash /path/to/run-ui.sh &
 
 After starting, open the browser:
 ```bash
-open http://localhost:8765
+open http://localhost:8765      # xdg-open on Linux
 ```
 
 If the port is already in use, set `PORT` to a different value and pass it through:
 ```bash
 PORT=8766 PROJECT_DIR=$(pwd) bash /path/to/run-ui.sh &
-open http://localhost:8766
+open http://localhost:8766      # xdg-open on Linux
 ```
 
 The UI reads the markdown files from `PROJECT_DIR` on each page load - no restart needed after editing files.

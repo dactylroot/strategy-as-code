@@ -77,11 +77,16 @@ def resolve_actor() -> Actor:
     return Actor(name, email)
 
 
+_SKILL_DIRS = (".opencode/skills", ".claude/skills", ".agents/skills")
+_HOME_SKILL_DIRS = (".config/opencode/skills", ".claude/skills", ".agents/skills")
+
+
 def _find_gen_wbs() -> Path:
     here = Path(__file__).resolve().parent.parent
-    for p in (os.environ.get("GEN_WBS_SCRIPT"),
-              Path.home() / ".claude/skills/program-strategy/scripts/gen_wbs.py",
-              here / ".claude/skills/program-strategy/scripts/gen_wbs.py"):
+    candidates = [os.environ.get("GEN_WBS_SCRIPT")]
+    candidates += [Path.home() / d / "program-strategy/scripts/gen_wbs.py" for d in _HOME_SKILL_DIRS]
+    candidates += [here / d / "program-strategy/scripts/gen_wbs.py" for d in _SKILL_DIRS]
+    for p in candidates:
         if p and Path(p).is_file():
             return Path(p)
     raise CliError("gen_wbs.py not found (set GEN_WBS_SCRIPT)")

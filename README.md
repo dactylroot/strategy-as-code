@@ -59,6 +59,12 @@ The script symlinks `.claude/skills/program-strategy/` into the target skill dir
 
 The skill manages the four markdown files directly - reading and editing them in whichever directory the Claude Code session is open in.
 
+**OpenCode:** it reads `.claude/skills/` and `~/.claude/skills/` too, so the install above works unchanged. To install under OpenCode's own directories instead, pass `--opencode` (global: `~/.config/opencode/skills/`, per-project: `.opencode/skills/`):
+
+```bash
+./scripts/install-skill.sh --opencode [/path/to/your/project]
+```
+
 To launch the web UI from within a skill session, tell Claude to run the UI:
 
 ```
