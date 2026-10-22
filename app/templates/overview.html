@@ -44,11 +44,15 @@
       <h2><span>{{ i.name }} <span class="muted">({{ i.kind }})</span></span>
         <b class="{{ 'ok' if i.total and i.done == i.total else '' }}">{{ i.done }}/{{ i.total }}</b></h2>
       <div class="bar" role="img" aria-label="{{ i.done }} of {{ i.total }} features live or released"><span style="width:{{ (100 * i.done / i.total) | round | int if i.total else 0 }}%"></span></div>
-      <ul>{% for m in i.members %}
-        <li><a href="#{{ m.project }}">{{ m.project }}</a> <code>{{ m.wbs }}</code>
+      {% for project, group in i.members | groupby('project') %}
+      <h3><a href="#{{ project }}">{{ project }}</a></h3>
+      <ul>{% for m in group %}
+        <li><code>{{ m.wbs }}</code>
           {% if m.name %}{{ m.name }}{% endif %}
-          <span class="{{ 'ok' if m.done else ('bad' if m.missing else 'muted') }}">{{ m.stage }}</span></li>
+          <span class="{{ 'ok' if m.done else ('bad' if m.missing else 'muted') }}">{{ m.stage }}</span>
+          {% if m.blocked_by %}<span class="warn">blocked by {{ m.blocked_by | join(', ') }}</span>{% endif %}</li>
       {% endfor %}</ul>
+      {% endfor %}
     </section>
     {% endfor %}
   </div>
@@ -74,8 +78,15 @@
           {% if p.flagged %}<span class="warn"><b>{{ p.flagged }}</b> flagged</span>{% endif %}
         </div>
         {% endif %}
+        {% if p.blocked %}
+          <h3>Blocked</h3>
+          <ul class="warn">{% for b in p.blocked %}<li>{{ b }}</li>{% endfor %}</ul>
+        {% endif %}
         <h3>Bugs</h3>
         {% if p.bug_total %}
+          <div class="row">
+            {% for st, n in p.bug_status.items() %}{% if n %}<span>{{ st }} <b>{{ n }}</b></span>{% endif %}{% endfor %}
+          </div>
           <div class="row">
             {% for sev, n in p.bugs.items() %}{% if n %}<span class="{{ 'bad' if sev in ('Critical','High') else '' }}">{{ sev }} <b>{{ n }}</b></span>{% endif %}{% endfor %}
           </div>
@@ -107,8 +118,11 @@
         </div>
       {% endif %}
       <div class="muted" style="margin-top:0.7rem">
+        {% if p.last_fetch_age is not none %}fetched {{ p.last_fetch_age }}s ago{% endif %}
+        {% if p.last_push_age is not none %} · last write {{ p.last_push_age }}s ago{% endif %}<br>
         {{ p.mode }}{% if p.branch %} · <code>{{ p.branch }}</code>{% endif %}{% if p.sha %} · <code>{{ p.sha }}</code>{% endif %}
         {% if p.stale %}<span class="warn"> · could not refresh, showing older data</span>{% endif %}
+        {% if p.sync_error and not p.error %}<div class="bad">last sync error: {{ p.sync_error }}</div>{% endif %}
       </div>
     </section>
   {% endfor %}

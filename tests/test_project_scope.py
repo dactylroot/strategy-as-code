@@ -351,3 +351,29 @@ def test_overview_counts_the_inbox(client, program):
     client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "One"})
     page = client.get("/p").text
     assert "Needs triage" in page and "<b>1</b> waiting" in page and "Inbox is empty" in page   # beta has none
+
+
+def test_overview_flags_members_blocked_by_an_upstream_member(client, program, tmp_path):
+    manifest = tmp_path / "PROGRAM.MD"
+    # beta depends on alpha; alpha:1.1.2 is not done, so beta's unfinished member waits on it.
+    manifest.write_text("## Projects\n\n| Key | Repo / Path |\n| --- | --- |\n| alpha | x |\n| beta | y |\n\n"
+                        "## Initiatives\n\n### Joint (Major)\n- alpha:1.1.2\n- beta:1.1.2\n", encoding="utf-8")
+    program.manifest_path = manifest
+    page = client.get("/p").text
+    assert "blocked by alpha:1.1.2" in page and "waits on alpha:1.1.2" in page
+    assert "fetched" in page
+
+
+def test_overview_reparses_only_when_the_commit_changes(client, program, monkeypatch):
+    from app import overview
+    calls = []
+    real = overview._load_content
+    monkeypatch.setattr(overview, "_load_content", lambda s, root: (calls.append(s.key), real(s, root))[1])
+    overview._cache.clear()
+    client.get("/p")
+    first = len(calls)
+    client.get("/p")
+    assert len(calls) == first                      # same commits: served from the cache
+    client.patch("/p/alpha/api/features/1.1.2", json={"notes": "changed"})
+    client.get("/p")
+    assert calls[first:] == ["alpha"]               # only the project whose commit moved

@@ -104,8 +104,12 @@ $S bug close  12 --resolved-in 0.4.2    # only after UAT confirms the fix
 - The CLI needs the strategy-as-code requirements installed; if it fails with an import error, point `STRATEGY_PYTHON` at a Python that has them.
 - After a CLI write the working-tree copy of the file is stale (the change lives on the planning branch until it is merged). Do not re-read it as current state or "fix" it by hand; read the planning branch (`git fetch`, then `git show <branch>:PRODUCT.MD`) or the web UI.
 - `feature move` prints notes about references it cannot update (other mentions of the old code in notes or Known Gaps, and initiatives in other projects or the manifest that cite `key:old`). Relay those to the user.
-- The CLI does not yet cover ABOUT.MD (roadmap and changelog) or the prose sections (summary, users, scope, workflows). Make those edits directly, say that you did, and expect to reconcile them with the planning branch.
+- The CLI does not yet cover program initiatives (edit `PROGRAM.MD` directly), ABOUT.MD (roadmap and changelog) or the prose sections (summary, users, scope, workflows). Make those edits directly, say that you did, and expect to reconcile them with the planning branch.
+- User submissions wait as files under `.planning/inbox/` and are triaged with `$S inbox list`, `inbox promote <id> [--prefix 1.2]`, `inbox decline <id> --reason "..."`, `inbox duplicate <id> --of <ref>` and `inbox sweep`. Promote and decline only when the user asks you to triage; never edit those files by hand.
+- Run `$S merge-driver install` once in a clone (and commit the `.gitattributes` lines it adds) so that merging branches combines PRODUCT.MD and BUGS.MD row by row instead of conflicting.
 - Do not regenerate the WBS chart as part of these changes; `--chart` exists, but only use it when the user asks.
+
+**Asking about the whole program.** When the user asks about program scope (what depends on what, which initiative is blocked, how a feature in one project affects another), read the `PROGRAM.MD` manifest first: its Projects table gives each project's role and `Depends On`, and its `## Initiatives` section lists cross-project members as `project:WBS`. Then read each member project's own PRODUCT.MD from its planning branch, or use the program Overview page (`/p`) if the web UI is running. Recurse depth-first through `Depends On`, stop at a project already visited, and stay within three levels. Reading is free; change another project's files only when the user asks for that project by name, and then through that project's own `-p <key>`.
 
 **Standalone** - no manifest lists this repository. Edit the files directly in the working tree, as described in the sections below.
 

@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import threading
@@ -16,6 +17,7 @@ from .auth import is_authenticated
 from . import git_sync
 from . import github_issues
 from . import overview
+from . import poller
 from . import scope
 from .fileio import ProjectReadOnly
 from .registry import Registry, RegistryError, SyncConflict
@@ -53,7 +55,13 @@ def _periodic_sync_loop() -> None:
 async def _lifespan(_app: FastAPI):
     if settings.git_sync_enabled or settings.github_repo:
         threading.Thread(target=_periodic_sync_loop, daemon=True).start()
+    stop = threading.Event()
+    registry = scope.get_registry()
+    if registry is not None and settings.program_poll_seconds > 0:
+        threading.Thread(target=poller.poll_loop, args=(registry, settings.program_poll_seconds, stop),
+                         daemon=True).start()
     yield
+    stop.set()
 
 
 app = FastAPI(title=settings.app_title, docs_url=full("/api-docs"), lifespan=_lifespan)
@@ -79,7 +87,7 @@ static_dir = Path(__file__).parent.parent / "static"
 if static_dir.exists():
     app.mount(full("/static"), StaticFiles(directory=str(static_dir)), name="static")
 
-_PUBLIC = {full("/login"), full("/logout")}
+_PUBLIC = {full("/login"), full("/logout"), full("/hooks/refresh")}  # the webhook authenticates by signature
 _SCOPE_RE = re.compile(rf"^{re.escape(settings.root_path)}/p/([^/]+)(/.*)?$")
 
 
@@ -147,6 +155,27 @@ def _conflict(_request: Request, exc: RegistryError):
 def _sync_failed(_request: Request, exc: RegistryError):
     logger.error("program write failed: %s", exc)
     return JSONResponse({"detail": f"Could not save to the project repository: {exc}"}, status_code=502)
+
+
+@app.post(full("/hooks/refresh"), include_in_schema=False)
+async def refresh_hook(request: Request):
+    """GitHub push webhook: refresh the project named by the event now. Disabled
+    unless a webhook secret is configured; the signature is the only credential."""
+    registry = scope.get_registry()
+    if registry is None or not settings.webhook_secret:
+        raise HTTPException(status_code=404)
+    body = await request.body()
+    if not poller.valid_signature(settings.webhook_secret, body, request.headers.get("X-Hub-Signature-256")):
+        raise HTTPException(status_code=401, detail="bad signature")
+    if request.headers.get("X-GitHub-Event") == "ping":
+        return {"ok": True}
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid JSON")
+    result = await run_in_threadpool(poller.handle_push_event, registry, payload)
+    return {"refreshed": sorted(k for k, err in result.items() if err is None),
+            "failed": {k: err for k, err in result.items() if err}}
 
 
 @app.get(full("/p"), include_in_schema=False)

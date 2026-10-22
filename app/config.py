@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # .screenshots deliberately excluded - bug screenshots are uploaded as
     # GitHub Release assets instead (see github_issues.py), not committed to git.
     program_manifest: str = ""  # path to a PROGRAM.MD; enables /p/<key>/ project-scoped routes
+    program_poll_seconds: int = 45   # background refresh of every member project; 0 disables
+    webhook_secret: str = ""         # GitHub webhook secret; empty disables POST /hooks/refresh
     git_sync_paths: str = "PRODUCT.MD,ABOUT.MD,BUGS.MD,README.MD"
     git_sync_poll_seconds: int = 30
     git_token: str = ""  # Same token entrypoint.sh seeds into the HTTPS credential store;
@@ -201,6 +203,14 @@ class _SettingsProxy:
     @property
     def program_manifest(self) -> str:
         return str(_deploy_value("program_manifest") or _base.program_manifest)
+
+    @property
+    def program_poll_seconds(self) -> int:
+        return _base.program_poll_seconds
+
+    @property
+    def webhook_secret(self) -> str:
+        return _base.webhook_secret
 
     @property
     def auth_introspect_url(self) -> str:

@@ -5,12 +5,14 @@ clones concurrently. A project that cannot be read yields an error row; it never
 hides the others.
 """
 from __future__ import annotations
+import copy
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from . import inbox as inbox_lib
 from . import scope
-from .models import BugSeverity, FeatureStatus
+from .models import BugSeverity, BugStatus, FeatureStatus
 from .parsers import about as about_parser
 from .parsers import bugs as bugs_parser
 from .parsers import product as product_parser
@@ -38,6 +40,12 @@ class ProjectSummary:
     bug_total: int = 0
     initiatives: list[tuple[str, str, int, int]] = field(default_factory=list)  # name, kind, done, total
     version: str = ""
+    bug_status: dict[str, int] = field(default_factory=dict)  # Open / Investigating / Resolved
+    last_fetch_age: int | None = None    # seconds since the last successful fetch
+    last_push_age: int | None = None
+    sync_error: str | None = None
+    pushes: int = 0
+    blocked: list[str] = field(default_factory=list)   # "project:WBS waits on dep:WBS"
     inbox_count: int = 0
     inbox_oldest_days: int = 0
     inbox_stale: int = 0
@@ -50,7 +58,67 @@ class ProgramInitiativeView:
     kind: str
     done: int = 0
     total: int = 0
-    members: list[dict] = field(default_factory=list)   # project, wbs, name, stage, done, missing
+    members: list[dict] = field(default_factory=list)   # project, wbs, name, stage, done, missing, blocked_by
+
+
+def _load_content(s: ProjectSummary, root) -> None:
+    """Parse the project's planning files into `s`. Pure function of the files."""
+    product = product_parser._parse_text((root / "PRODUCT.MD").read_text(encoding="utf-8"))
+    s.title = product.title
+    feats = product.all_features
+    s.total = len(feats)
+    s.stages_by_wbs = {f.wbs: (f.name, "In-Progress" if f.status == FeatureStatus.planned else
+                               ("Idea" if f.stage == "Gap" else f.stage)) for f in feats}
+    s.features = {st: 0 for st in STAGES}
+    for f in feats:
+        stage = "In-Progress" if f.status == FeatureStatus.planned else f.stage
+        if stage == "Gap":
+            stage = "Idea"
+        s.features[stage] = s.features.get(stage, 0) + 1
+    done = s.features["Live"] + s.features["Released"]
+    s.done_pct = round(100 * done / s.total) if s.total else 0
+    s.awaiting_uat = s.features["Live"]
+    s.flagged = sum(1 for f in feats if f.flagged)
+    s.in_progress = [(f.wbs, f.name, f.owner or "") for f in feats
+                     if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)]
+
+    bfile = root / "BUGS.MD"
+    if bfile.exists():
+        doc = bugs_parser._parse_text(bfile.read_text(encoding="utf-8"))
+        s.bug_total = len(doc.active)
+        s.bugs = {sev.value: sum(1 for b in doc.active if b.severity == sev) for sev in BugSeverity}
+        s.bug_status = {st.value: sum(1 for b in doc.active if b.status == st) for st in BugStatus}
+
+    afile = root / "ABOUT.MD"
+    if afile.exists():
+        about = about_parser._parse_text(afile.read_text(encoding="utf-8"))
+        by_wbs = {f.wbs: f for f in feats}
+        for ini in about.initiatives:
+            members = [by_wbs[w] for w in ini.items if w in by_wbs]
+            n_done = sum(1 for f in members if f.status in (FeatureStatus.live, FeatureStatus.released))
+            s.initiatives.append((ini.name, ini.kind, n_done, len(members)))
+        if about.changelog:
+            s.version = about.changelog[0].version
+
+
+_CONTENT_FIELDS = ("title", "features", "total", "done_pct", "in_progress", "awaiting_uat", "flagged",
+                   "bugs", "bug_total", "bug_status", "initiatives", "version", "stages_by_wbs")
+_cache: dict[tuple[str, str], dict] = {}
+
+
+def _fill_content(s: ProjectSummary, project, root, sha: str | None) -> None:
+    """Fill the file-derived fields, re-parsing only when the project's commit changed (2.1.4)."""
+    cache_key = (s.key, sha or "")
+    hit = _cache.get(cache_key) if sha else None
+    if hit is None:
+        _load_content(s, root)
+        if sha:
+            for k in [k for k in _cache if k[0] == s.key]:
+                del _cache[k]
+            _cache[cache_key] = {f: copy.deepcopy(getattr(s, f)) for f in _CONTENT_FIELDS}
+        return
+    for f in _CONTENT_FIELDS:
+        setattr(s, f, copy.deepcopy(hit[f]))
 
 
 STAGES = ("Idea", "Scored", "In-Progress", "Live", "Released")
@@ -67,52 +135,25 @@ def _summarize(key: str) -> ProjectSummary:
     )
     try:
         s.stale = scope.freshen(key)
-        s.sha = (project.status.sha or "")[:7]
+        st = project.status
+        s.sha = (st.sha or "")[:7]
+        now = time.time()
+        s.last_fetch_age = int(now - st.last_fetch) if st.last_fetch else None
+        s.last_push_age = int(now - st.last_push) if st.last_push else None
+        s.sync_error = st.last_error
+        s.pushes = st.pushes
         root = project.planning_root
         pfile = root / "PRODUCT.MD"
         if not pfile.exists():
             s.error = f"no PRODUCT.MD in {spec.planning_dir or 'the repository root'}"
             return s
-        product = product_parser._parse_text(pfile.read_text(encoding="utf-8"))
-        s.title = product.title
-        feats = product.all_features
-        s.total = len(feats)
-        s.stages_by_wbs = {f.wbs: (f.name, "In-Progress" if f.status == FeatureStatus.planned else
-                                   ("Idea" if f.stage == "Gap" else f.stage)) for f in feats}
-        s.features = {st: 0 for st in STAGES}
-        for f in feats:
-            stage = "In-Progress" if f.status == FeatureStatus.planned else f.stage
-            if stage == "Gap":
-                stage = "Idea"
-            s.features[stage] = s.features.get(stage, 0) + 1
-        done = s.features["Live"] + s.features["Released"]
-        s.done_pct = round(100 * done / s.total) if s.total else 0
-        s.awaiting_uat = s.features["Live"]
-        s.flagged = sum(1 for f in feats if f.flagged)
-        s.in_progress = [(f.wbs, f.name, f.owner or "") for f in feats
-                         if f.status in (FeatureStatus.in_progress, FeatureStatus.planned)]
-
-        bfile = root / "BUGS.MD"
-        if bfile.exists():
-            doc = bugs_parser._parse_text(bfile.read_text(encoding="utf-8"))
-            s.bug_total = len(doc.active)
-            s.bugs = {sev.value: sum(1 for b in doc.active if b.severity == sev) for sev in BugSeverity}
+        _fill_content(s, project, root, st.sha)
 
         waiting = inbox_lib.list_items(root)
         s.inbox_count = len(waiting)
         s.inbox_oldest_days = max((i.age_days for i in waiting), default=0)
         s.inbox_stale = sum(1 for i in waiting if i.stale)
 
-        afile = root / "ABOUT.MD"
-        if afile.exists():
-            about = about_parser._parse_text(afile.read_text(encoding="utf-8"))
-            by_wbs = {f.wbs: f for f in feats}
-            for ini in about.initiatives:
-                members = [by_wbs[w] for w in ini.items if w in by_wbs]
-                n_done = sum(1 for f in members if f.status in (FeatureStatus.live, FeatureStatus.released))
-                s.initiatives.append((ini.name, ini.kind, n_done, len(members)))
-            if about.changelog:
-                s.version = about.changelog[0].version
     except Exception as exc:  # one broken project must not take down the page
         s.error = str(exc) or exc.__class__.__name__
     return s
@@ -141,6 +182,7 @@ def initiative_views(projects: list[ProjectSummary]) -> tuple[list[ProgramInitia
     except Exception as exc:
         return [], str(exc)
     by_key = {p.key: p for p in projects}
+    upstream = {k: _transitive_deps(reg, k) for k in reg.keys()}
     views = []
     for ini in inits:
         v = ProgramInitiativeView(ini.name, ini.kind)
@@ -150,8 +192,29 @@ def initiative_views(projects: list[ProjectSummary]) -> tuple[list[ProgramInitia
             name, stage = hit if hit else ("", "")
             is_done = stage in ("Live", "Released")
             v.members.append({"project": key, "wbs": wbs, "name": name, "stage": stage or "Unavailable",
-                              "done": is_done, "missing": hit is None})
+                              "done": is_done, "missing": hit is None, "blocked_by": []})
             v.total += 1
             v.done += is_done
+        # A member waits on any unfinished member, in the same initiative, of a
+        # project it depends on (directly or through other projects).
+        for m in v.members:
+            if m["done"]:
+                continue
+            for other in v.members:
+                if other is not m and not other["done"] and other["project"] in upstream.get(m["project"], ()):
+                    m["blocked_by"].append(f"{other['project']}:{other['wbs']}")
+            if m["blocked_by"] and m["project"] in by_key:
+                by_key[m["project"]].blocked.append(f"{m['wbs']} waits on {', '.join(m['blocked_by'])} ({ini.name})")
         views.append(v)
     return views, None
+
+
+def _transitive_deps(reg, key: str) -> set[str]:
+    seen: set[str] = set()
+    stack = list(reg.get(key).spec.depends_on)
+    while stack:
+        d = stack.pop()
+        if d not in seen:
+            seen.add(d)
+            stack.extend(reg.get(d).spec.depends_on)
+    return seen
