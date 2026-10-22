@@ -8,6 +8,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
+from . import inbox as inbox_lib
 from . import scope
 from .models import BugSeverity, FeatureStatus
 from .parsers import about as about_parser
@@ -37,6 +38,9 @@ class ProjectSummary:
     bug_total: int = 0
     initiatives: list[tuple[str, str, int, int]] = field(default_factory=list)  # name, kind, done, total
     version: str = ""
+    inbox_count: int = 0
+    inbox_oldest_days: int = 0
+    inbox_stale: int = 0
     stages_by_wbs: dict[str, tuple[str, str]] = field(default_factory=dict)  # wbs -> (name, stage)
 
 
@@ -93,6 +97,11 @@ def _summarize(key: str) -> ProjectSummary:
             doc = bugs_parser._parse_text(bfile.read_text(encoding="utf-8"))
             s.bug_total = len(doc.active)
             s.bugs = {sev.value: sum(1 for b in doc.active if b.severity == sev) for sev in BugSeverity}
+
+        waiting = inbox_lib.list_items(root)
+        s.inbox_count = len(waiting)
+        s.inbox_oldest_days = max((i.age_days for i in waiting), default=0)
+        s.inbox_stale = sum(1 for i in waiting if i.stale)
 
         afile = root / "ABOUT.MD"
         if afile.exists():

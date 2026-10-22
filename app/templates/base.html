@@ -320,6 +320,7 @@
     <a href="{{ base_path }}/roadmap" {% if active_page == 'roadmap' %}class="active"{% endif %}>Roadmap</a>
     <a href="{{ base_path }}/structure" {% if active_page == 'structure' %}class="active"{% endif %}>Structure</a>
     <a href="{{ base_path }}/bugs" {% if active_page == 'bugs' %}class="active"{% endif %}>Bugs</a>
+    {% if scope_key() %}<a href="{{ base_path }}/inbox" {% if active_page == 'inbox' %}class="active"{% endif %}>Inbox</a>{% endif %}
     <span class="nav-section">Reference</span>
     <a href="{{ base_path }}/about" {% if active_page == 'about' %}class="active"{% endif %}>About</a>
     <a href="{{ base_path }}/readme" {% if active_page == 'readme' %}class="active"{% endif %}>README</a>

@@ -35,7 +35,9 @@ def refuse_when_scoped(what: str) -> Callable[[Request], None]:
     return dep
 
 
-def program_write(message: str) -> Callable:
+def program_write(message: str | Callable[[dict], str]) -> Callable:
+    """`message` is a format string over the endpoint's simple arguments, or a
+    callable taking those arguments (including request bodies) as a dict."""
     def decorate(fn: Callable) -> Callable:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
@@ -56,9 +58,12 @@ def program_write(message: str) -> Callable:
                     scope.writing.reset(token)
 
             try:
-                text = message.format(**{k: v for k, v in kwargs.items() if isinstance(v, (str, int))})
-            except (KeyError, IndexError, ValueError):
-                text = message
+                if callable(message):
+                    text = message(kwargs)
+                else:
+                    text = message.format(**{k: v for k, v in kwargs.items() if isinstance(v, (str, int))})
+            except (KeyError, IndexError, ValueError, AttributeError):
+                text = message if isinstance(message, str) else "inbox update"
             try:
                 edit(registry, key, run, f"UI: {text}", request_actor(kwargs.get("request")))
             except EditAborted as aborted:

@@ -80,6 +80,12 @@
             {% for sev, n in p.bugs.items() %}{% if n %}<span class="{{ 'bad' if sev in ('Critical','High') else '' }}">{{ sev }} <b>{{ n }}</b></span>{% endif %}{% endfor %}
           </div>
         {% else %}<div class="muted">No active bugs</div>{% endif %}
+        <h3>Needs triage</h3>
+        {% if p.inbox_count %}
+          <div class="row"><a href="{{ projects_url() }}/{{ p.key }}/inbox"><b>{{ p.inbox_count }}</b> waiting</a>
+            <span class="muted">oldest {{ p.inbox_oldest_days }}d</span>
+            {% if p.inbox_stale %}<span class="warn"><b>{{ p.inbox_stale }}</b> stale</span>{% endif %}</div>
+        {% else %}<div class="muted">Inbox is empty</div>{% endif %}
         {% if p.initiatives %}
           <h3>Initiatives</h3>
           <ul>{% for name, kind, done, total in p.initiatives %}

@@ -311,3 +311,43 @@ def test_overview_rolls_up_program_initiatives(client, program, tmp_path):
     assert "Unavailable" in page               # the missing member is called out, not hidden
     manifest.write_text("## Projects\n\n## Initiatives\n\n### X\n- nope:1.1.1\n", encoding="utf-8")
     assert "could not be read" in client.get("/p").text
+
+
+# ── inbox ──────────────────────────────────────────────────────────────────
+
+def test_inbox_submit_triage_through_the_web(client, program):
+    h = {"X-Host-User": "ada@example.com"}
+    client.get("/p/alpha/features")
+    r = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Export fails", "body": "<script>x</script>"}, headers=h)
+    assert r.status_code == 201, r.text
+    item_id = r.json()["id"]
+    page = client.get("/p/alpha/inbox").text
+    assert "Export fails" in page and "<script>x</script>" not in page and "&lt;script&gt;" in page
+    assert run_git(origin_of(program, "alpha"), ["log", "-1", "--format=%ae|%s", "main"]).startswith("ada@example.com|UI: inbox: bug")
+    r = client.post(f"/p/alpha/api/inbox/{item_id}/promote", json={}, headers=h)
+    assert r.status_code == 200 and r.json()["became"].startswith("bug")
+    assert "Export fails" in remote_text(program, "alpha", "BUGS.MD")
+    assert client.get("/p/alpha/api/inbox").json() == []
+
+
+def test_inbox_decline_reason_is_in_the_commit_and_bad_input_is_422(client, program):
+    client.get("/p/alpha/features")
+    assert client.post("/p/alpha/api/inbox", json={"type": "bug", "title": " "}).status_code == 422
+    item_id = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Spam"}).json()["id"]
+    client.post(f"/p/alpha/api/inbox/{item_id}/decline", json={"reason": "not a bug"})
+    assert "not a bug" in run_git(origin_of(program, "alpha"), ["log", "-1", "--format=%s", "main"])
+
+
+def test_inbox_is_unavailable_outside_program_mode_and_rate_limited(client, program):
+    assert client.post("/api/inbox", json={"type": "bug", "title": "x"}).status_code == 404
+    client.get("/p/alpha/features")
+    codes = [client.post("/p/alpha/api/inbox", json={"type": "bug", "title": f"b{i}"}, headers={"X-Host-User": "rl"}).status_code
+             for i in range(12)]
+    assert codes[:10] == [201] * 10 and codes[10:] == [429, 429]
+
+
+def test_overview_counts_the_inbox(client, program):
+    client.get("/p/alpha/features")
+    client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "One"})
+    page = client.get("/p").text
+    assert "Needs triage" in page and "<b>1</b> waiting" in page and "Inbox is empty" in page   # beta has none

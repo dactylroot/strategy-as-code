@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from . import inbox as _inbox
 from .manifest import ManifestError
 from .models import BugCreate, BugSeverity, BugStatus, BugUpdate, FeatureStatus, NewFeature
 from .parsers import about as about_parser
@@ -171,6 +172,17 @@ def build_parser() -> argparse.ArgumentParser:
     sc = feature.add_parser("score"); sc.add_argument("wbs"); sc.add_argument("value", type=int)
     sc.add_argument("effort", type=int, nargs="?")
 
+    ib = top.add_parser("inbox").add_subparsers(dest="action", required=True)
+    ib.add_parser("list").add_argument("--all", action="store_true", help="include archived items")
+    sub = ib.add_parser("submit"); sub.add_argument("type", choices=list(_inbox.KINDS)); sub.add_argument("title")
+    sub.add_argument("--body", default=""); sub.add_argument("--severity"); sub.add_argument("--wbs")
+    sub.add_argument("--as", dest="submitter", help="submitter name (default: the actor)")
+    pr = ib.add_parser("promote"); pr.add_argument("id")
+    pr.add_argument("--prefix", help="WBS sub-area for a feature request, e.g. 1.2"); pr.add_argument("--value", type=int)
+    dc = ib.add_parser("decline"); dc.add_argument("id"); dc.add_argument("--reason", required=True)
+    du = ib.add_parser("duplicate"); du.add_argument("id"); du.add_argument("--of", required=True, help="existing bug id or WBS")
+    ib.add_parser("sweep", help="archive items untriaged for %d days" % _inbox.ARCHIVE_DAYS)
+
     md = top.add_parser("merge-driver").add_subparsers(dest="action", required=True)
     mi = md.add_parser("install", help="register the field-level merge driver in the current git repository")
     mi.add_argument("--repo", default=".")
@@ -220,6 +232,8 @@ def run(args: argparse.Namespace) -> str:
     reg = Registry.from_manifest(find_manifest(args.manifest))
     key = _pick_project(reg, args.project)
     actor = resolve_actor()
+    if args.resource == "inbox":
+        return _run_inbox(reg, key, actor, args)
     msg = args.message
     chart = args.chart
 
@@ -291,6 +305,49 @@ def run(args: argparse.Namespace) -> str:
     result = _apply(reg, key, edits, msg or label, actor, chart)
     where = f"{result.branch} @ {result.sha[:7]}" if result.changed else "no change"
     return "\n".join([f"{key}: {summary} ({where})", *[f"  note: {n}" for n in notes]])
+
+
+def _run_inbox(reg: Registry, key: str, actor: Actor, args: argparse.Namespace) -> str:
+    spec = reg.get(key).spec
+    out: list[str] = []
+
+    def change(fn: Callable[[Path], None], message: str) -> str:
+        res = edit(reg, key, lambda checkout: fn(checkout / spec.planning_dir), message, actor)
+        return f"{key}: {message} ({res.branch} @ {res.sha[:7]})" if res.changed else f"{key}: no change"
+
+    if args.action == "list":
+        reg.refresh(key)
+        items = _inbox.list_items(reg.get(key).planning_root, include_archive=args.all)
+        if not items:
+            return f"{key}: inbox is empty"
+        return "\n".join(f"{i.id}  {i.kind:<7} {'STALE ' if i.stale else ''}{'ARCHIVED ' if i.archived else ''}"
+                         f"{i.title}  ({i.submitter}, {i.age_days}d)" for i in items)
+    try:
+        if args.action == "submit":
+            who = args.submitter or actor.name
+            made: dict[str, str] = {}
+
+            def add(root: Path) -> None:
+                made["id"] = _inbox.write_item(root, args.type, args.title, args.body, who,
+                                               args.severity or "", args.wbs or "").id
+            line = change(add, f"inbox: {args.type} submitted: {args.title}")
+            return f"{line}\n  id: {made.get('id', '?')}"
+        if args.action == "promote":
+            made = {}
+
+            def pro(root: Path) -> None:
+                made["what"] = _inbox.promote(root, args.id, args.prefix or "", args.value)
+            line = change(pro, f"inbox: promote {args.id}")
+            return f"{line}\n  became: {made.get('what')}"
+        if args.action == "decline":
+            return change(lambda root: _inbox.decline(root, args.id), f"inbox: decline {args.id}: {args.reason}")
+        if args.action == "duplicate":
+            return change(lambda root: _inbox.decline(root, args.id), f"inbox: duplicate {args.id} of {args.of}")
+        moved: list[str] = []
+        line = change(lambda root: moved.extend(_inbox.sweep(root)), "inbox: archive stale items")
+        return f"{line}\n  archived: {len(moved)}"
+    except _inbox.InboxError as exc:
+        raise CliError(str(exc)) from exc
 
 
 def main(argv: list[str] | None = None) -> int:

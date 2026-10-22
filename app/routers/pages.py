@@ -336,6 +336,20 @@ def about_page(request: Request):
     return templates.TemplateResponse(request, "about.html", _ctx(request, "about", about_html=content))
 
 
+@router.get("/inbox", response_class=HTMLResponse)
+def inbox_page(request: Request):
+    from .. import inbox as inbox_lib
+    from .. import scope
+    if not scope.scope_key():
+        return RedirectResponse(url=full("/dashboard"))
+    items = inbox_lib.list_items(settings.project_dir)
+    product = product_parser.parse(settings.product_md) if settings.product_md.exists() else None
+    sub_areas = [sa for area in product.wbs_areas for sa in area.sub_areas] if product else []
+    return templates.TemplateResponse(request, "inbox.html", _ctx(
+        request, "inbox", items=items, sub_areas=sub_areas,
+        stale_days=inbox_lib.STALE_DAYS, archive_days=inbox_lib.ARCHIVE_DAYS))
+
+
 @router.get("/bugs", response_class=HTMLResponse)
 def bugs_page(request: Request):
     s = _get_session(request)

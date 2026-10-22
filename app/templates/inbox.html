@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Inbox - {{ app_title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Inbox</h1>
+  <p class="subtitle">Bug reports and feature requests waiting for triage. Each one is a file in the project repository; promoting one adds it to the board in a single commit.</p>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem">
+  <h3 style="margin-top:0">Submit</h3>
+  <form id="inbox-form">
+    <div class="grid-2">
+      <div class="form-group"><label for="f-type">Type</label>
+        <select id="f-type" class="form-select"><option value="bug">Bug</option><option value="feature">Feature request</option></select></div>
+      <div class="form-group"><label for="f-sev">Severity (bugs)</label>
+        <select id="f-sev" class="form-select"><option value="">Not sure</option><option>low</option><option>medium</option><option>high</option><option>critical</option></select></div>
+    </div>
+    <div class="form-group"><label for="f-title">Title</label><input type="text" id="f-title" maxlength="200" required></div>
+    <div class="form-group"><label for="f-body">Description</label><textarea id="f-body" maxlength="5000" rows="4"></textarea></div>
+    <button class="btn btn-primary" type="submit">Submit</button>
+    <span id="f-msg" class="text-muted"></span>
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Waiting for triage ({{ items | length }})</h3>
+  {% if not items %}<p class="text-muted">Nothing waiting.</p>{% endif %}
+  {% for i in items %}
+  <div class="inbox-item" data-id="{{ i.id }}" style="border-top:1px solid var(--color-border-subtle);padding:0.75rem 0">
+    <div>
+      <span class="badge">{{ i.kind }}</span>
+      {% if i.severity %}<span class="badge">{{ i.severity }}</span>{% endif %}
+      {% if i.stale %}<span class="badge" title="Untriaged for {{ stale_days }}+ days; archived after {{ archive_days }}">stale</span>{% endif %}
+      <strong>{{ i.title }}</strong>
+      <span class="text-muted">{{ i.submitter }} &middot; {{ i.age_days }}d</span>
+    </div>
+    {% if i.body %}<p style="white-space:pre-wrap;margin:0.4rem 0">{{ i.body }}</p>{% endif %}
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+      {% if i.kind == 'feature' %}
+      <select class="form-select prefix" style="width:auto"><option value="">Sub-area…</option>
+        {% for sa in sub_areas %}<option value="{{ sa.wbs }}">{{ sa.wbs }} {{ sa.name }}</option>{% endfor %}</select>
+      {% endif %}
+      <button class="btn btn-primary promote" type="button">Promote</button>
+      <input type="text" class="reason" placeholder="Reason or duplicate of…" style="width:14rem">
+      <button class="btn decline" type="button">Decline</button>
+      <button class="btn dup" type="button">Duplicate</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+const API = '{{ base_path }}/api/inbox';
+async function send(url, body) {
+  const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail || d; } catch (e) {} throw new Error(d); }
+  return r.json();
+}
+document.getElementById('inbox-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('f-msg');
+  try {
+    await send(API, {type: f('f-type'), title: f('f-title'), body: f('f-body'), severity: f('f-sev')});
+    location.reload();
+  } catch (err) { msg.textContent = err.message; }
+});
+function f(id) { return document.getElementById(id).value; }
+document.querySelectorAll('.inbox-item').forEach(row => {
+  const id = row.dataset.id, reason = () => row.querySelector('.reason').value.trim();
+  const act = async (url, body) => { try { await send(url, body); location.reload(); } catch (err) { alert(err.message); } };
+  row.querySelector('.promote').onclick = () => {
+    const p = row.querySelector('.prefix');
+    act(API + '/' + id + '/promote', {prefix: p ? p.value : ''});
+  };
+  row.querySelector('.decline').onclick = () => act(API + '/' + id + '/decline', {reason: reason()});
+  row.querySelector('.dup').onclick = () => {
+    if (!reason()) { alert('Enter the id this duplicates.'); return; }
+    act(API + '/' + id + '/decline', {duplicate_of: reason()});
+  };
+});
+</script>
+{% endblock %}

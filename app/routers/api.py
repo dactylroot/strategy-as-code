@@ -573,3 +573,90 @@ async def events(request: Request):
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
+
+
+# ── Inbox (program mode only: submissions are files committed to the project repo) ──
+
+from collections import defaultdict, deque   # noqa: E402
+import time as _time                          # noqa: E402
+from .. import inbox as inbox_lib             # noqa: E402
+from .. import scope as _scope                # noqa: E402
+from ..program_write import request_actor     # noqa: E402
+
+_SUBMIT_LIMIT = 10          # submissions per submitter per project per hour
+_submit_log: dict[tuple[str, str], deque] = defaultdict(deque)
+
+
+def _require_program() -> None:
+    if not _scope.scope_key():
+        raise HTTPException(status_code=404, detail="The inbox is only available for program projects.")
+
+
+def _rate_limit(request: Request) -> None:
+    """Dependency, so a retried write attempt is not counted twice."""
+    _require_program()
+    actor = request_actor(request)
+    log, now = _submit_log[(_scope.scope_key(), actor.name if actor else "anonymous")], _time.time()
+    while log and now - log[0] > 3600:
+        log.popleft()
+    if len(log) >= _SUBMIT_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many submissions; try again later.")
+    log.append(now)
+
+
+class InboxSubmit(BaseModel):
+    type: str
+    title: str
+    body: str = ""
+    severity: str = ""
+    wbs: str = ""
+
+
+class InboxPromote(BaseModel):
+    prefix: str = ""
+    value: int | None = None
+
+
+class InboxDecline(BaseModel):
+    reason: str = ""
+    duplicate_of: str = ""
+
+
+@router.get("/inbox")
+def list_inbox(request: Request):
+    _require_program()
+    return [i.__dict__ for i in inbox_lib.list_items(settings.project_dir)]
+
+
+@router.post("/inbox", status_code=201, dependencies=[Depends(_rate_limit)])
+@program_write(lambda kw: f"inbox: {kw['req'].type} submitted: {kw['req'].title[:80]}")
+def submit_inbox(request: Request, req: InboxSubmit):
+    actor = request_actor(request)
+    who = actor.name if actor else "anonymous"
+    try:
+        item = inbox_lib.write_item(settings.project_dir, req.type, req.title, req.body, who, req.severity, req.wbs)
+    except inbox_lib.InboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"id": item.id}
+
+
+@router.post("/inbox/{item_id}/promote")
+@program_write("inbox {item_id} promoted")
+def promote_inbox(request: Request, item_id: str, req: InboxPromote):
+    _require_program()
+    try:
+        return {"became": inbox_lib.promote(settings.project_dir, item_id, req.prefix, req.value)}
+    except inbox_lib.InboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/inbox/{item_id}/decline")
+@program_write(lambda kw: (f"inbox: duplicate {kw['item_id']} of {kw['req'].duplicate_of}" if kw["req"].duplicate_of
+                           else f"inbox: decline {kw['item_id']}: {kw['req'].reason or 'no reason given'}"))
+def decline_inbox(request: Request, item_id: str, req: InboxDecline):
+    _require_program()
+    try:
+        inbox_lib.decline(settings.project_dir, item_id)
+    except inbox_lib.InboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"ok": True}
