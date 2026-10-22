@@ -1,8 +1,8 @@
 # strategy-as-code
 
-Core information for communication and design on project planning.
+Core information for communication, design, and project planning.
 
-Each interface type is supported by a respective markdown file.
+Each interface audience is supported by a respective markdown file.
 
 Other workflows and reports for stakeholders, engineers, and end-users derive from these sources of truth.
 
