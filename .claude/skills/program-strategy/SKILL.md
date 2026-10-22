@@ -63,12 +63,45 @@ Scored never appears as a literal transition - it's just how an Idea row current
 
 Marking a feature Complete sets it to `Live`, so it lands in **Review** and stays there until a human approves it - independent of any changelog or release entry. Every `Live` feature is in Review; approving one advances it to `Released`. Never set `Released` yourself from a code change - that transition is the human UAT step (see below).
 
-**When implementation work finishes, advance the feature to `Live` immediately - do not wait to be asked.** If a code change (bug fix or new functionality) satisfies an `In-Progress` (or `Idea`) feature's described requirement, update PRODUCT.MD in the same pass as the code change:
+**When implementation work finishes, advance the feature to `Live` immediately - do not wait to be asked.** If a code change (bug fix or new functionality) satisfies an `In-Progress` (or `Idea`) feature's described requirement, update PRODUCT.MD in the same pass as the code change (in program mode, through the `strategy` CLI - see Writing Changes):
 - Move its `Status` to `Live`. Never set `Released` from a code change alone - that status requires a human UAT sign-off and is a separate, later, human-triggered step.
 - Rewrite the `Notes` text if it was phrased as a pending requirement (e.g. "X should do Y"). Once shipped, describe the implemented behavior instead (e.g. "X does Y"), so a `Live` row doesn't read like an open TODO.
 - If the feature has no existing WBS row, don't fabricate one - ask which existing feature it belongs to, or whether it needs a new row first.
 
-**Regenerate the WBS chart after any status edit.** `docs/wbs.html`/`docs/wbs.png` are generated artifacts, not hand-maintained - a PRODUCT.MD status change alone leaves them stale. Re-run `gen_wbs.py` (see WBS Chart Generation below) as part of the same change.
+**The WBS chart is optional and on demand.** `docs/wbs.html`/`docs/wbs.png` are generated artifacts, so a PRODUCT.MD status change leaves them stale until someone regenerates them. Do not regenerate them, or suggest regenerating them, as part of a routine status, notes or score edit. Run `gen_wbs.py` (see WBS Chart Generation below) only when the user asks for the chart, or when the chart itself is what is being changed.
+
+---
+
+## Writing Changes: Program Mode vs. Standalone
+
+How a status, notes, score or bug change reaches the markdown files depends on whether the project belongs to a **program**.
+
+**Program mode** - a `PROGRAM.MD` manifest lists this repository. Look for it at or above the working directory, in a `program/` folder there, or at `$STRATEGY_MANIFEST`; the project's key is the manifest row whose `Repo / Path` is this repository. In program mode PRODUCT.MD and BUGS.MD are shared with other writers (the web UI, other developers), so **do not edit them in the working tree** - least of all on a feature branch, where the edit collides with the same row changed elsewhere. Use the `strategy` CLI instead. It applies the change to the latest copy of the file on the project's planning branch, commits it as you, and pushes it, so the code pull request contains only code:
+
+```bash
+S=~/.claude/skills/program-strategy/scripts/strategy      # or .claude/skills/... in a per-project install
+
+$S feature status 3.1.1 live            # idea | in-progress | live  (never 'released' from a code change)
+$S feature notes  3.1.1 "Does X now"
+$S feature score  3.1.1 8 3             # value [effort]
+$S feature add    3.1 "Feature name" --value 8 --notes "..."   # sub-area prefix; the next WBS code is assigned and printed
+$S feature move   3.1.1 4.2             # new WBS code; initiative bullets and bug WBS refs in this project follow it
+$S bug add "Short title" --severity high --notes "..." --wbs 1.2.3
+$S bug status 12 resolved --fix 0.4.2   # open | investigating | resolved
+$S bug close  12 --resolved-in 0.4.2    # only after UAT confirms the fix
+```
+
+- Add `-p <key>` when the manifest lists several projects, and `--manifest <path>` if it is not found automatically.
+- The commit author is read from `$STRATEGY_ACTOR` (`Name <email>`) or git `user.name`/`user.email`.
+- The CLI needs the strategy-as-code requirements installed; if it fails with an import error, point `STRATEGY_PYTHON` at a Python that has them.
+- After a CLI write the working-tree copy of the file is stale (the change lives on the planning branch until it is merged). Do not re-read it as current state or "fix" it by hand; read the planning branch (`git fetch`, then `git show <branch>:PRODUCT.MD`) or the web UI.
+- `feature move` prints notes about references it cannot update (other mentions of the old code in notes or Known Gaps, and initiatives in other projects or the manifest that cite `key:old`). Relay those to the user.
+- The CLI does not yet cover ABOUT.MD (roadmap and changelog) or the prose sections (summary, users, scope, workflows). Make those edits directly, say that you did, and expect to reconcile them with the planning branch.
+- Do not regenerate the WBS chart as part of these changes; `--chart` exists, but only use it when the user asks.
+
+**Standalone** - no manifest lists this repository. Edit the files directly in the working tree, as described in the sections below.
+
+Everything below that says "update PRODUCT.MD" or "set status" means *make that change*, by the route above.
 
 ---
 
@@ -197,7 +230,7 @@ Bug tracking. Two sections: `## Active` (bugs still on the board, including code
 
 `Open`, `Investigating`, and `Resolved` are all *active* - a bug keeps its board row and, when mirrored, its GitHub Issue stays open through all three. Only moving to `## Closed` closes the mirrored Issue. This matches the GitHub flow: `Open → Open → Open → Closed`.
 
-**When a fix is implemented but not yet verified by the user or in production, set status to `Resolved`.** Do not close the bug (move it to `## Closed`) until the fix is confirmed in UAT.
+**When a fix is implemented but not yet verified by the user or in production, set status to `Resolved`** (in program mode: `strategy bug status <id> resolved --fix <version>`). Do not close the bug (move it to `## Closed`) until the fix is confirmed in UAT.
 
 **Fix Version** is the planned build version in which the fix will ship (e.g. `0.2.2`). Set it when advancing a bug to `Resolved`. Leave blank for `Open` and `Investigating` bugs. The UI displays it as a badge on Resolved cards.
 
@@ -245,7 +278,7 @@ Outputs:
 
 ### Updating the chart
 
-PRODUCT.MD is the single source of truth. The script parses the `## Features` section directly - no separate data structure to maintain. Edit PRODUCT.MD and re-run the script.
+PRODUCT.MD is the single source of truth. The script parses the `## Features` section directly - no separate data structure to maintain. Regenerate only when asked; a stale chart is expected between regenerations, and is not something to flag or offer to fix after ordinary edits.
 
 The parser reads:
 - `### N. Title` → swimlane (Level 1 scope area)

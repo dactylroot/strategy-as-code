@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Launcher for the `strategy` CLI shipped in the strategy-as-code repo this skill
+# lives in. Resolves symlinks, so it works from ~/.claude/skills/program-strategy
+# and from a per-project install. Runs in the caller's directory (manifest
+# discovery starts there). Set STRATEGY_PYTHON to a Python that has the repo's
+# requirements installed.
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/../../../../strategy" "$@"
