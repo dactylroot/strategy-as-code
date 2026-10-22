@@ -435,3 +435,28 @@ def transform_set_gh_issue(text: str, bug_id: int, issue_ref: str) -> tuple[str,
     pattern = rf"^\| {bug_id} \|[^\n]+\|$"
     new_text, n = re.subn(pattern, lambda _m: new_row, text, count=1, flags=re.MULTILINE)
     return new_text, n == 1
+
+
+def transform_rewrite_wbs_refs(text: str, old: str, new: str) -> str:
+    """Re-point active bugs at a feature's new WBS code after the feature moved."""
+    if not text.strip():
+        return text
+    text = _normalize_corrupted_rows(text)
+    doc = _parse_text(text)
+    column_count = _section_column_count(text, "## Active")
+    today = date.today().isoformat()
+    for bug in doc.active:
+        if (bug.wbs_ref or "") != old:
+            continue
+        values = {
+            "id": bug.id, "title": bug.title, "severity": bug.severity.value,
+            "status": bug.status.value, "notes": bug.notes, "wbs_ref": new,
+            "fix_version": bug.fix_version or "", "owner": bug.owner or "",
+            "uat_confirmed": "Yes" if bug.uat_confirmed else "", "gh_issue": bug.gh_issue or "",
+            "created_at": bug.created_at or "", "last_updated": today,
+        }
+        new_row = _build_row(values, _ACTIVE_FIELDS, column_count)
+        text, n = re.subn(rf"^\| {bug.id} \|[^\n]+\|$", lambda _m: new_row, text, flags=re.MULTILINE)
+        if n != 1:
+            raise ValueError(f"Expected 1 match for bug {bug.id}, got {n}")
+    return text

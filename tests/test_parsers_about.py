@@ -196,3 +196,12 @@ class TestTransformUpdateInitiatives:
         assert bl and "Future items" in bl.items
 
 
+
+
+def test_rewrite_wbs_refs_only_touches_initiative_items():
+    text = ("# Roadmap\n\n## Initiatives\n\n### A (Major)\n- 1.2.2\n- prog:1.2.2\n- 1.2.20\n\n"
+            "## Backlog\n- 1.2.2 later\n")
+    out = parser.transform_rewrite_wbs_refs(text, "1.2.2", "3.1.1")
+    assert "- 3.1.1\n- prog:1.2.2\n- 1.2.20\n" in out
+    assert "- 1.2.2 later" in out
+    assert parser.transform_rewrite_wbs_refs("# x\n", "1.2.2", "3.1.1") == "# x\n"

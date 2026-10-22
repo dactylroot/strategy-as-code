@@ -542,10 +542,19 @@ def transform_move_feature(text: str, wbs: str, target_prefix: str) -> tuple[str
         value, effort = None, None
         feat_notes = cells[3] if len(cells) > 3 else ""
     created_at = cells[9].strip() if len(cells) > 9 and cells[9].strip() else None
+    # Trailing Flag / Owner / UAT Confirmed columns travel with the feature.
+    flagged = len(cells) > 6 and cells[6].strip().lower() in ("gap", "flagged", "true")
+    owner = cells[7].strip() if len(cells) > 7 and cells[7].strip() else None
+    uat = len(cells) > 8 and cells[8].strip().lower() in ("yes", "true")
 
     text = row_pat.sub("", text, count=1)
     text = re.sub(r"\n{3,}", "\n\n", text)
-    return transform_add_feature(text, NewFeature(
+    text, moved = transform_add_feature(text, NewFeature(
         wbs_prefix=target_prefix, name=feat_name, status=status,
-        value=value, effort=effort, notes=feat_notes,
+        value=value, effort=effort, notes=feat_notes, owner=owner,
     ), created_at=created_at)
+    if flagged:
+        text = transform_feature_flagged(text, moved.wbs, True)
+    if uat:
+        text = transform_feature_uat(text, moved.wbs, True)
+    return text, moved

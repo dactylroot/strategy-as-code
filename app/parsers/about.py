@@ -160,3 +160,17 @@ def transform_update_initiatives(text: str, initiatives: list[InitiativeUpdate])
     return result
 
 
+
+
+def transform_rewrite_wbs_refs(text: str, old: str, new: str) -> str:
+    """Point initiative members at a feature's new WBS code after a move.
+
+    Only unprefixed bullet items inside `## Initiatives` are touched: a `project:WBS`
+    item points at a different project's feature, so it is not this file's to
+    rewrite. Free-text mentions elsewhere are left alone."""
+    m = re.search(r"(## Initiatives\n)(.*?)(?=\n## |\n# |\Z)", text, flags=re.DOTALL)
+    if not m:
+        return text
+    item = re.compile(rf"^([-*]\s+){re.escape(old)}(\s*)$", re.MULTILINE)
+    body = item.sub(lambda mm: f"{mm.group(1)}{new}{mm.group(2)}", m.group(2))
+    return text[:m.start(2)] + body + text[m.end(2):]
