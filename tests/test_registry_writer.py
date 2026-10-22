@@ -172,13 +172,28 @@ def test_branch_mode_merges_new_main_commits_before_editing(tmp_path, origin):
     assert "| 1.1.2 | Logout | Live |" in remote_file(origin, "planning")
 
 
-def test_branch_mode_unmergeable_main_raises_and_keeps_branch(tmp_path, origin):
+def test_branch_mode_merges_main_edits_to_other_fields_of_the_same_row(tmp_path, origin):
     reg = make_registry(tmp_path, origin, mode="branch")
-    edit_file(reg, "demo", "PRODUCT.MD", live("1.1.1"), "one")
+    edit_file(reg, "demo", "PRODUCT.MD", live("1.1.1"), "planning edit")
+    other = clone_of(tmp_path, origin)
+    f = other / "PRODUCT.MD"
+    f.write_text(f.read_text().replace("| Live | 8 | 3 | first |", "| Live | 8 | 3 | first |")
+                 .replace("| Idea | 8 | 3 | first |", "| Idea | 8 | 3 | reworded by dev |"))
+    _git(other, "commit", "-qam", "dev edits notes")
+    _git(other, "push", "-q", "origin", "main")
+    edit_file(reg, "demo", "PRODUCT.MD", live("1.1.2"), "two")
+    row = [l for l in remote_file(origin, "planning").splitlines() if l.startswith("| 1.1.1")][0]
+    assert "Live" in row and "reworded by dev" in row
+
+
+def test_branch_mode_unmergeable_main_raises_and_keeps_branch(tmp_path, origin):
+    # Rows merge field by field, but a prose line edited on both sides still conflicts.
+    reg = make_registry(tmp_path, origin, mode="branch")
+    edit_file(reg, "demo", "PRODUCT.MD", lambda t: t.replace("# Demo", "# Planning title"), "one")
     planning_tip = run_git(origin, ["rev-parse", "planning"])
     other = clone_of(tmp_path, origin)
     f = other / "PRODUCT.MD"
-    f.write_text(f.read_text().replace("| 1.1.1 | Login | Idea |", "| 1.1.1 | Login | Released |"))
+    f.write_text(f.read_text().replace("# Demo", "# Main title"))
     _git(other, "commit", "-qam", "conflicting")
     _git(other, "push", "-q", "origin", "main")
     with pytest.raises(RegistryError, match="cannot merge"):

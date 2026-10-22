@@ -9,6 +9,7 @@ from __future__ import annotations
 import fcntl
 import os
 import subprocess
+import sys
 import threading
 import time
 from contextlib import contextmanager
@@ -200,6 +201,15 @@ class Registry:
         # Identity for commits the registry itself creates (planning-branch merges).
         project.git("config", "user.name", self.committer[0])
         project.git("config", "user.email", self.committer[1])
+        # Field-level merge for the planning tables, so merging the default branch
+        # into the planning branch combines row edits instead of conflicting.
+        # info/attributes is local to the clone; nothing is committed to the project.
+        driver = Path(__file__).resolve().with_name("mergedriver.py")
+        project.git("config", "merge.strategy-rows.driver", f'"{sys.executable}" "{driver}" %O %A %B %P')
+        info = project.path / ".git" / "info"
+        info.mkdir(exist_ok=True)
+        (info / "attributes").write_text(
+            "PRODUCT.MD merge=strategy-rows\nBUGS.MD merge=strategy-rows\n", encoding="utf-8")
 
     def refresh(self, key: str) -> Project:
         """Bring one project's clone up to date. A failure is recorded in its

@@ -201,3 +201,17 @@ def test_feature_move_unknown_feature_changes_nothing(manifest, origin, capsys):
     before = run_git(origin, ["rev-parse", "main"])
     assert main(["--manifest", str(manifest), "feature", "move", "9.9.9", "1.2"]) == 1
     assert run_git(origin, ["rev-parse", "main"]) == before
+
+
+def test_merge_driver_install_configures_git_and_attributes(tmp_path):
+    import subprocess
+    from app.cli import install_merge_driver
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    msg = install_merge_driver(tmp_path)
+    assert "commit it" in msg
+    attrs = (tmp_path / ".gitattributes").read_text()
+    assert "PRODUCT.MD merge=strategy-rows" in attrs and "BUGS.MD merge=strategy-rows" in attrs
+    driver = subprocess.run(["git", "config", "merge.strategy-rows.driver"], cwd=tmp_path,
+                            capture_output=True, text=True).stdout
+    assert "mergedriver.py" in driver and "%O %A %B %P" in driver
+    assert "already set" in install_merge_driver(tmp_path)       # idempotent

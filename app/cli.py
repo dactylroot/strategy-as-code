@@ -171,6 +171,10 @@ def build_parser() -> argparse.ArgumentParser:
     sc = feature.add_parser("score"); sc.add_argument("wbs"); sc.add_argument("value", type=int)
     sc.add_argument("effort", type=int, nargs="?")
 
+    md = top.add_parser("merge-driver").add_subparsers(dest="action", required=True)
+    mi = md.add_parser("install", help="register the field-level merge driver in the current git repository")
+    mi.add_argument("--repo", default=".")
+
     bug = top.add_parser("bug").add_subparsers(dest="action", required=True)
     a = bug.add_parser("add"); a.add_argument("title"); a.add_argument("--severity", choices=list(_SEVERITIES), default="medium")
     a.add_argument("--notes", default=""); a.add_argument("--wbs"); a.add_argument("--owner")
@@ -180,7 +184,39 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+DRIVER_NAME = "strategy-rows"
+_ATTRIBUTES = ("PRODUCT.MD", "BUGS.MD")
+
+
+def install_merge_driver(repo: Path) -> str:
+    """Point git at the field-level merge driver for PRODUCT.MD and BUGS.MD.
+
+    The git config is local to the clone (each developer runs this once); the
+    .gitattributes lines are committed so the file names are tracked with the code.
+    """
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=repo, capture_output=True, text=True)
+    if top.returncode != 0:
+        raise CliError(f"{repo} is not inside a git repository")
+    root = Path(top.stdout.strip())
+    driver = Path(__file__).resolve().with_name("mergedriver.py")
+    command = f'"{sys.executable}" "{driver}" %O %A %B %P'
+    for key, value in ((f"merge.{DRIVER_NAME}.name", "Field-level merge for strategy-as-code tables"),
+                       (f"merge.{DRIVER_NAME}.driver", command)):
+        subprocess.run(["git", "config", "--local", key, value], cwd=root, check=True)
+    attrs = root / ".gitattributes"
+    existing = attrs.read_text(encoding="utf-8") if attrs.exists() else ""
+    missing = [f"{name} merge={DRIVER_NAME}" for name in _ATTRIBUTES
+               if f"{name} merge={DRIVER_NAME}" not in existing]
+    if missing:
+        sep = "" if not existing or existing.endswith("\n") else "\n"
+        attrs.write_text(existing + sep + "\n".join(missing) + "\n", encoding="utf-8")
+    return (f"merge driver '{DRIVER_NAME}' configured in {root}"
+            + (f"; added {len(missing)} line(s) to .gitattributes (commit it)" if missing else "; .gitattributes already set"))
+
+
 def run(args: argparse.Namespace) -> str:
+    if args.resource == "merge-driver":
+        return install_merge_driver(Path(args.repo))
     reg = Registry.from_manifest(find_manifest(args.manifest))
     key = _pick_project(reg, args.project)
     actor = resolve_actor()
