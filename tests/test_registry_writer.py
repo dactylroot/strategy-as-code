@@ -293,3 +293,21 @@ def test_initiative_naming_an_unknown_project_is_an_error():
 def test_no_initiatives_section_is_empty():
     from app.manifest import parse_initiatives
     assert parse_initiatives("## Projects\n") == []
+
+
+def test_github_token_is_sent_as_a_header_not_in_urls(tmp_path, monkeypatch):
+    import base64
+    monkeypatch.setenv("GIT_TOKEN", "tok123")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "user.name")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "kept")
+    run_git(None, ["init", "-q", str(tmp_path / "r")])
+    got = run_git(tmp_path / "r", ["config", "--get", "http.https://github.com/.extraheader"])
+    assert got == "Authorization: basic " + base64.b64encode(b"x-access-token:tok123").decode()
+    assert run_git(tmp_path / "r", ["config", "--get", "user.name"]) == "kept"       # existing GIT_CONFIG_* survives
+
+
+def test_no_token_adds_no_header(tmp_path, monkeypatch):
+    monkeypatch.delenv("GIT_TOKEN", raising=False)
+    run_git(None, ["init", "-q", str(tmp_path / "r")])
+    assert run_git(tmp_path / "r", ["config", "--get", "http.https://github.com/.extraheader"], check=False) == ""

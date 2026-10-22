@@ -6,6 +6,7 @@ developer's own working checkout. For a local-path project the registry
 clones from that path into its own cache directory.
 """
 from __future__ import annotations
+import base64
 import fcntl
 import os
 import subprocess
@@ -39,8 +40,29 @@ def default_cache_dir() -> Path:
     return Path(env) if env else Path.home() / ".cache" / "strategy-as-code" / "projects"
 
 
+def _token_env(base: dict) -> dict:
+    """Authenticate https://github.com remotes with $GIT_TOKEN, for every git call.
+
+    The token travels as an http extra header set through GIT_CONFIG_* (never in a
+    remote URL, a file or a command line), so it stays out of `git remote -v`,
+    process listings and error messages. Other hosts and ssh remotes are untouched.
+    """
+    token = base.get("GIT_TOKEN", "")
+    if not token:
+        return {}
+    n = int(base.get("GIT_CONFIG_COUNT", "0") or 0)
+    basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+    return {
+        "GIT_CONFIG_COUNT": str(n + 1),
+        f"GIT_CONFIG_KEY_{n}": "http.https://github.com/.extraheader",
+        f"GIT_CONFIG_VALUE_{n}": f"Authorization: basic {basic}",
+    }
+
+
 def run_git(cwd: Path | None, args: list[str], *, env: dict | None = None, check: bool = True) -> str:
-    full_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", **(env or {})}
+    full_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    full_env.update(_token_env(full_env))
+    full_env.update(env or {})
     result = subprocess.run(["git", *args], cwd=cwd, env=full_env, capture_output=True, text=True)
     if check and result.returncode != 0:
         raise GitError(args, (result.stderr or result.stdout).strip())
