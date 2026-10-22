@@ -4,7 +4,7 @@ import re
 import zipfile
 import tempfile
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from watchfiles import awatch
 from pydantic import BaseModel
@@ -20,6 +20,7 @@ from ..parsers import about as about_parser
 from ..parsers import bugs as bugs_parser
 from .. import wbs as wbs_module
 from .. import git_sync
+from ..program_write import program_write, refuse_when_scoped
 from ..template_env import templates
 
 router = APIRouter()
@@ -69,6 +70,7 @@ def get_product(request: Request):
 
 
 @router.patch("/features/{wbs:path}")
+@program_write("feature {wbs} updated")
 def patch_feature(wbs: str, body: FeatureUpdate, request: Request):
     s = _session(request)
     if body.name is not None and (
@@ -133,6 +135,7 @@ class MoveFeatureBody(BaseModel):
 
 
 @router.post("/features/{wbs:path}/move")
+@program_write("feature {wbs} moved")
 def move_feature(wbs: str, body: MoveFeatureBody, request: Request):
     s = _session(request)
     try:
@@ -149,6 +152,7 @@ def move_feature(wbs: str, body: MoveFeatureBody, request: Request):
 
 
 @router.delete("/features/{wbs:path}")
+@program_write("feature {wbs} deleted")
 def delete_feature(wbs: str, request: Request):
     s = _session(request)
     try:
@@ -170,6 +174,7 @@ def delete_feature(wbs: str, request: Request):
 
 
 @router.post("/features")
+@program_write("feature added")
 def post_feature(body: NewFeature, request: Request):
     s = _session(request)
     if "|" in body.name or len(body.name.splitlines()) > 1:
@@ -203,6 +208,7 @@ def get_about(request: Request):
 
 
 @router.put("/roadmap")
+@program_write("backlog updated")
 def put_roadmap(body: RoadmapUpdate, request: Request):
     s = _session(request)
     if s:
@@ -214,6 +220,7 @@ def put_roadmap(body: RoadmapUpdate, request: Request):
 
 
 @router.put("/roadmap/features")
+@program_write("initiatives and backlog updated")
 def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
     s = _session(request)
     if s:
@@ -234,6 +241,7 @@ def put_roadmap_features(body: RoadmapFeaturesUpdate, request: Request):
 # ── WBS Chart ─────────────────────────────────────────────────────────────────
 
 @router.post("/wbs/regenerate")
+@program_write("WBS chart regenerated")
 def regenerate_wbs(request: Request):
     s = _session(request)
     if s:
@@ -288,7 +296,7 @@ def browse_directory(path: str = ""):
         raise HTTPException(status_code=404, detail="Path not found")
 
 
-@router.post("/switch-project")
+@router.post("/switch-project", dependencies=[Depends(refuse_when_scoped("Switching projects"))])
 def switch_project_api(body: SwitchProjectBody):
     if settings.lock_project:
         raise HTTPException(status_code=403, detail="Project switching is disabled on this instance.")
@@ -379,6 +387,7 @@ class SectionUpdate(BaseModel):
 
 
 @router.put("/structure/users")
+@program_write("users section updated")
 def put_users(body: SectionUpdate, request: Request):
     s = _session(request)
     try:
@@ -392,6 +401,7 @@ def put_users(body: SectionUpdate, request: Request):
 
 
 @router.put("/structure/workflows")
+@program_write("workflows section updated")
 def put_workflows(body: SectionUpdate, request: Request):
     s = _session(request)
     try:
@@ -405,6 +415,7 @@ def put_workflows(body: SectionUpdate, request: Request):
 
 
 @router.put("/structure/scope")
+@program_write("scope section updated")
 def put_scope(body: SectionUpdate, request: Request):
     s = _session(request)
     try:
@@ -434,7 +445,7 @@ def _screenshots_dir() -> Path:
     return d
 
 
-@router.post("/bugs/{bug_id}/screenshot")
+@router.post("/bugs/{bug_id}/screenshot", dependencies=[Depends(refuse_when_scoped("Screenshot upload"))])
 async def upload_bug_screenshot(bug_id: int, request: Request, file: UploadFile = File(...)):
     if not (file.content_type or "").startswith("image/"):
         raise HTTPException(status_code=400, detail="Only image files are accepted")
@@ -485,6 +496,7 @@ def get_bugs(request: Request):
 
 
 @router.post("/bugs")
+@program_write("bug added")
 def post_bug(body: BugCreate, request: Request):
     body = body.model_copy(update={"owner": _default_owner(request, body.owner)})
     s = _session(request)
@@ -497,6 +509,7 @@ def post_bug(body: BugCreate, request: Request):
 
 
 @router.patch("/bugs/{bug_id}")
+@program_write("bug {bug_id} updated")
 def patch_bug(bug_id: int, body: BugUpdate, request: Request):
     s = _session(request)
     try:
@@ -511,6 +524,7 @@ def patch_bug(bug_id: int, body: BugUpdate, request: Request):
 
 
 @router.post("/bugs/{bug_id}/close")
+@program_write("bug {bug_id} closed")
 def close_bug(bug_id: int, request: Request, body: dict = {}):
     resolved_in = body.get("resolved_in", "") if isinstance(body, dict) else ""
     s = _session(request)

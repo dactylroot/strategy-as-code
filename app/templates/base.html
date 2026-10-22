@@ -308,8 +308,8 @@
 
 {% if not embed_chrome %}
 <aside class="sidebar">
-  <a href="{{ base_path }}/switch-project" class="sidebar-brand" style="text-decoration:none;display:block;"
-     title="{% if lock_project %}Project files{% else %}Switch project{% endif %}">
+  <a href="{% if scope_key() %}{{ projects_url() }}{% else %}{{ base_path }}/switch-project{% endif %}" class="sidebar-brand" style="text-decoration:none;display:block;"
+     title="{% if scope_key() %}All program projects{% elif lock_project %}Project files{% else %}Switch project{% endif %}">
     <small>strategy-as-code</small>
     {{ app_title }}
   </a>
@@ -344,6 +344,11 @@
 {% endif %}
 
 <main class="main">
+  {% if scope_key() %}
+  <div role="status" style="margin:0 0 1rem;padding:0.55rem 0.8rem;border:1px solid var(--color-border-muted);border-radius:8px;font-size:0.82rem;color:var(--color-text-secondary);">
+    Program project <strong>{{ scope_key() }}</strong>. Saved changes are committed to <code>{{ scope_branch() }}</code> in its repository.
+  </div>
+  {% endif %}
   {% block content %}{% endblock %}
 </main>
 

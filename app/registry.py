@@ -22,6 +22,10 @@ class RegistryError(RuntimeError):
     pass
 
 
+class SyncConflict(RegistryError):
+    """The remote's default branch cannot be merged into the planning branch."""
+
+
 class GitError(RegistryError):
     def __init__(self, args: list[str], stderr: str):
         self.git_args = args
@@ -62,6 +66,11 @@ class Project:
     @property
     def key(self) -> str:
         return self.spec.key
+
+    @property
+    def planning_root(self) -> Path:
+        """Folder in the clone that holds PRODUCT.MD, BUGS.MD, ABOUT.MD."""
+        return self.path / self.spec.planning_dir
 
     @property
     def target_branch(self) -> str | None:
@@ -129,7 +138,7 @@ class Project:
                 if merged.returncode != 0:
                     self.git("merge", "--abort", check=False)
                     self.git("reset", "-q", "--hard", source)
-                    raise RegistryError(
+                    raise SyncConflict(
                         f"{self.key}: cannot merge {base} into {target}: "
                         f"{(merged.stderr or merged.stdout).strip()}")
         sha = self.git("rev-parse", "HEAD")

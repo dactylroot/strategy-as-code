@@ -15,7 +15,17 @@ def _lock_for(path: Path) -> threading.Lock:
         return _locks[path]
 
 
+class ProjectReadOnly(PermissionError):
+    """Raised when a legacy in-place write is attempted while serving a program project."""
+
+
 def _atomic_write(path: Path, text: str) -> None:
+    # A program project's files are a managed clone that is reset on every sync, so
+    # an in-place write would be silently lost. Program edits go through writer.edit.
+    from . import scope
+    scoped = scope.scope_key() is not None
+    if scoped and not scope.writing.get():
+        raise ProjectReadOnly(f"{scope.scope_key()}: program edits must go through program_write")
     # Writes in place (open + truncate + write), NOT tmp-file + os.replace.
     # In prod these .MD files are individual single-file bind mounts shared with
     # the embedding host (renewals: see docker-compose.yml). Renaming a tmp file
@@ -45,5 +55,6 @@ def _atomic_write(path: Path, text: str) -> None:
         os.close(fd)
     # Best-effort background export to the content-sync branch - never lets a
     # sync problem surface as a failed save (see git_sync.schedule_sync).
-    from . import git_sync
-    git_sync.schedule_sync("save")
+    if not scoped:  # a program project is committed by the writer, not exported to content-sync
+        from . import git_sync
+        git_sync.schedule_sync("save")

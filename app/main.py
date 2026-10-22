@@ -1,11 +1,13 @@
 import logging
+import re
 import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 
 from .config import settings, full
 from .routers import pages, api
@@ -13,6 +15,11 @@ from .routers import auth_router
 from .auth import is_authenticated
 from . import git_sync
 from . import github_issues
+from . import scope
+from .fileio import ProjectReadOnly
+from .registry import Registry, RegistryError, SyncConflict
+from .writer import WriteConflict
+from .template_env import templates
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +57,21 @@ async def _lifespan(_app: FastAPI):
 
 app = FastAPI(title=settings.app_title, docs_url=full("/api-docs"), lifespan=_lifespan)
 
-# Serve static files from the project's docs/ directory (WBS charts etc.)
-docs_dir = settings.docs_dir
-if docs_dir.exists():
-    app.mount(full("/docs"), StaticFiles(directory=str(docs_dir)), name="docs")
+# Program mode: one clone per member project, served under <base>/p/<key>/.
+if settings.program_manifest:
+    scope.set_registry(Registry.from_manifest(Path(settings.program_manifest).expanduser()))
+
+
+@app.get(full("/docs/{path:path}"), include_in_schema=False)
+def project_docs(path: str):
+    """The project's docs/ folder (WBS charts etc.), resolved per request so it follows
+    the active project - including a project-scoped request."""
+    root = settings.docs_dir.resolve()
+    target = (root / path).resolve()
+    if not target.is_file() or (root != target and root not in target.parents):
+        raise HTTPException(status_code=404)
+    return FileResponse(target)
+
 
 # Serve local static assets
 static_dir = Path(__file__).parent.parent / "static"
@@ -61,6 +79,43 @@ if static_dir.exists():
     app.mount(full("/static"), StaticFiles(directory=str(static_dir)), name="static")
 
 _PUBLIC = {full("/login"), full("/logout")}
+_SCOPE_RE = re.compile(rf"^{re.escape(settings.root_path)}/p/([^/]+)(/.*)?$")
+
+
+def _plain(status: int, message: str) -> HTMLResponse:
+    return HTMLResponse(f"<p style=\"font-family:sans-serif\">{message}</p>", status_code=status)
+
+
+# Declared before require_auth so it sits inside it: auth sees the original
+# /p/<key>/... path (and returns to it after login), the router sees the rewritten one.
+@app.middleware("http")
+async def scope_project(request: Request, call_next):
+    m = _SCOPE_RE.match(request.scope["path"])
+    registry = scope.get_registry()
+    if not m:
+        return await call_next(request)
+    key, rest = m.group(1), m.group(2) or "/"
+    if registry is None or key not in registry:
+        return _plain(404, f"Unknown project {key!r}.")
+    root = settings.root_path
+    if rest == "/":
+        return RedirectResponse(url=f"{root}/p/{key}/dashboard")
+    try:
+        stale = await run_in_threadpool(scope.freshen, key)
+    except Exception as exc:
+        logger.exception("cannot load project %s", key)
+        return _plain(502, f"Could not load project {key!r}: {exc}")
+    token = scope.current_project.set(key)
+    request.scope["path"] = root + rest
+    if "raw_path" in request.scope:
+        request.scope["raw_path"] = (root + rest).encode()
+    try:
+        response = await call_next(request)
+    finally:
+        scope.current_project.reset(token)
+    if stale:
+        response.headers["X-Project-Stale"] = "1"
+    return response
 
 
 @app.middleware("http")
@@ -74,6 +129,36 @@ async def require_auth(request: Request, call_next):
 app.include_router(auth_router.router, prefix=settings.base_path)
 app.include_router(pages.router, prefix=settings.base_path)
 app.include_router(api.router, prefix=full("/api"))
+
+
+@app.exception_handler(ProjectReadOnly)
+def _read_only(_request: Request, exc: ProjectReadOnly):
+    return JSONResponse({"detail": str(exc)}, status_code=403)
+
+
+@app.exception_handler(WriteConflict)
+@app.exception_handler(SyncConflict)
+def _conflict(_request: Request, exc: RegistryError):
+    return JSONResponse({"detail": f"Could not save, please retry: {exc}"}, status_code=409)
+
+
+@app.exception_handler(RegistryError)
+def _sync_failed(_request: Request, exc: RegistryError):
+    logger.error("program write failed: %s", exc)
+    return JSONResponse({"detail": f"Could not save to the project repository: {exc}"}, status_code=502)
+
+
+@app.get(full("/p"), include_in_schema=False)
+def projects_index(request: Request):
+    registry = scope.get_registry()
+    if registry is None:
+        raise HTTPException(status_code=404)
+    rows = []
+    for key in registry.keys():
+        project = registry.get(key)
+        st = project.status
+        rows.append({"key": key, "spec": project.spec, "sha": (st.sha or "")[:7], "error": st.last_error})
+    return templates.TemplateResponse(request, "projects.html", {"projects": rows, "app_title": "Program projects"})
 
 
 @app.get("/", include_in_schema=False)

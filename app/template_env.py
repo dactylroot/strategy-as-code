@@ -2,6 +2,7 @@ from pathlib import Path
 import markdown as md
 from fastapi.templating import Jinja2Templates
 
+from . import scope
 from .config import settings
 
 _templates_dir = Path(__file__).parent / "templates"
@@ -9,7 +10,24 @@ templates = Jinja2Templates(directory=str(_templates_dir))
 templates.env.filters["markdown_to_html"] = lambda text: md.markdown(
     text, extensions=["tables", "fenced_code"]
 )
-templates.env.globals["base_path"] = settings.base_path
+
+
+class _BasePath:
+    """Rendered per use, so links carry /p/<key> while a project-scoped request is served."""
+    def __str__(self) -> str:
+        return settings.base_path
+
+    def __add__(self, other):
+        return str(self) + str(other)
+
+    def __radd__(self, other):
+        return str(other) + str(self)
+
+
+templates.env.globals["base_path"] = _BasePath()
+templates.env.globals["scope_key"] = scope.scope_key
+templates.env.globals["scope_branch"] = scope.branch_label
+templates.env.globals["projects_url"] = lambda: f"{settings.root_path}/p"
 templates.env.globals["embed_chrome"] = settings.embed_chrome
 
 

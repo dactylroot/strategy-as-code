@@ -1,6 +1,7 @@
 import os
 import re
 import figtion
+from . import scope
 from pathlib import Path
 from pydantic_settings import BaseSettings
 
@@ -27,6 +28,7 @@ class Settings(BaseSettings):
     git_sync_remote: str = "content-sync-origin"
     # .screenshots deliberately excluded - bug screenshots are uploaded as
     # GitHub Release assets instead (see github_issues.py), not committed to git.
+    program_manifest: str = ""  # path to a PROGRAM.MD; enables /p/<key>/ project-scoped routes
     git_sync_paths: str = "PRODUCT.MD,ABOUT.MD,BUGS.MD,README.MD"
     git_sync_poll_seconds: int = 30
     git_token: str = ""  # Same token entrypoint.sh seeds into the HTTPS credential store;
@@ -48,6 +50,7 @@ _deploy = figtion.Config(
         "project_dir": "",      # absolute path; overrides PROJECT_DIR env var
         "lock_project": False,  # disable Switch Project UI when True
         "app_title": "",        # override title; empty = read from PRODUCT.MD
+        "program_manifest": "", # path to a PROGRAM.MD; overrides PROGRAM_MANIFEST env var
     },
     verbose=False,
 )
@@ -85,11 +88,24 @@ _recent_projects: list[dict] = []  # {"path": str, "title": str, "uploaded": boo
 _is_uploaded: bool = False
 
 
+def _deploy_value(key: str, default=""):
+    try:
+        return _deploy[key]
+    except KeyError:
+        return default
+
+
 def _effective_project_dir() -> Path:
+    scoped = scope.scoped_dir()
+    if scoped is not None:
+        return scoped
     return _runtime_project_dir or _base.project_dir
 
 
 def _effective_app_title() -> str:
+    scoped = scope.scoped_dir()
+    if scoped is not None:
+        return _title_from_product_md(scoped / "PRODUCT.MD") or scope.scope_key() or ""
     return _runtime_app_title or _base.app_title
 
 
@@ -173,8 +189,18 @@ class _SettingsProxy:
 
     @property
     def base_path(self) -> str:
+        """URL prefix for generated links; includes /p/<key> while serving a scoped project."""
+        return f"{self.root_path}/p/{scope.scope_key()}" if scope.scope_key() else self.root_path
+
+    @property
+    def root_path(self) -> str:
+        """URL prefix the app itself is served under, never including a project scope."""
         v = _base.base_path.strip("/")
         return f"/{v}" if v else ""
+
+    @property
+    def program_manifest(self) -> str:
+        return str(_deploy_value("program_manifest") or _base.program_manifest)
 
     @property
     def auth_introspect_url(self) -> str:

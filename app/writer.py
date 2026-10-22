@@ -24,6 +24,11 @@ class WriteError(RegistryError):
     pass
 
 
+class EditAborted(Exception):
+    """Raised by an edit function to abandon the write without it counting as a sync
+    failure (e.g. the request was invalid). The original error is the __cause__."""
+
+
 class WriteConflict(WriteError):
     """The push kept losing to concurrent writers."""
 
@@ -86,6 +91,8 @@ def edit(
                 return result
             except _PushRejected as rej:
                 last_err = rej.stderr
+            except EditAborted:
+                raise
             except Exception as exc:
                 project.status.last_ok = False
                 project.status.last_error = str(exc)
