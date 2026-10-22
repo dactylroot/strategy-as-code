@@ -13,15 +13,25 @@ from typing import Callable
 
 from fastapi import HTTPException, Request
 
-from . import scope
+from . import hub_identity, scope
 from .writer import Actor, EditAborted, edit
+
+
+def request_email(request: Request | None) -> str:
+    """The signed-in person's email. In hub mode this is only ever the hub's verdict;
+    otherwise the host app's forwarded X-Host-User."""
+    if request is None:
+        return ""
+    if hub_identity.enabled():
+        identity = getattr(request.state, "identity", None)
+        return identity.email if identity else ""
+    return (request.headers.get("X-Host-User") or "").strip()
 
 
 def request_actor(request: Request | None) -> Actor | None:
     """Who is making the request, from the host app's forwarded identity (the same
     X-Host-User the legacy owner default trusts). None = attribute to the service."""
-    who = (request.headers.get("X-Host-User") if request is not None else None) or ""
-    who = who.strip()
+    who = request_email(request)
     if not who:
         return None
     return Actor(who, who if "@" in who else f"{who}@strategy-as-code")

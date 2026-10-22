@@ -132,6 +132,9 @@ Supports `linux/amd64` and `linux/arm64`.
 | `SERVER_CONFIG` | `~/.config/strategy-as-code/server.yml` | Path to deployment config (`project_dir`, `lock_project`, `app_title`) |
 | `BASE_PATH` | (empty) | URL prefix to serve under, e.g. `/strategy` - see [Embedded](#embedded) below |
 | `AUTH_INTROSPECT_URL` | (empty) | Host session-introspection endpoint - see [Embedded](#embedded) below |
+| `HUB_AUTH_URL` | (empty) | RevOps hub `/internal/auth?app=strategy`. Enables hub identity: the visitor's cookie is forwarded, the hub's `X-User-Email` and `X-App-Role` answer is the only identity accepted (`viewer` reads, `editor` and `admin` write), and `X-Host-User` is ignored |
+| `PROGRAM_POLL_SECONDS` | `45` | Background refresh of every member project's clone; `0` turns it off |
+| `WEBHOOK_SECRET` | (empty) | Enables `POST <base>/hooks/refresh` for signed GitHub push events |
 | `HOST_LOGIN_URL` | (empty) | Host's login page, used as the redirect target in embedded mode |
 | `EMBED_CHROME` | `false` | When `true`, hides this app's own sidebar/nav - use when the host page already provides navigation, e.g. inside an iframe |
 

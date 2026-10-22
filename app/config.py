@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     # .screenshots deliberately excluded - bug screenshots are uploaded as
     # GitHub Release assets instead (see github_issues.py), not committed to git.
     program_manifest: str = ""  # path to a PROGRAM.MD; enables /p/<key>/ project-scoped routes
+    hub_auth_url: str = ""           # RevOps hub /internal/auth?app=strategy; enables hub identity and roles
     program_poll_seconds: int = 45   # background refresh of every member project; 0 disables
     webhook_secret: str = ""         # GitHub webhook secret; empty disables POST /hooks/refresh
     git_sync_paths: str = "PRODUCT.MD,ABOUT.MD,BUGS.MD,README.MD"
@@ -203,6 +204,10 @@ class _SettingsProxy:
     @property
     def program_manifest(self) -> str:
         return str(_deploy_value("program_manifest") or _base.program_manifest)
+
+    @property
+    def hub_auth_url(self) -> str:
+        return _base.hub_auth_url
 
     @property
     def program_poll_seconds(self) -> int:

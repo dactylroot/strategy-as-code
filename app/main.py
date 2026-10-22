@@ -16,6 +16,7 @@ from .routers import auth_router
 from .auth import is_authenticated
 from . import git_sync
 from . import github_issues
+from . import hub_identity
 from . import overview
 from . import poller
 from . import scope
@@ -129,6 +130,18 @@ async def scope_project(request: Request, call_next):
 
 @app.middleware("http")
 async def require_auth(request: Request, call_next):
+    if hub_identity.enabled() and request.url.path not in _PUBLIC:
+        verdict = await hub_identity.lookup(request.headers.get("cookie"))
+        if verdict.status == 401:
+            login_url = settings.host_login_url or full("/login")
+            return RedirectResponse(url=f"{login_url}?next={request.url.path}", status_code=303)
+        if verdict.status != 200:
+            return _plain(verdict.status, "You do not have access to Program Strategy." if verdict.status == 403
+                          else "Sign-in service unavailable. Try again shortly.")
+        request.state.identity = verdict.identity
+        if hub_identity.is_write(request.method, request.url.path) and not hub_identity.may_write(verdict.identity):
+            return JSONResponse({"detail": "Your role is read-only."}, status_code=403)
+        return await call_next(request)
     if request.url.path not in _PUBLIC and not await is_authenticated(request):
         login_url = settings.host_login_url or full("/login")
         return RedirectResponse(url=f"{login_url}?next={request.url.path}", status_code=303)

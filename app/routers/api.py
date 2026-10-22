@@ -20,7 +20,7 @@ from ..parsers import about as about_parser
 from ..parsers import bugs as bugs_parser
 from .. import wbs as wbs_module
 from .. import git_sync
-from ..program_write import program_write, refuse_when_scoped
+from ..program_write import program_write, refuse_when_scoped, request_email
 from ..template_env import templates
 
 router = APIRouter()
@@ -49,7 +49,7 @@ def _default_owner(request: Request, owner: str | None) -> str | None:
     making the request, forwarded via X-Host-User (see the Embedded
     deployment mode in README.md) - only used when the caller didn't set
     owner explicitly."""
-    return owner or request.headers.get("X-Host-User") or None
+    return owner or request_email(request) or None
 
 
 def _require_session(request: Request) -> session_store.Session:
