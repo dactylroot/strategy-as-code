@@ -201,6 +201,12 @@ async def projects_index(request: Request):
         "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "stages": overview.STAGES, "app_title": "Program overview"})
 
 
-@app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url=full("/dashboard"))
+    # In program mode the front page is the overview; a single project goes straight to its dashboard.
+    return RedirectResponse(url=full("/p") if scope.get_registry() is not None else full("/dashboard"))
+
+
+# Served at "/" and at the configured prefix with and without its trailing slash: behind a proxy that does not strip
+# the prefix (Renewals' /strategy) the first request is "<prefix>/", which has no other route.
+for _path in {"/", settings.root_path, f"{settings.root_path}/"} - {""}:
+    app.get(_path, include_in_schema=False)(root)

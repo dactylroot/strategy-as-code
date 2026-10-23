@@ -377,3 +377,25 @@ def test_overview_reparses_only_when_the_commit_changes(client, program, monkeyp
     client.patch("/p/alpha/api/features/1.1.2", json={"notes": "changed"})
     client.get("/p")
     assert calls[first:] == ["alpha"]               # only the project whose commit moved
+
+
+def test_front_page_is_the_overview_in_program_mode_and_the_dashboard_otherwise(client, program):
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "/p"
+    scope.set_registry(None)
+    assert client.get("/", follow_redirects=False).headers["location"] == "/dashboard"
+
+
+def test_prefixed_front_page_is_routed(tmp_path):
+    """Behind a proxy that keeps the prefix (Renewals' /strategy) the first request is /strategy/, with or without the slash."""
+    code = (
+        "from fastapi.testclient import TestClient\n"
+        "import app.auth as a; a.cfg.update(enabled=False)\n"
+        "from app.main import app\n"
+        "c = TestClient(app)\n"
+        "for u in ('/strategy/', '/strategy'):\n"
+        "    r = c.get(u, follow_redirects=False); print(u, r.status_code, r.headers.get('location'))\n")
+    out = subprocess.run([os.sys.executable, "-c", code], cwd=Path(__file__).parent.parent, capture_output=True,
+                         text=True, env={**os.environ, "BASE_PATH": "/strategy", "PROJECT_DIR": str(tmp_path)})
+    assert out.returncode == 0, out.stderr
+    assert "/strategy/ 307 /strategy/dashboard" in out.stdout and "/strategy 307 /strategy/dashboard" in out.stdout
