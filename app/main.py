@@ -207,6 +207,6 @@ def root():
 
 
 # Served at "/" and at the configured prefix with and without its trailing slash: behind a proxy that does not strip
-# the prefix (Renewals' /strategy) the first request is "<prefix>/", which has no other route.
+# the prefix (Renewals' /project-planning) the first request is "<prefix>/", which has no other route.
 for _path in {"/", settings.root_path, f"{settings.root_path}/"} - {""}:
     app.get(_path, include_in_schema=False)(root)
