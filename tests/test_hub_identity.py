@@ -100,3 +100,10 @@ def test_is_write_classification():
     assert hub.is_write("PATCH", "/p/a/api/features/1.1.1")
     assert not hub.is_write("POST", "/p/a/api/markdown/preview")
     assert hub.is_write("POST", "/api/inbox")
+
+
+def test_healthz_is_open_for_the_deploy_check(client, hub_mode, program):  # noqa: F811
+    r = client.get("/healthz")                     # no cookie: the hub would answer 401 for anything else
+    assert r.status_code == 200 and r.json() == {"status": "ok"}
+    assert client.get("/dashboard", follow_redirects=False).status_code in (302, 303, 307)
+    assert hub_mode == []                          # and it never asked the hub

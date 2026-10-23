@@ -88,7 +88,7 @@ static_dir = Path(__file__).parent.parent / "static"
 if static_dir.exists():
     app.mount(full("/static"), StaticFiles(directory=str(static_dir)), name="static")
 
-_PUBLIC = {full("/login"), full("/logout"), full("/hooks/refresh")}  # the webhook authenticates by signature
+_PUBLIC = {full("/login"), full("/logout"), full("/hooks/refresh"), full("/healthz")}  # the webhook authenticates by signature
 _SCOPE_RE = re.compile(rf"^{re.escape(settings.root_path)}/p/([^/]+)(/.*)?$")
 
 
@@ -189,6 +189,12 @@ async def refresh_hook(request: Request):
     result = await run_in_threadpool(poller.handle_push_event, registry, payload)
     return {"refreshed": sorted(k for k, err in result.items() if err is None),
             "failed": {k: err for k, err in result.items() if err}}
+
+
+@app.get(full("/healthz"), include_in_schema=False)
+def healthz():
+    """Liveness for the deploy health check; reveals nothing, so it is outside authentication."""
+    return {"status": "ok"}
 
 
 @app.get(full("/p"), include_in_schema=False)
