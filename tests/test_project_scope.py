@@ -399,3 +399,33 @@ def test_prefixed_front_page_is_routed(tmp_path):
                          text=True, env={**os.environ, "BASE_PATH": "/strategy", "PROJECT_DIR": str(tmp_path)})
     assert out.returncode == 0, out.stderr
     assert "/strategy/ 307 /strategy/dashboard" in out.stdout and "/strategy 307 /strategy/dashboard" in out.stdout
+
+
+def test_work_page_lists_every_projects_features_and_edits_land_in_that_projects_repo(client, program):
+    page = client.get("/work")
+    assert page.status_code == 200
+    assert 'data-project="alpha" data-wbs="1.1.1"' in page.text and 'data-project="beta" data-wbs="1.1.1"' in page.text
+    assert "AlphaLogin" in page.text and "BetaLogin" in page.text
+    assert 'href="/work"' in client.get("/p").text
+    # the page saves through each project's own scoped route: one commit, in that project only
+    before_beta = run_git(origin_of(program, "beta"), ["rev-parse", "main"])
+    assert client.patch("/p/alpha/api/features/1.2.3", json={"status": "In-Progress", "owner": "Ada"}).status_code == 200
+    assert client.patch("/p/beta/api/features/1.2.3", json={"notes": "beta only"}).status_code == 200
+    assert "In-Progress" in remote_text(program, "alpha", "PRODUCT.MD") and "beta only" not in remote_text(program, "alpha", "PRODUCT.MD")
+    assert "beta only" in remote_text(program, "beta", "PRODUCT.MD", subdir="plan")
+    assert run_git(origin_of(program, "beta"), ["rev-parse", "main"]) != before_beta
+    after = client.get("/work").text
+    assert 'data-project="alpha" data-wbs="1.2.3" data-stage="In-Progress"' in after
+
+
+def test_work_page_reports_a_broken_project_without_losing_the_rest(client, program, tmp_path):
+    from app.manifest import ProjectSpec
+    reg = Registry([program.get("alpha").spec, ProjectSpec(key="bad", repo="/nonexistent/x.git")], tmp_path / "cache2")
+    scope.set_registry(reg)
+    page = client.get("/work")
+    assert page.status_code == 200 and 'data-project="alpha"' in page.text and "bad could not be read" in page.text
+
+
+def test_work_is_404_without_a_program(client):
+    scope.set_registry(None)
+    assert client.get("/work").status_code == 404

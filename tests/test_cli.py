@@ -215,3 +215,33 @@ def test_merge_driver_install_configures_git_and_attributes(tmp_path):
                             capture_output=True, text=True).stdout
     assert "mergedriver.py" in driver and "%O %A %B %P" in driver
     assert "already set" in install_merge_driver(tmp_path)       # idempotent
+
+
+def _deps_manifest(tmp_path, rows):
+    m = tmp_path / "PROGRAM.MD"
+    m.write_text("## Projects\n\n| Key | Repo / Path | Depends On |\n| --- | --- | --- |\n"
+                 + "".join(f"| {k} | /tmp/{k} | {d} |\n" for k, d in rows))
+    return m
+
+
+def test_deps_walks_depth_first_and_marks_shared_dependencies_once(tmp_path, capsys):
+    m = _deps_manifest(tmp_path, [("a", ""), ("b", "a"), ("c", "a, b"), ("d", "c")])
+    assert main(["--manifest", str(m), "deps", "d"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["d", "  c", "    a", "    b", "      a (already listed above)"]
+    assert main(["--manifest", str(m), "deps", "a", "--up"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["a", "  b", "    c", "      d", "  c (already listed above)"]
+
+
+def test_deps_stops_at_the_depth_cap_and_refuses_a_larger_one(tmp_path, capsys):
+    m = _deps_manifest(tmp_path, [("a", ""), ("b", "a"), ("c", "b"), ("d", "c"), ("e", "d")])
+    assert main(["--manifest", str(m), "deps", "e"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["e", "  d", "    c", "      b (more beyond 3 levels)"]
+    assert main(["--manifest", str(m), "deps", "e", "--depth", "9"]) == 1
+    assert "between 0 and 3" in capsys.readouterr().err
+    assert main(["--manifest", str(m), "deps", "zzz"]) == 1
+
+
+def test_walk_terminates_on_a_cycle_even_though_the_manifest_rejects_one():
+    from app.manifest import ProjectSpec, walk
+    specs = [ProjectSpec(key="a", repo="/a", depends_on=("b",)), ProjectSpec(key="b", repo="/b", depends_on=("a",))]
+    assert [(v.key, v.repeat) for v in walk(specs, "a")] == [("a", False), ("b", False), ("a", True)]

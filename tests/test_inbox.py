@@ -7,6 +7,7 @@ from app.cli import main
 from app.registry import run_git
 from tests.test_cli import manifest, remote  # noqa: F401
 from tests.test_registry_writer import origin  # noqa: F401
+from tests.test_project_scope import program, origin_of  # noqa: F401
 
 
 def ls(origin, path="plan/.planning/inbox"):
@@ -106,3 +107,39 @@ def test_screenshot_is_renamed_on_promotion(tmp_path):
     inbox.promote(tmp_path, item.id)
     assert (tmp_path / ".screenshots" / "bug_1.png").read_bytes() == b"png"
     assert not list((tmp_path / inbox.INBOX).glob("*"))
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+
+def test_attach_trusts_the_bytes_not_the_name_and_replaces_an_earlier_one(tmp_path):
+    item = inbox.write_item(tmp_path, "bug", "Crash", "", "u")
+    assert inbox.attach(tmp_path, item.id, PNG) == f"{item.id}.png"
+    assert inbox.attach(tmp_path, item.id, b"\xff\xd8\xff" + b"0" * 8) == f"{item.id}.jpg"
+    assert sorted(p.suffix for p in (tmp_path / inbox.INBOX).glob(item.id + ".*")) == [".jpg", ".md"]
+    assert inbox.read_item(tmp_path / inbox.INBOX / f"{item.id}.md").attachment == f"{item.id}.jpg"
+    for bad in (b"<svg onload=alert(1)>", b"%PDF-1.4", b""):
+        with pytest.raises(inbox.InboxError, match="PNG, JPEG or GIF"):
+            inbox.attach(tmp_path, item.id, bad)
+    with pytest.raises(inbox.InboxError, match="larger"):
+        inbox.attach(tmp_path, item.id, PNG + b"0" * inbox.MAX_ATTACHMENT)
+    with pytest.raises(inbox.InboxError, match="no inbox item"):
+        inbox.attach(tmp_path, "nope", PNG)
+
+
+def test_web_screenshot_is_committed_served_and_follows_the_bug_on_promotion(client, program):
+    from tests.test_project_scope import remote_text  # noqa: F401
+    made = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Crash on save"}).json()["id"]
+    r = client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", PNG, "image/png")})
+    assert r.status_code == 200 and r.json() == {"file": f"{made}.png"}
+    assert f".planning/inbox/{made}.png" in run_git(origin_of(program, "alpha"), ["ls-tree", "-r", "--name-only", "main"])
+    served = client.get(f"/p/alpha/api/inbox/{made}/screenshot")
+    assert served.status_code == 200 and served.content == PNG and served.headers["content-type"] == "image/png"
+    assert f"/api/inbox/{made}/screenshot" in client.get("/p/alpha/inbox").text
+    bad = client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", b"<svg/>", "image/png")})
+    assert bad.status_code == 422
+    assert client.get("/p/alpha/api/inbox/missing/screenshot").status_code == 404
+    assert client.post(f"/p/alpha/api/inbox/{made}/promote", json={}).status_code == 200
+    assert client.get(f"/p/alpha/api/bugs").status_code == 200
+    files = run_git(origin_of(program, "alpha"), ["ls-tree", "-r", "--name-only", "main"]).splitlines()
+    assert ".screenshots/bug_1.png" in files and not any(f.startswith(".planning/inbox/") for f in files)

@@ -25,6 +25,7 @@ class ProjectSummary:
     depends_on: tuple[str, ...] = ()
     required_by: tuple[str, ...] = ()
     mode: str = "direct"
+    pr_url: str = ""
     branch: str = ""
     sha: str = ""
     stale: bool = False
@@ -142,6 +143,7 @@ def _summarize(key: str) -> ProjectSummary:
         s.last_push_age = int(now - st.last_push) if st.last_push else None
         s.sync_error = st.last_error
         s.pushes = st.pushes
+        s.pr_url = st.pr_url or ""
         root = project.planning_root
         pfile = root / "PRODUCT.MD"
         if not pfile.exists():
@@ -167,6 +169,36 @@ def summarize_all() -> list[ProjectSummary]:
         return []
     with ThreadPoolExecutor(max_workers=min(8, len(keys))) as pool:
         return list(pool.map(_summarize, keys))
+
+
+def _feature_rows(key: str) -> tuple[list[dict], str | None]:
+    reg = scope.get_registry()
+    try:
+        scope.freshen(key)
+        product = product_parser._parse_text((reg.get(key).planning_root / "PRODUCT.MD").read_text(encoding="utf-8"))
+    except Exception as exc:  # one broken project must not take down the page
+        return [], str(exc) or exc.__class__.__name__
+    rows = []
+    for area in product.wbs_areas:
+        for sub in area.sub_areas:
+            for f in sub.features:
+                stage = "In-Progress" if f.status == FeatureStatus.planned else ("Idea" if f.stage == "Gap" else f.stage)
+                rows.append({"project": key, "wbs": f.wbs, "name": f.name, "area": f"{sub.wbs_prefix} {sub.title}",
+                             "stage": stage, "status": "Idea" if stage in ("Idea", "Scored") else stage,
+                             "owner": f.owner or "", "notes": f.notes, "flagged": f.flagged})
+    return rows, None
+
+
+def program_features() -> tuple[list[dict], dict[str, str]]:
+    """Every feature of every member project, in manifest order, for the cross-project
+    editing page; and {project: error} for the ones that could not be read."""
+    keys = scope.get_registry().keys()
+    if not keys:
+        return [], {}
+    with ThreadPoolExecutor(max_workers=min(8, len(keys))) as pool:
+        results = list(pool.map(_feature_rows, keys))
+    rows = [r for part, _ in results for r in part]
+    return rows, {k: err for k, (_, err) in zip(keys, results) if err}
 
 
 def initiative_views(projects: list[ProjectSummary]) -> tuple[list[ProgramInitiativeView], str | None]:

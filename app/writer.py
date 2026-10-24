@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from . import pullrequest
 from .registry import GitError, Project, Registry, RegistryError
 
 MAX_ATTEMPTS = 3
@@ -126,6 +127,7 @@ def _commit_and_push(project: Project, message: str, actor: Actor | None,
     project.status.sha = sha
     project.status.last_push = time.time()
     project.status.pushes += 1
+    pullrequest.request_sync(project, base_branch)
     return WriteResult(project.key, True, sha, branch, attempt)
 
 

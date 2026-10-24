@@ -61,6 +61,9 @@ async def _lifespan(_app: FastAPI):
     if registry is not None and settings.program_poll_seconds > 0:
         threading.Thread(target=poller.poll_loop, args=(registry, settings.program_poll_seconds, stop),
                          daemon=True).start()
+    if registry is not None and settings.program_sweep_seconds > 0:
+        threading.Thread(target=poller.sweep_loop, args=(registry, settings.program_sweep_seconds, stop),
+                         daemon=True).start()
     yield
     stop.set()
 
@@ -205,6 +208,19 @@ async def projects_index(request: Request):
     initiatives, initiatives_error = overview.initiative_views(rows)
     return templates.TemplateResponse(request, "overview.html", {
         "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "stages": overview.STAGES, "app_title": "Program overview"})
+
+
+@app.get(full("/work"), include_in_schema=False)
+async def program_work(request: Request):
+    """Features of every project on one page; each edit is saved to its own project's
+    repository through that project's /p/<key>/api route."""
+    if scope.get_registry() is None:
+        raise HTTPException(status_code=404)
+    rows, errors = await run_in_threadpool(overview.program_features)
+    identity = getattr(request.state, "identity", None)
+    return templates.TemplateResponse(request, "work.html", {
+        "rows": rows, "errors": errors, "projects": scope.get_registry().keys(), "app_title": "Program work",
+        "can_write": identity is None or hub_identity.may_write(identity)})
 
 
 def root():

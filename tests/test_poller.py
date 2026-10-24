@@ -62,3 +62,37 @@ def test_webhook_refreshes_only_the_named_project(client, program, tmp_path, mon
 
 def test_webhook_is_disabled_without_a_secret(client, program):
     assert client.post("/hooks/refresh", content=b"{}").status_code == 404
+
+
+def _file_inbox_item(program, key, age_days):
+    from datetime import datetime, timedelta, timezone
+    from app import inbox
+    from app.writer import edit
+    when = datetime.now(timezone.utc) - timedelta(days=age_days)
+    made = {}
+    root = program.get(key).spec.planning_dir
+    edit(program, key, lambda c: made.update(id=inbox.write_item(c / root, "bug", "old one", "", "ada", now=when).id), "seed")
+    return made["id"], root
+
+
+def test_sweep_all_archives_only_what_is_due_and_commits_once(program):
+    old, root = _file_inbox_item(program, "alpha", 61)
+    fresh, _ = _file_inbox_item(program, "alpha", 3)
+    result = poller.sweep_all(program)
+    assert result == {"alpha": [old], "beta": []}
+    origin = origin_of(program, "alpha")
+    files = run_git(origin, ["ls-tree", "-r", "--name-only", "main"]).splitlines()
+    assert f".planning/inbox/archive/{old}.md" in files and f".planning/inbox/{fresh}.md" in files
+    assert run_git(origin, ["log", "-1", "--format=%s", "main"]) == "inbox: archive 1 stale item(s)"
+    before = run_git(origin_of(program, "beta"), ["rev-parse", "main"])
+    poller.sweep_all(program)                                  # nothing due: no new commit anywhere
+    assert run_git(origin_of(program, "beta"), ["rev-parse", "main"]) == before
+    assert run_git(origin, ["log", "-1", "--format=%s", "main"]) == "inbox: archive 1 stale item(s)"
+
+
+def test_sweep_all_isolates_a_failing_project(program):
+    bad = type(program.get("beta").spec)(key="bad", repo="/nonexistent/x.git")
+    from app.registry import Registry
+    reg = Registry([program.get("alpha").spec, bad], program.cache_dir)
+    out = poller.sweep_all(reg)
+    assert out["alpha"] == [] and isinstance(out["bad"], str) and out["bad"]

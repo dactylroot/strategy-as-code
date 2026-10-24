@@ -8,6 +8,8 @@
     strategy bug add "Login times out" --severity high
     strategy bug status 12 resolved --fix 0.4.2
     strategy bug close  12 --resolved-in 0.4.2
+    strategy deps funnel [--up] [--depth 2]
+    strategy pr -p funnel            (open or refresh the pull request for a branch-mode project)
 
 Every command is one commit pushed to the project's planning target (see
 `app.writer.edit`); nothing is edited in the caller's working tree, so it is
@@ -26,7 +28,8 @@ from pathlib import Path
 from typing import Callable
 
 from . import inbox as _inbox
-from .manifest import ManifestError
+from . import pullrequest
+from .manifest import MAX_DEPTH, ManifestError, load_manifest, walk
 from .models import BugCreate, BugSeverity, BugStatus, BugUpdate, FeatureStatus, NewFeature
 from .parsers import about as about_parser
 from .parsers import bugs as bugs_parser
@@ -183,6 +186,12 @@ def build_parser() -> argparse.ArgumentParser:
     du = ib.add_parser("duplicate"); du.add_argument("id"); du.add_argument("--of", required=True, help="existing bug id or WBS")
     ib.add_parser("sweep", help="archive items untriaged for %d days" % _inbox.ARCHIVE_DAYS)
 
+    top.add_parser("pr", help="open, or refresh, the pull request from the project's planning branch to its default branch")
+
+    dp = top.add_parser("deps", help="list the projects a project depends on (--up: that depend on it), depth-first")
+    dp.add_argument("project"); dp.add_argument("--up", action="store_true")
+    dp.add_argument("--depth", type=int, default=MAX_DEPTH, help=f"levels to follow, at most {MAX_DEPTH}")
+
     md = top.add_parser("merge-driver").add_subparsers(dest="action", required=True)
     mi = md.add_parser("install", help="register the field-level merge driver in the current git repository")
     mi.add_argument("--repo", default=".")
@@ -226,11 +235,41 @@ def install_merge_driver(repo: Path) -> str:
             + (f"; added {len(missing)} line(s) to .gitattributes (commit it)" if missing else "; .gitattributes already set"))
 
 
+def _run_deps(manifest: Path, args: argparse.Namespace) -> str:
+    visits = walk(load_manifest(manifest), args.project, "up" if args.up else "down", args.depth)
+    lines = []
+    for v in visits:
+        note = " (already listed above)" if v.repeat else f" (more beyond {args.depth} levels)" if v.truncated else ""
+        lines.append(f"{'  ' * v.depth}{v.key}{note}")
+    return "\n".join(lines)
+
+
+def _run_pr(reg: Registry, key: str) -> str:
+    project = reg.refresh(key)
+    if project.spec.mode != "branch":
+        raise CliError(f"{key} is in {project.spec.mode} mode; only branch-mode projects have a planning branch to propose")
+    if not os.environ.get("GIT_TOKEN"):
+        raise CliError("set GIT_TOKEN (a token that can open pull requests) to talk to GitHub")
+    if pullrequest.github_repo(project.spec.repo) is None:
+        raise CliError(f"{key}: {project.spec.repo} is not a github.com repository")
+    with project.locked():
+        base = project.default_branch()
+        commits = pullrequest.waiting(project, base)
+    pr = pullrequest.ensure_pull_request(project, base, commits)
+    if pr is None:
+        return f"{key}: nothing waiting on {project.target_branch}, no pull request opened"
+    return f"{key}: {'opened' if pr.created else 'refreshed'} pull request #{pr.number}: {pr.url}"
+
+
 def run(args: argparse.Namespace) -> str:
     if args.resource == "merge-driver":
         return install_merge_driver(Path(args.repo))
+    if args.resource == "deps":
+        return _run_deps(find_manifest(args.manifest), args)
     reg = Registry.from_manifest(find_manifest(args.manifest))
     key = _pick_project(reg, args.project)
+    if args.resource == "pr":
+        return _run_pr(reg, key)
     actor = resolve_actor()
     if args.resource == "inbox":
         return _run_inbox(reg, key, actor, args)

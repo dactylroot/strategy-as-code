@@ -77,6 +77,7 @@ class SyncStatus:
     last_ok: bool | None = None
     last_error: str | None = None
     pushes: int = 0
+    pr_url: str | None = None      # open pull request for the planning branch, once known
 
 
 @dataclass

@@ -18,6 +18,8 @@
     </div>
     <div class="form-group"><label for="f-title">Title</label><input type="text" id="f-title" maxlength="200" required></div>
     <div class="form-group"><label for="f-body">Description</label><textarea id="f-body" maxlength="5000" rows="4"></textarea></div>
+    <div class="form-group"><label for="f-shot">Screenshot (optional, PNG, JPEG or GIF, up to 5 MB)</label>
+      <input type="file" id="f-shot" accept="image/png,image/jpeg,image/gif"></div>
     <button class="btn btn-primary" type="submit">Submit</button>
     <span id="f-msg" class="text-muted"></span>
   </form>
@@ -36,6 +38,7 @@
       <span class="text-muted">{{ i.submitter }} &middot; {{ i.age_days }}d</span>
     </div>
     {% if i.body %}<p style="white-space:pre-wrap;margin:0.4rem 0">{{ i.body }}</p>{% endif %}
+    {% if i.attachment %}<p style="margin:0.4rem 0"><a href="{{ base_path }}/api/inbox/{{ i.id }}/screenshot" target="_blank" rel="noopener"><img src="{{ base_path }}/api/inbox/{{ i.id }}/screenshot" alt="Screenshot for {{ i.title }}" style="max-width:20rem;max-height:12rem;border:1px solid var(--color-border-subtle)"></a></p>{% endif %}
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
       {% if i.kind == 'feature' %}
       <select class="form-select prefix" style="width:auto"><option value="">Sub-area…</option>
@@ -61,7 +64,16 @@ document.getElementById('inbox-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const msg = document.getElementById('f-msg');
   try {
-    await send(API, {type: f('f-type'), title: f('f-title'), body: f('f-body'), severity: f('f-sev')});
+    const made = await send(API, {type: f('f-type'), title: f('f-title'), body: f('f-body'), severity: f('f-sev')});
+    const shot = document.getElementById('f-shot').files[0];
+    if (shot) {
+      const form = new FormData(); form.append('file', shot);
+      const r = await fetch(API + '/' + made.id + '/screenshot', {method: 'POST', body: form});
+      if (!r.ok) {
+        let d = r.statusText; try { d = (await r.json()).detail || d; } catch (e) {}
+        msg.textContent = 'Submitted, but the screenshot was not attached: ' + d; return;
+      }
+    }
     location.reload();
   } catch (err) { msg.textContent = err.message; }
 });

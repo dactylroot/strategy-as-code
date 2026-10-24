@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Program work</title>
+  <style>
+    :root { --bg:#fff; --fg:#1b1f24; --muted:#59636e; --line:#d1d9e0; --card:#f6f8fa; --link:#0b5cad;
+            --bad:#b42318; --warn:#9a6700; --ok:#1a7f37; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --line:#30363d;
+            --card:#151b23; --link:#58a6ff; --bad:#ff7b72; --warn:#d29922; --ok:#3fb950; } }
+    body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+    main { max-width:84rem; margin:0 auto; padding:2rem 16px; }
+    h1 { font-size:1.4rem; margin:0 0 0.25rem; }
+    .sub { color:var(--muted); margin:0 0 1rem; font-size:0.9rem; }
+    a { color:var(--link); }
+    .filters { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0 0 1rem; }
+    select, input[type=text] { font:inherit; padding:0.25rem 0.4rem; border:1px solid var(--line); border-radius:6px;
+                               background:var(--bg); color:var(--fg); }
+    table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+    th, td { text-align:left; padding:0.4rem 0.5rem; border-top:1px solid var(--line); vertical-align:top; }
+    th { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+    td.notes input { width:100%; box-sizing:border-box; }
+    code { background:var(--card); padding:0 0.3em; border-radius:4px; font-size:0.8rem; }
+    .muted { color:var(--muted); } .bad { color:var(--bad); } .ok { color:var(--ok); } .warn { color:var(--warn); }
+    tr.saving { opacity:0.6; } tr.failed td.state { color:var(--bad); }
+    .scroll { overflow-x:auto; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Program work</h1>
+  <p class="sub">{{ rows | length }} features across {{ projects | length }} projects. Each change is saved to that project's own repository as you.
+    <a href="{{ projects_url() }}">Back to the overview</a>.
+    {% if not can_write %}<span class="warn">Your role is read-only here.</span>{% endif %}</p>
+  {% for key, err in errors.items() %}<p class="bad">{{ key }} could not be read: {{ err }}</p>{% endfor %}
+  <div class="filters">
+    <select id="f-project" aria-label="Project"><option value="">All projects</option>
+      {% for k in projects %}<option>{{ k }}</option>{% endfor %}</select>
+    <select id="f-stage" aria-label="Stage"><option value="">Any stage</option>
+      {% for s in ['Idea', 'Scored', 'In-Progress', 'Live', 'Released'] %}<option>{{ s }}</option>{% endfor %}</select>
+    <input type="text" id="f-text" placeholder="Search name, WBS, owner, notes" aria-label="Search" size="30">
+    <span class="muted" id="f-count"></span>
+  </div>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Project</th><th>WBS</th><th>Feature</th><th>Status</th><th>Owner</th><th>Notes</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr data-project="{{ r.project }}" data-wbs="{{ r.wbs }}" data-stage="{{ r.stage }}"
+        data-text="{{ (r.wbs ~ ' ' ~ r.name ~ ' ' ~ r.owner ~ ' ' ~ r.notes) | lower }}">
+      <td><a href="{{ projects_url() }}/{{ r.project }}/features">{{ r.project }}</a></td>
+      <td><code>{{ r.wbs }}</code></td>
+      <td>{{ r.name }}{% if r.flagged %} <span class="warn" title="Flagged as a gap">&#9873;</span>{% endif %}<div class="muted">{{ r.area }}</div></td>
+      <td><select class="f-status" data-orig="{{ r.status }}" {% if not can_write %}disabled{% endif %}>
+        {% for s in ['Idea', 'In-Progress', 'Live', 'Released'] %}<option {% if s == r.status %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+        {% if r.stage == 'Scored' %}<span class="muted">scored</span>{% endif %}</td>
+      <td><input type="text" class="f-owner" value="{{ r.owner }}" data-orig="{{ r.owner }}" size="14" {% if not can_write %}disabled{% endif %}></td>
+      <td class="notes"><input type="text" class="f-notes" value="{{ r.notes }}" data-orig="{{ r.notes }}" {% if not can_write %}disabled{% endif %}></td>
+      <td class="state muted" aria-live="polite"></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</main>
+<script>
+const BASE = '{{ projects_url() }}';
+const rows = [...document.querySelectorAll('tbody tr')];
+function applyFilter() {
+  const p = document.getElementById('f-project').value, s = document.getElementById('f-stage').value;
+  const q = document.getElementById('f-text').value.trim().toLowerCase();
+  let shown = 0;
+  rows.forEach(r => {
+    const ok = (!p || r.dataset.project === p) && (!s || r.dataset.stage === s) && (!q || r.dataset.text.includes(q));
+    r.hidden = !ok; if (ok) shown++;
+  });
+  document.getElementById('f-count').textContent = shown + ' shown';
+}
+['f-project', 'f-stage'].forEach(id => document.getElementById(id).addEventListener('change', applyFilter));
+document.getElementById('f-text').addEventListener('input', applyFilter);
+applyFilter();
+
+async function save(row, field, input) {
+  const state = row.querySelector('.state');
+  const body = {}; body[field] = input.value;
+  row.classList.add('saving'); row.classList.remove('failed'); state.textContent = 'saving…';
+  try {
+    const r = await fetch(BASE + '/' + row.dataset.project + '/api/features/' + row.dataset.wbs,
+      {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail || d; } catch (e) {} throw new Error(d); }
+    input.dataset.orig = input.value;
+    if (field === 'status') { row.dataset.stage = input.value; }
+    row.dataset.text = [row.dataset.wbs, row.children[2].firstChild.textContent, row.querySelector('.f-owner').value,
+                        row.querySelector('.f-notes').value].join(' ').toLowerCase();
+    state.textContent = 'saved';
+  } catch (err) {
+    input.value = input.dataset.orig; row.classList.add('failed'); state.textContent = err.message;
+  } finally { row.classList.remove('saving'); }
+}
+rows.forEach(row => {
+  [['.f-status', 'status'], ['.f-owner', 'owner'], ['.f-notes', 'notes']].forEach(([sel, field]) => {
+    const input = row.querySelector(sel);
+    input.addEventListener('change', () => { if (input.value !== input.dataset.orig) save(row, field, input); });
+  });
+});
+</script>
+</body>
+</html>

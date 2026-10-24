@@ -107,3 +107,12 @@ def test_healthz_is_open_for_the_deploy_check(client, hub_mode, program):  # noq
     assert r.status_code == 200 and r.json() == {"status": "ok"}
     assert client.get("/dashboard", follow_redirects=False).status_code in (302, 303, 307)
     assert hub_mode == []                          # and it never asked the hub
+
+
+def test_work_page_is_read_only_for_a_viewer_and_editable_for_an_editor(client, program, hub_mode):  # noqa: F811
+    as_user(client, "viewer")
+    page = client.get("/work")
+    assert page.status_code == 200 and "read-only here" in page.text and "disabled" in page.text
+    as_user(client, "editor")
+    page = client.get("/work")
+    assert page.status_code == 200 and "read-only here" not in page.text and "disabled" not in page.text

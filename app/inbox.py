@@ -27,6 +27,8 @@ ARCHIVE_DAYS = 60
 MAX_TITLE = 200
 MAX_BODY = 5000
 KINDS = ("bug", "feature")
+MAX_ATTACHMENT = 5 * 1024 * 1024
+_IMAGE_TYPES = ((b"\x89PNG\r\n\x1a\n", ".png"), (b"\xff\xd8\xff", ".jpg"), (b"GIF87a", ".gif"), (b"GIF89a", ".gif"))
 
 
 class InboxError(ValueError):
@@ -130,6 +132,34 @@ def _find(root: Path, item_id: str) -> Path | None:
         raise InboxError("invalid item id")
     p = root / INBOX / f"{item_id}.md"
     return p if p.is_file() else None
+
+
+def attach(root: Path, item_id: str, data: bytes) -> str:
+    """Store a screenshot next to the item, replacing an earlier one. The type comes
+    from the file's own first bytes, never from the name or content type the client
+    claims. Returns the stored file name."""
+    path = _find(root, item_id)
+    if path is None:
+        raise InboxError(f"no inbox item {item_id!r}")
+    if len(data) > MAX_ATTACHMENT:
+        raise InboxError(f"screenshot is larger than {MAX_ATTACHMENT // (1024 * 1024)} MB")
+    ext = next((e for magic, e in _IMAGE_TYPES if data.startswith(magic)), None)
+    if ext is None:
+        raise InboxError("screenshot must be a PNG, JPEG or GIF image")
+    for old in path.parent.glob(path.stem + ".*"):
+        if old.suffix.lower() != ".md":
+            old.unlink()
+    target = path.with_suffix(ext)
+    target.write_bytes(data)
+    return target.name
+
+
+def attachment_path(root: Path, item_id: str) -> Path | None:
+    path = _find(root, item_id)
+    if path is None:
+        return None
+    name = read_item(path).attachment
+    return path.parent / name if name else None
 
 
 def _marker(item_id: str) -> str:

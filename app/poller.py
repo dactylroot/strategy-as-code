@@ -13,7 +13,9 @@ import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+from . import inbox
 from .registry import Registry
+from .writer import edit
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,32 @@ def poll_loop(registry: Registry, interval: float, stop: threading.Event) -> Non
             refresh_all(registry)
         except Exception:
             logger.exception("project poll failed; continuing")
+
+
+def sweep_all(registry: Registry) -> dict[str, list[str] | str]:
+    """Archive inbox items untriaged for ARCHIVE_DAYS, in every project, one commit each
+    (none when nothing is due). Returns {key: archived ids, or the error}."""
+    out: dict[str, list[str] | str] = {}
+    for key in registry.keys():
+        moved: list[str] = []
+        planning_dir = registry.get(key).spec.planning_dir
+        try:
+            def fn(checkout, moved=moved, planning_dir=planning_dir):
+                moved[:] = inbox.sweep(checkout / planning_dir)
+            edit(registry, key, fn, lambda moved=moved: f"inbox: archive {len(moved)} stale item(s)")
+            out[key] = moved
+        except Exception as exc:  # one unreachable project must not stop the others
+            logger.warning("inbox sweep of %s failed: %s", key, exc)
+            out[key] = str(exc) or exc.__class__.__name__
+    return out
+
+
+def sweep_loop(registry: Registry, interval: float, stop: threading.Event) -> None:
+    while not stop.wait(max(interval, 60)):
+        try:
+            sweep_all(registry)
+        except Exception:
+            logger.exception("inbox sweep failed; continuing")
 
 
 def valid_signature(secret: str, body: bytes, header: str | None) -> bool:

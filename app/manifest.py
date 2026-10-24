@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 MODES = ("direct", "branch")
+MAX_DEPTH = 3                      # how many levels a walk across dependent projects may go
 DEFAULT_PLANNING_BRANCH = "planning"
 
 
@@ -136,6 +137,52 @@ def _validate(specs: list[ProjectSpec]) -> None:
 
     for k in keys:
         visit(k, [])
+
+
+@dataclass(frozen=True)
+class Visit:
+    key: str
+    depth: int                     # 0 for the starting project
+    via: str = ""                  # the project this one was reached from
+    repeat: bool = False           # already visited on another branch of the walk: not expanded again
+    truncated: bool = False        # has further projects beyond the depth cap: not expanded
+
+
+def walk(specs: list[ProjectSpec], start: str, direction: str = "down", max_depth: int = MAX_DEPTH) -> list[Visit]:
+    """Depth-first walk of the dependency graph from `start`, in visiting order.
+
+    "down" follows `Depends On` (what the project needs); "up" follows the reverse
+    (what needs it). A project reached twice is listed again but marked `repeat` and
+    not expanded, so shared dependencies and cycles terminate. Nothing is expanded
+    below `max_depth` levels, and `max_depth` itself cannot exceed `MAX_DEPTH`.
+    """
+    if direction not in ("down", "up"):
+        raise ManifestError("direction must be 'down' or 'up'")
+    if not 0 <= max_depth <= MAX_DEPTH:
+        raise ManifestError(f"depth must be between 0 and {MAX_DEPTH}")
+    by_key = {s.key: s for s in specs}
+    if start not in by_key:
+        raise ManifestError(f"unknown project {start!r}")
+    nexts = {k: list(s.depends_on) for k, s in by_key.items()} if direction == "down" else {
+        k: [o.key for o in specs if k in o.depends_on] for k in by_key}
+    seen: set[str] = set()
+    out: list[Visit] = []
+
+    def visit(key: str, depth: int, via: str) -> None:
+        if key in seen:
+            out.append(Visit(key, depth, via, repeat=True))
+            return
+        seen.add(key)
+        children = [c for c in nexts[key] if c in by_key]
+        if children and depth >= max_depth:
+            out.append(Visit(key, depth, via, truncated=True))
+            return
+        out.append(Visit(key, depth, via))
+        for child in children:
+            visit(child, depth + 1, key)
+
+    visit(start, 0, "")
+    return out
 
 
 def load_manifest(path: Path) -> list[ProjectSpec]:

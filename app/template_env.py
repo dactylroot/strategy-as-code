@@ -28,6 +28,7 @@ templates.env.globals["base_path"] = _BasePath()
 templates.env.globals["scope_key"] = scope.scope_key
 templates.env.globals["scope_branch"] = scope.branch_label
 templates.env.globals["projects_url"] = lambda: f"{settings.root_path}/p"
+templates.env.globals["work_url"] = lambda: f"{settings.root_path}/work"
 templates.env.globals["embed_chrome"] = settings.embed_chrome
 
 

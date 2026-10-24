@@ -640,6 +640,30 @@ def submit_inbox(request: Request, req: InboxSubmit):
     return {"id": item.id}
 
 
+@router.post("/inbox/{item_id}/screenshot")
+@program_write("inbox {item_id} screenshot attached")
+def attach_inbox_screenshot(request: Request, item_id: str, file: UploadFile = File(...)):
+    _require_program()
+    data = file.file.read(inbox_lib.MAX_ATTACHMENT + 1)
+    try:
+        return {"file": inbox_lib.attach(settings.project_dir, item_id, data)}
+    except inbox_lib.InboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/inbox/{item_id}/screenshot")
+def get_inbox_screenshot(request: Request, item_id: str):
+    _require_program()
+    try:
+        path = inbox_lib.attachment_path(settings.project_dir, item_id)
+    except inbox_lib.InboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    if path is None:
+        raise HTTPException(status_code=404, detail="No screenshot")
+    return Response(content=path.read_bytes(), media_type=_SCREENSHOT_MIME.get(path.suffix.lower(), "image/png"),
+                    headers={"X-Content-Type-Options": "nosniff"})
+
+
 @router.post("/inbox/{item_id}/promote")
 @program_write("inbox {item_id} promoted")
 def promote_inbox(request: Request, item_id: str, req: InboxPromote):

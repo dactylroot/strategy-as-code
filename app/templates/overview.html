@@ -34,7 +34,7 @@
 <body>
 <main>
   <h1>Program overview</h1>
-  <p class="sub">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each card links to that project's own board.</p>
+  <p class="sub">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each card links to that project's own board. <a href="{{ work_url() }}">Edit features across projects</a>.</p>
   {% if initiatives_error %}<p class="bad">Program initiatives could not be read: {{ initiatives_error }}</p>{% endif %}
   {% if initiatives %}
   <h2 class="sec">Program initiatives</h2>
@@ -120,7 +120,7 @@
       <div class="muted" style="margin-top:0.7rem">
         {% if p.last_fetch_age is not none %}fetched {{ p.last_fetch_age }}s ago{% endif %}
         {% if p.last_push_age is not none %} · last write {{ p.last_push_age }}s ago{% endif %}<br>
-        {{ p.mode }}{% if p.branch %} · <code>{{ p.branch }}</code>{% endif %}{% if p.sha %} · <code>{{ p.sha }}</code>{% endif %}
+        {{ p.mode }}{% if p.branch %} · <code>{{ p.branch }}</code>{% endif %}{% if p.pr_url %} · <a href="{{ p.pr_url }}" target="_blank" rel="noopener">pull request</a>{% endif %}{% if p.sha %} · <code>{{ p.sha }}</code>{% endif %}
         {% if p.stale %}<span class="warn"> · could not refresh, showing older data</span>{% endif %}
         {% if p.sync_error and not p.error %}<div class="bad">last sync error: {{ p.sync_error }}</div>{% endif %}
       </div>
