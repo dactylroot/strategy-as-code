@@ -190,10 +190,10 @@
     .menu-panel .role-chip { display: inline-block; margin-top: 0.3rem; padding: 0.1rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 500; background: #00bcd4; color: #000; }
     .menu-panel a { display: block; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--color-text-primary); text-decoration: none; }
     .menu-panel a:hover { background: var(--sidebar-hover-bg); }
-    .theme-toggle-btn .icon-sun { display: none; }
-    .theme-toggle-btn .icon-moon { display: block; }
-    :root[data-theme="light"] .theme-toggle-btn .icon-sun { display: block; }
-    :root[data-theme="light"] .theme-toggle-btn .icon-moon { display: none; }
+    .theme-toggle-btn .icon-sun { display: block; }
+    .theme-toggle-btn .icon-moon { display: none; }
+    :root[data-theme="light"] .theme-toggle-btn .icon-sun { display: none; }
+    :root[data-theme="light"] .theme-toggle-btn .icon-moon { display: block; }
     .skip-link { position: absolute; left: -9999px; }
     .skip-link:focus { left: 8px; top: 8px; z-index: 2000; background: var(--color-bg-card); padding: 0.5rem 0.75rem; border-radius: 6px; }
 
@@ -352,9 +352,9 @@
      title="{% if scope_key() %}All program projects{% elif lock_project %}Project files{% else %}Switch project{% endif %}">{{ app_title }}</a>
   {% if scope_key() %}<span class="scope-chip" title="Program project, saved to {{ scope_branch() }}">{{ scope_key() }}</span>{% endif %}
   <div class="header-spacer"></div>
-  <button id="theme-toggle" class="icon-btn theme-toggle-btn" type="button" aria-label="Toggle color theme" title="Toggle light/dark theme">
-    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
-    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+  <button id="theme-toggle" class="icon-btn theme-toggle-btn" type="button" aria-label="Toggle color theme" title="Switch theme">
+    <svg class="icon-sun" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6m0-10c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4"></path></svg>
+    <svg class="icon-moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zM12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6c3.31 0 6 2.69 6 6s-2.69 6-6 6"></path></svg>
   </button>
   {% if ident or auth_enabled %}
   <div class="menu-wrap">
@@ -486,7 +486,11 @@ function exportMarkdown() {
   const HOST_MESSAGE_SOURCE = 'renewals-host';
   const root = document.documentElement;
 
-  function applyTheme(mode) { root.setAttribute('data-theme', mode === 'dark' ? 'dark' : 'light'); }
+  function applyTheme(mode) {
+    root.setAttribute('data-theme', mode === 'dark' ? 'dark' : 'light');
+    const t = document.getElementById('theme-toggle');
+    if (t) t.title = mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+  }
 
   if (EMBED_CHROME) {
     // The host posts {source: 'renewals-host', type: 'theme', mode: 'light'|'dark'} whenever its theme changes.
@@ -524,6 +528,7 @@ function exportMarkdown() {
     if (e.key === PREFS_KEY) applyNav();
   });
   applyNav();
+  applyTheme(readMode());
 
   const toggle = document.getElementById('theme-toggle');
   if (toggle) toggle.addEventListener('click', function() {
