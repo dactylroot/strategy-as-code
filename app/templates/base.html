@@ -7,24 +7,33 @@
   <title>{% block title %}{{ app_title }}{% endblock %}</title>
   <script>
   (function() {
+    // Colour mode and navigation state are shared with the other Trace3 revenue apps (same origin): the same
+    // localStorage keys and JSON shapes they use. Light is the default. Applied here, before first paint.
+    var root = document.documentElement;
     var EMBED_CHROME = {{ 'true' if embed_chrome else 'false' }};
     if (EMBED_CHROME) {
-      // The host (renewals-web-react) passes its current theme as a `?theme=`
-      // query param on this iframe's src (same-origin embed, so we can read
-      // it synchronously) - applying it now avoids painting the dark default
-      // and then flashing to light once postMessage arrives.
+      // The host passes its current theme as `?theme=` on this iframe's src (same-origin embed), so there is no flash
+      // before its postMessage arrives.
       var embedMode = new URLSearchParams(window.location.search).get('theme');
-      if (embedMode === 'light') document.documentElement.setAttribute('data-theme', 'light');
-      return; // subsequent changes arrive via the host's postMessage instead
+      root.setAttribute('data-theme', embedMode === 'dark' ? 'dark' : 'light');
+      return;
     }
-    var mode = 'dark';
-    try { mode = localStorage.getItem('strategy-as-code-theme') || 'dark'; } catch (e) {}
-    if (mode === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    var mode = 'light';
+    try {
+      var raw = localStorage.getItem('renewals-theme-mode');
+      var v = raw ? JSON.parse(raw).state.mode : null;
+      if (v === 'light' || v === 'dark') mode = v;
+    } catch (e) {}
+    root.setAttribute('data-theme', mode);
+    try {
+      var prefs = JSON.parse(localStorage.getItem('t3-prefs') || '{}');
+      if (prefs && prefs.navOpen === false) root.setAttribute('data-nav', 'collapsed');
+    } catch (e) {}
   })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2/dist/htmx.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/htmx-ext-json-enc@2.0.1/json-enc.js" defer></script>
   <style>
@@ -47,9 +56,9 @@
       --color-text-muted:     #4a5568;
 
       /* Brand / categorical */
-      --color-t3-blue:        #00a3ff;
-      --color-t3-blue-dim:    rgba(0,163,255,0.15);
-      --color-t3-blue-border: rgba(0,163,255,0.3);
+      --color-t3-blue:        #00bcd4;   /* the family's primary accent (teal) */
+      --color-t3-blue-dim:    rgba(0,188,212,0.15);
+      --color-t3-blue-border: rgba(0,188,212,0.3);
       --color-teal:           #00c4b4;
       --color-purple:         #8b5cf6;
       --color-amber:          #f59e0b;
@@ -82,41 +91,43 @@
       --sidebar-border:        #1e3a5f;
       --sidebar-text:          rgba(255,255,255,0.65);
       --sidebar-text-active:   #f0f4ff;
-      --sidebar-hover-bg:      rgba(0,163,255,0.08);
+      --sidebar-hover-bg:      rgba(0,188,212,0.08);
       --sidebar-section-color: rgba(255,255,255,0.35);
 
-      --sidebar-width: 14rem;
+      --sidebar-width: 240px;
+      --sidebar-collapsed: 64px;
+      --header-height: 64px;
       --radius: 10px;
-      --font-display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      --font-display: 'Inter', 'Roboto', 'Helvetica', 'Arial', system-ui, -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', ui-monospace, monospace;
     }
 
     :root[data-theme="light"] {
-      --color-bg-base:        #f7f8fa;
-      --color-bg-surface:     #eef2f7;
+      --color-bg-base:        #f5f7fa;
+      --color-bg-surface:     #ffffff;
       --color-bg-card:        #ffffff;
-      --color-bg-card-hover:  rgba(0,163,255,0.04);
-      --color-border-subtle:  rgba(15,20,30,0.08);
-      --color-border-muted:   rgba(15,20,30,0.14);
+      --color-bg-card-hover:  rgba(0,151,167,0.04);
+      --color-border-subtle:  #e8eaed;
+      --color-border-muted:   #e0e0e0;
       --card-blur:            none;
       --card-shadow:          0 1px 3px rgba(15,20,30,0.06);
 
-      --color-text-primary:   #0f172a;
-      --color-text-secondary: #475569;
+      --color-text-primary:   #1a1a2e;
+      --color-text-secondary: #546e7a;
       --color-text-muted:     #7c8797;
 
-      --color-t3-blue:        #0088d4;
-      --color-t3-blue-dim:    rgba(0,136,212,0.12);
-      --color-t3-blue-border: rgba(0,136,212,0.3);
+      --color-t3-blue:        #0097a7;
+      --color-t3-blue-dim:    rgba(0,151,167,0.12);
+      --color-t3-blue-border: rgba(0,151,167,0.3);
       --color-teal:           #00897b;
       --color-amber:          #d97706;
 
       --live:         #0f766e;
       --live-bg:      rgba(0,137,123,0.12);
       --live-border:  rgba(0,137,123,0.35);
-      --planned:        #0369a1;
-      --planned-bg:     rgba(0,136,212,0.12);
-      --planned-border: rgba(0,136,212,0.3);
+      --planned:        #00778a;
+      --planned-bg:     rgba(0,151,167,0.12);
+      --planned-border: rgba(0,151,167,0.3);
       --gap:        #b91c1c;
       --gap-bg:     rgba(239,68,68,0.12);
       --gap-border: rgba(239,68,68,0.35);
@@ -128,11 +139,11 @@
       --color-purple-bg:     rgba(139,92,246,0.12);
       --color-purple-border: rgba(139,92,246,0.35);
 
-      --sidebar-bg:            rgba(247,248,250,0.9);
-      --sidebar-border:        rgba(15,20,30,0.08);
-      --sidebar-text:          #475569;
-      --sidebar-text-active:   #0f172a;
-      --sidebar-hover-bg:      rgba(0,136,212,0.06);
+      --sidebar-bg:            #ffffff;
+      --sidebar-border:        #e0e0e0;
+      --sidebar-text:          #546e7a;
+      --sidebar-text-active:   #1a1a2e;
+      --sidebar-hover-bg:      rgba(0,151,167,0.06);
       --sidebar-section-color: #7c8797;
     }
 
@@ -144,53 +155,75 @@
       margin: 0;
       color: var(--color-text-primary);
       display: flex;
+      flex-direction: column;
       min-height: 100vh;
       transition: background 0.15s, color 0.15s;
     }
+    .shell { display: flex; flex: 1; min-height: 0; }
 
-    /* Sidebar - solid navy panel (renewals-web-react's Drawer), no blur */
+    /* Header bar: navigation toggle, title, colour mode, account. Same arrangement as the other revenue apps. */
+    .app-header {
+      position: sticky; top: 0; z-index: 100; height: var(--header-height); flex-shrink: 0;
+      display: flex; align-items: center; gap: 0.5rem; padding: 0 1rem;
+      background: var(--sidebar-bg); border-bottom: 1px solid var(--sidebar-border);
+    }
+    .header-spacer { flex: 1; }
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+      border: none; border-radius: 50%; background: transparent; color: var(--color-text-primary); cursor: pointer;
+      transition: background 0.15s;
+    }
+    .icon-btn:hover { background: var(--sidebar-hover-bg); }
+    .icon-btn:focus-visible, .shell nav a:focus-visible { outline: 2px solid var(--color-t3-blue); outline-offset: -2px; }
+    .icon-btn svg { width: 22px; height: 22px; }
+    .app-title { font-size: 1.25rem; font-weight: 700; color: var(--color-t3-blue); text-decoration: none; white-space: nowrap; }
+    .scope-chip { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--color-t3-blue-dim); color: var(--color-t3-blue); border: 1px solid var(--color-t3-blue-border); }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #00bcd4; color: #000; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+    .menu-wrap { position: relative; }
+    .menu-panel {
+      position: absolute; right: 0; top: calc(100% + 4px); min-width: 14rem; z-index: 200; padding: 0.4rem 0;
+      background: var(--color-bg-card); border: 1px solid var(--color-border-muted); border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    }
+    .menu-panel[hidden] { display: none; }
+    .menu-panel .menu-who { padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; word-break: break-all; }
+    .menu-panel .role-chip { display: inline-block; margin-top: 0.3rem; padding: 0.1rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 500; background: #00bcd4; color: #000; }
+    .menu-panel a { display: block; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--color-text-primary); text-decoration: none; }
+    .menu-panel a:hover { background: var(--sidebar-hover-bg); }
+    .theme-toggle-btn .icon-sun { display: none; }
+    .theme-toggle-btn .icon-moon { display: block; }
+    :root[data-theme="light"] .theme-toggle-btn .icon-sun { display: block; }
+    :root[data-theme="light"] .theme-toggle-btn .icon-moon { display: none; }
+    .skip-link { position: absolute; left: -9999px; }
+    .skip-link:focus { left: 8px; top: 8px; z-index: 2000; background: var(--color-bg-card); padding: 0.5rem 0.75rem; border-radius: 6px; }
+
+    /* Sidebar: expanded 240px, or a 64px icon rail when collapsed. The state is the shared `navOpen` preference. */
     .sidebar {
       width: var(--sidebar-width); min-width: var(--sidebar-width);
       background: var(--sidebar-bg);
       color: var(--sidebar-text-active);
       border-right: 1px solid var(--sidebar-border);
       display: flex; flex-direction: column;
-      position: sticky; top: 0; height: 100vh; overflow-y: auto;
+      position: sticky; top: var(--header-height); height: calc(100vh - var(--header-height)); overflow-x: hidden; overflow-y: auto;
+      transition: width 0.2s, min-width 0.2s;
     }
-    .sidebar-brand { padding: 1.25rem 1rem 1rem; font-size: 0.95rem; font-weight: 700; color: var(--sidebar-text-active); border-bottom: 1px solid var(--sidebar-border); line-height: 1.4; }
-    .sidebar-brand small { display: block; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 500; color: var(--sidebar-section-color); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.2rem; }
     nav { padding: 0.5rem 0; flex: 1; }
-    nav a { display: block; padding: 0.5rem 1rem; color: var(--sidebar-text); text-decoration: none; font-size: 0.875rem; border-right: 3px solid transparent; transition: background 0.15s, color 0.15s; }
+    nav a { display: flex; align-items: center; gap: 1rem; min-height: 46px; padding: 0 1.25rem; color: var(--sidebar-text); text-decoration: none; font-size: 0.875rem; border-right: 3px solid transparent; white-space: nowrap; transition: background 0.15s, color 0.15s; }
+    nav a svg { width: 22px; height: 22px; flex-shrink: 0; }
     nav a:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-text-active); }
-    nav a.active { color: var(--color-t3-blue); border-right-color: var(--color-t3-blue); background: var(--color-t3-blue-dim); font-weight: 500; }
-    .nav-section { display: block; font-family: var(--font-mono); padding: 0.75rem 1rem 0.2rem; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--sidebar-section-color); pointer-events: none; }
-    .sidebar-footer { padding: 0.75rem 1rem; border-top: 1px solid var(--sidebar-border); display: flex; flex-direction: column; gap: 0.5rem; }
-
-    .theme-toggle-btn {
-      display: flex; align-items: center; justify-content: center; gap: 0.4rem;
-      width: 100%; padding: 0.4rem 0.75rem; border-radius: 5px; cursor: pointer;
-      font-size: 0.72rem; font-weight: 600; font-family: inherit; letter-spacing: 0.02em;
-      background: var(--sidebar-hover-bg); border: 1px solid var(--sidebar-border);
-      color: var(--sidebar-text); transition: background 0.15s, color 0.15s;
-    }
-    .theme-toggle-btn:hover { background: var(--color-t3-blue-dim); color: var(--color-t3-blue); }
-    .theme-toggle-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-    .theme-toggle-btn .icon-sun { display: none; }
-    .theme-toggle-btn .icon-moon { display: block; }
-    :root[data-theme="light"] .theme-toggle-btn .icon-sun { display: block; }
-    :root[data-theme="light"] .theme-toggle-btn .icon-moon { display: none; }
-
-    .sync-btn {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.4rem;
-      padding: 0.4rem 0.75rem; border-radius: 5px; cursor: pointer; font-size: 0.72rem;
-      font-weight: 600; font-family: inherit; letter-spacing: 0.02em;
-      background: var(--sidebar-hover-bg); border: 1px solid var(--sidebar-border);
-      color: var(--sidebar-text); transition: background 0.15s, color 0.15s;
-    }
-    .sync-btn:hover { background: var(--color-t3-blue-dim); color: var(--color-t3-blue); }
+    nav a.active { color: var(--color-t3-blue); border-right-color: var(--color-t3-blue); background: var(--color-t3-blue-dim); font-weight: 600; }
+    .nav-section { display: block; font-family: var(--font-mono); padding: 0.75rem 1.25rem 0.2rem; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--sidebar-section-color); pointer-events: none; white-space: nowrap; }
+    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid var(--sidebar-border); }
+    .sidebar-footer button.nav-btn { display: flex; align-items: center; gap: 1rem; width: 100%; min-height: 46px; padding: 0 1.25rem; border: none; background: transparent; color: var(--sidebar-text); font: inherit; font-size: 0.875rem; cursor: pointer; white-space: nowrap; }
+    .sidebar-footer button.nav-btn:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-text-active); }
+    .sidebar-footer button.nav-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+    :root[data-nav="collapsed"] .sidebar { width: var(--sidebar-collapsed); min-width: var(--sidebar-collapsed); }
+    :root[data-nav="collapsed"] .sidebar .label, :root[data-nav="collapsed"] .nav-section { display: none; }
+    :root[data-nav="collapsed"] nav a, :root[data-nav="collapsed"] .sidebar-footer button.nav-btn { padding: 0; justify-content: center; }
+    @media (max-width: 700px) { .sidebar { width: var(--sidebar-collapsed); min-width: var(--sidebar-collapsed); } .sidebar .label, .nav-section { display: none; } nav a, .sidebar-footer button.nav-btn { padding: 0; justify-content: center; } }
 
     /* Main */
-    .main { flex: 1; padding: 2rem; min-width: 0; }
+    .main { flex: 1; padding: 1.5rem; min-width: 0; }
     .page-header { margin-bottom: 1.5rem; }
     .page-header h1 { font-size: 1.5rem; margin: 0 0 0.25rem; font-weight: 700; color: var(--color-text-primary); }
     .page-header .subtitle { color: var(--color-text-secondary); font-size: 0.875rem; margin: 0; }
@@ -217,7 +250,7 @@
 
     /* Buttons */
     .btn { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.45rem 1rem; border: none; border-radius: 6px; font-size: 0.875rem; cursor: pointer; font-weight: 500; text-decoration: none; transition: background 0.15s, color 0.15s, border-color 0.15s; }
-    .btn-primary { background: linear-gradient(135deg, #0088d4, #00a3ff); color: #fff; }
+    .btn-primary { background: #00bcd4; color: #000; }
     .btn-primary:hover { filter: brightness(1.08); }
     .btn-success { background: var(--color-teal); color: #fff; }
     .btn-success:hover { filter: brightness(1.1); }
@@ -274,15 +307,15 @@
     .grid-bg {
       position: fixed; inset: 0; z-index: -1; pointer-events: none;
       background-image:
-        linear-gradient(rgba(0,163,255,0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,163,255,0.05) 1px, transparent 1px);
+        linear-gradient(rgba(0,188,212,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,188,212,0.05) 1px, transparent 1px);
       background-size: 60px 60px;
       mask-image: radial-gradient(ellipse 80% 80% at 50% 0%, black 40%, transparent 100%);
       -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 0%, black 40%, transparent 100%);
     }
     .grid-bg::after {
       content: ''; position: absolute; inset: 0;
-      background: radial-gradient(ellipse 100% 60% at 50% 0%, rgba(0,163,255,0.08) 0%, transparent 60%);
+      background: radial-gradient(ellipse 100% 60% at 50% 0%, rgba(0,188,212,0.08) 0%, transparent 60%);
     }
 
     {% block extra_styles %}{% endblock %}
@@ -306,45 +339,63 @@
   </div>
 </dialog>
 
+{% macro icon(d) %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ d|safe }}</svg>{% endmacro %}
+{% macro nav_item(page, label, d, href=none) %}<a href="{{ href or (base_path ~ '/' ~ page) }}" aria-label="{{ label }}" title="{{ label }}"{% if active_page == page %} class="active" aria-current="page"{% endif %}>{{ icon(d) }}<span class="label">{{ label }}</span></a>{% endmacro %}
 {% if not embed_chrome %}
-<aside class="sidebar">
-  <a href="{% if scope_key() %}{{ projects_url() }}{% else %}{{ base_path }}/switch-project{% endif %}" class="sidebar-brand" style="text-decoration:none;display:block;"
-     title="{% if scope_key() %}All program projects{% elif lock_project %}Project files{% else %}Switch project{% endif %}">
-    <small>strategy-as-code</small>
-    {{ app_title }}
-  </a>
-  <nav>
-    <span class="nav-section">Planning</span>
-    <a href="{{ base_path }}/dashboard" {% if active_page == 'dashboard' %}class="active"{% endif %}>Overview</a>
-    <a href="{{ base_path }}/features" {% if active_page == 'features' %}class="active"{% endif %}>Features</a>
-    <a href="{{ base_path }}/roadmap" {% if active_page == 'roadmap' %}class="active"{% endif %}>Roadmap</a>
-    <a href="{{ base_path }}/structure" {% if active_page == 'structure' %}class="active"{% endif %}>Structure</a>
-    <a href="{{ base_path }}/bugs" {% if active_page == 'bugs' %}class="active"{% endif %}>Bugs</a>
-    {% if scope_key() %}<a href="{{ base_path }}/inbox" {% if active_page == 'inbox' %}class="active"{% endif %}>Inbox</a>{% endif %}
-    <span class="nav-section">Reference</span>
-    <a href="{{ base_path }}/about" {% if active_page == 'about' %}class="active"{% endif %}>About</a>
-    <a href="{{ base_path }}/readme" {% if active_page == 'readme' %}class="active"{% endif %}>README</a>
-    {% if auth_enabled %}
-    <span class="nav-section">Account</span>
-    <a href="{{ base_path }}/logout">Sign Out</a>
-    {% endif %}
-  </nav>
-  <div class="sidebar-footer">
-    <button id="theme-toggle" class="theme-toggle-btn" type="button" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
-      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
-      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-      <span>Theme</span>
+{% set ident = request.state.identity if request is defined else none %}
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="app-header">
+  <button id="nav-toggle" class="icon-btn" type="button" aria-label="Collapse navigation" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+  </button>
+  <a href="{% if scope_key() %}{{ projects_url() }}{% else %}{{ base_path }}/switch-project{% endif %}" class="app-title"
+     title="{% if scope_key() %}All program projects{% elif lock_project %}Project files{% else %}Switch project{% endif %}">{{ app_title }}</a>
+  {% if scope_key() %}<span class="scope-chip" title="Program project, saved to {{ scope_branch() }}">{{ scope_key() }}</span>{% endif %}
+  <div class="header-spacer"></div>
+  <button id="theme-toggle" class="icon-btn theme-toggle-btn" type="button" aria-label="Toggle color theme" title="Toggle light/dark theme">
+    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+  </button>
+  {% if ident or auth_enabled %}
+  <div class="menu-wrap">
+    <button id="account-toggle" class="icon-btn" type="button" aria-label="Account" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu"{% if ident %} title="{{ ident.email }}"{% endif %}>
+      <span class="avatar">{{ (ident.email[0] if ident and ident.email else 'U')|upper }}</span>
     </button>
-    {% if is_uploaded %}
-    <button id="sync-btn" class="sync-btn" onclick="exportMarkdown()">
-      ⬇ Export Markdown
-    </button>
-    {% endif %}
+    <div id="account-menu" class="menu-panel" role="menu" hidden>
+      {% if ident %}<div class="menu-who">{{ ident.email }}<br><span class="role-chip">{{ ident.role }}</span></div>{% endif %}
+      {% if auth_enabled %}<a role="menuitem" href="{{ base_path }}/logout">Sign out</a>{% endif %}
+    </div>
   </div>
+  {% endif %}
+</header>
+{% endif %}
+
+<div class="shell">
+{% if not embed_chrome %}
+<aside class="sidebar" id="sidebar">
+  <nav aria-label="Main">
+    <span class="nav-section">Planning</span>
+    {{ nav_item('dashboard', 'Overview', '<rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect>') }}
+    {{ nav_item('features', 'Features', '<rect x="3" y="3" width="5" height="18" rx="1"></rect><rect x="10" y="3" width="5" height="12" rx="1"></rect><rect x="17" y="3" width="4" height="8" rx="1"></rect>') }}
+    {{ nav_item('roadmap', 'Roadmap', '<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path><path d="M9 3v15M15 6v15"></path>') }}
+    {{ nav_item('structure', 'Structure', '<rect x="9" y="3" width="6" height="5" rx="1"></rect><rect x="3" y="16" width="6" height="5" rx="1"></rect><rect x="15" y="16" width="6" height="5" rx="1"></rect><path d="M12 8v4M6 16v-4h12v4"></path>') }}
+    {{ nav_item('bugs', 'Bugs', '<rect x="8" y="6" width="8" height="14" rx="4"></rect><path d="M8 10H4M8 15H4M16 10h4M16 15h4M9 3l2 3M15 3l-2 3"></path>') }}
+    {% if scope_key() %}{{ nav_item('inbox', 'Inbox', '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>') }}{% endif %}
+    <span class="nav-section">Reference</span>
+    {{ nav_item('about', 'About', '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path>') }}
+    {{ nav_item('readme', 'README', '<path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z"></path><path d="M8 9h8M8 13h6"></path>') }}
+  </nav>
+  {% if is_uploaded %}
+  <div class="sidebar-footer">
+    <button id="sync-btn" class="nav-btn" type="button" onclick="exportMarkdown()" title="Export Markdown" aria-label="Export Markdown">
+      {{ icon('<path d="M12 3v12M7 10l5 5 5-5"></path><path d="M5 21h14"></path>') }}<span class="label">Export Markdown</span>
+    </button>
+  </div>
+  {% endif %}
 </aside>
 {% endif %}
 
-<main class="main">
+<main class="main" id="main" tabindex="-1" style="outline:none;">
   {% if scope_key() %}
   <div role="status" style="margin:0 0 1rem;padding:0.55rem 0.8rem;border:1px solid var(--color-border-muted);border-radius:8px;font-size:0.82rem;color:var(--color-text-secondary);">
     Program project <strong>{{ scope_key() }}</strong>. Saved changes are committed to <code>{{ scope_branch() }}</code> in its repository.
@@ -352,6 +403,7 @@
   {% endif %}
   {% block content %}{% endblock %}
 </main>
+</div>
 
 <script>
 // Session injection: attach X-Session-ID to all /api/ requests
@@ -423,44 +475,79 @@ function exportMarkdown() {
   }
 }
 
-// Theme engine: standalone mode persists to localStorage and toggles on click;
-// embedded mode (host provides chrome) instead inherits the host's theme via
-// postMessage. Envelope/source match renewals-web-react's actual
-// SolutionAnalyticsAdminPage.tsx broadcast (the same mechanism it uses for
-// solution-analytics), so this app follows suit when embedded the same way.
+// Colour mode and navigation state. Standalone, they use the localStorage keys and JSON shapes the other Trace3
+// revenue apps use (same origin), so a change in one shows in all: colour mode under `renewals-theme-mode`
+// ({state:{mode}, version:0}); the sidebar under `navOpen` in the `t3-prefs` object. Embedded (host provides the
+// chrome), the theme arrives by postMessage instead.
 (function() {
   const EMBED_CHROME = {{ 'true' if embed_chrome else 'false' }};
-  const STORAGE_KEY = 'strategy-as-code-theme';
+  const MODE_KEY = 'renewals-theme-mode';
+  const PREFS_KEY = 't3-prefs';
   const HOST_MESSAGE_SOURCE = 'renewals-host';
+  const root = document.documentElement;
 
-  function applyTheme(mode) {
-    if (mode === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
-  }
+  function applyTheme(mode) { root.setAttribute('data-theme', mode === 'dark' ? 'dark' : 'light'); }
 
   if (EMBED_CHROME) {
-    // The host (renewals-web-react) posts {source: 'renewals-host', type: 'theme', mode: 'light'|'dark'}
-    // into this iframe whenever its own theme changes (and once on load).
+    // The host posts {source: 'renewals-host', type: 'theme', mode: 'light'|'dark'} whenever its theme changes.
     window.addEventListener('message', function(e) {
       if (e.origin !== window.location.origin) return;
       const data = e.data;
-      if (data && typeof data === 'object' && data.source === HOST_MESSAGE_SOURCE && data.type === 'theme') {
-        applyTheme(data.mode === 'light' ? 'light' : 'dark');
-      }
+      if (data && typeof data === 'object' && data.source === HOST_MESSAGE_SOURCE && data.type === 'theme') applyTheme(data.mode);
     });
-  } else {
-    const toggle = document.getElementById('theme-toggle');
-    if (toggle) {
-      toggle.addEventListener('click', function() {
-        const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-        const next = current === 'light' ? 'dark' : 'light';
-        applyTheme(next);
-        try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
-      });
-    }
+    return;
+  }
+
+  function readMode() {
+    try {
+      const v = JSON.parse(localStorage.getItem(MODE_KEY)).state.mode;
+      if (v === 'light' || v === 'dark') return v;
+    } catch (e) {}
+    return 'light';
+  }
+  function readPrefs() {
+    try {
+      const v = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+      return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+    } catch (e) { return {}; }
+  }
+  function applyNav() {
+    const open = readPrefs().navOpen !== false;
+    if (open) root.removeAttribute('data-nav'); else root.setAttribute('data-nav', 'collapsed');
+    const btn = document.getElementById('nav-toggle');
+    if (btn) btn.setAttribute('aria-label', open ? 'Collapse navigation' : 'Expand navigation');
+  }
+
+  // Another tab or app changed either setting.
+  window.addEventListener('storage', function(e) {
+    if (e.key === MODE_KEY) applyTheme(readMode());
+    if (e.key === PREFS_KEY) applyNav();
+  });
+  applyNav();
+
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) toggle.addEventListener('click', function() {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem(MODE_KEY, JSON.stringify({ state: { mode: next }, version: 0 })); } catch (e) {}
+  });
+
+  const navBtn = document.getElementById('nav-toggle');
+  if (navBtn) navBtn.addEventListener('click', function() {
+    const next = readPrefs().navOpen === false;   // currently collapsed -> open
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(Object.assign(readPrefs(), { navOpen: next }))); } catch (e) {}
+    if (next) root.removeAttribute('data-nav'); else root.setAttribute('data-nav', 'collapsed');
+    applyNav();
+  });
+
+  // Account menu: click toggles, outside click or Escape closes.
+  const accBtn = document.getElementById('account-toggle');
+  const accMenu = document.getElementById('account-menu');
+  if (accBtn && accMenu) {
+    const setOpen = function(open) { accMenu.hidden = !open; accBtn.setAttribute('aria-expanded', String(open)); };
+    accBtn.addEventListener('click', function(e) { e.stopPropagation(); setOpen(accMenu.hidden); });
+    document.addEventListener('click', function(e) { if (!accMenu.contains(e.target)) setOpen(false); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && !accMenu.hidden) { setOpen(false); accBtn.focus(); } });
   }
 })();
 
