@@ -94,6 +94,7 @@
       --sidebar-hover-bg:      rgba(0,188,212,0.08);
       --sidebar-section-color: rgba(255,255,255,0.35);
 
+      --action-hover: rgba(255,255,255,0.08);
       --sidebar-width: 240px;
       --sidebar-collapsed: 64px;
       --header-height: 64px;
@@ -139,6 +140,7 @@
       --color-purple-bg:     rgba(139,92,246,0.12);
       --color-purple-border: rgba(139,92,246,0.35);
 
+      --action-hover: rgba(0,0,0,0.04);
       --sidebar-bg:            #ffffff;
       --sidebar-border:        #e0e0e0;
       --sidebar-text:          #546e7a;
@@ -161,67 +163,79 @@
     }
     .shell { display: flex; flex: 1; min-height: 0; }
 
-    /* Header bar: navigation toggle, title, colour mode, account. Same arrangement as the other revenue apps. */
+    /* Header bar and navigation, sized to match the other revenue apps' Material UI shell: fixed px sizes (not rem, which
+       this app's page scales), Inter, filled 24px Material icons, a 64px header, a 240px / 64px sidebar. */
+    .app-header, .sidebar, .menu-panel { font-family: var(--font-display); }
     .app-header {
       position: sticky; top: 0; z-index: 100; height: var(--header-height); flex-shrink: 0;
-      display: flex; align-items: center; gap: 0.5rem; padding: 0 1rem;
-      background: var(--sidebar-bg); border-bottom: 1px solid var(--sidebar-border);
+      display: flex; align-items: center; gap: 8px; padding: 0 24px;
+      background: var(--sidebar-bg); color: var(--color-text-primary); border-bottom: 1px solid var(--sidebar-border);
     }
+    @media (max-width: 599px) { .app-header { padding: 0 16px; } }
     .header-spacer { flex: 1; }
     .icon-btn {
       display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; flex-shrink: 0;
-      border: none; border-radius: 50%; background: transparent; color: var(--color-text-primary); cursor: pointer;
+      border: none; border-radius: 50%; background: transparent; color: inherit; cursor: pointer;
       transition: background 0.15s;
     }
-    .icon-btn:hover { background: var(--sidebar-hover-bg); }
+    .icon-btn:hover { background: var(--action-hover); }
     .icon-btn:focus-visible, .shell nav a:focus-visible { outline: 2px solid var(--color-t3-blue); outline-offset: -2px; }
-    .icon-btn svg { width: 22px; height: 22px; }
-    .app-title { font-size: 1.25rem; font-weight: 700; color: var(--color-t3-blue); text-decoration: none; white-space: nowrap; }
-    .scope-chip { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--color-t3-blue-dim); color: var(--color-t3-blue); border: 1px solid var(--color-t3-blue-border); }
+    .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+    .icon-btn.nav-btn-toggle { margin-left: -12px; }
     .icon-btn.account-btn { width: 48px; height: 48px; }
-    .avatar { flex: 0 0 32px; width: 32px; height: 32px; min-width: 32px; border-radius: 50%; line-height: 1; background: #00bcd4; color: #000; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+    .app-title { font-size: 20px; font-weight: 700; line-height: 1.6; letter-spacing: 0.0075em; color: #00bcd4; text-decoration: none; white-space: nowrap; }
+    .scope-chip { font-family: var(--font-mono); font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--color-t3-blue-dim); color: var(--color-t3-blue); border: 1px solid var(--color-t3-blue-border); }
+    .avatar { flex: 0 0 32px; width: 32px; height: 32px; min-width: 32px; border-radius: 50%; line-height: 1; background: #00bcd4; color: #000; font-size: 14px; font-weight: 400; display: flex; align-items: center; justify-content: center; }
     .menu-wrap { position: relative; }
     .menu-panel {
-      position: absolute; right: 0; top: calc(100% + 4px); min-width: 14rem; z-index: 200; padding: 0.4rem 0;
-      background: var(--color-bg-card); border: 1px solid var(--color-border-muted); border-radius: 8px;
+      position: absolute; right: 0; top: calc(100% + 4px); min-width: 16rem; z-index: 200; padding: 8px 0;
+      background: var(--color-bg-card); color: var(--color-text-primary); border: 1px solid var(--color-border-muted); border-radius: 8px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.25);
     }
     .menu-panel[hidden] { display: none; }
-    .menu-panel .menu-who { padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; word-break: break-all; }
-    .menu-panel .role-chip { display: inline-block; margin-top: 0.3rem; padding: 0.1rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 500; background: #00bcd4; color: #000; }
-    .menu-panel a { display: block; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--color-text-primary); text-decoration: none; }
-    .menu-panel a:hover { background: var(--sidebar-hover-bg); }
+    .menu-panel .menu-who { padding: 6px 16px; font-size: 14px; font-weight: 600; line-height: 1.43; word-break: break-all; }
+    .menu-panel .role-chip { display: inline-flex; align-items: center; height: 24px; margin-top: 4px; padding: 0 10px; border-radius: 16px; font-size: 13px; font-weight: 500; background: #00bcd4; color: #000; }
+    .menu-panel a { display: flex; align-items: center; min-height: 48px; padding: 6px 16px; font-size: 16px; line-height: 1.5; color: var(--color-text-primary); text-decoration: none; }
+    .menu-panel a:hover { background: var(--action-hover); }
+    /* Brightness7 is the dark-mode icon and Brightness4 the light-mode one, as in the other apps. */
     .theme-toggle-btn .icon-sun { display: block; }
     .theme-toggle-btn .icon-moon { display: none; }
     :root[data-theme="light"] .theme-toggle-btn .icon-sun { display: none; }
     :root[data-theme="light"] .theme-toggle-btn .icon-moon { display: block; }
+    .nav-btn-toggle .icon-open { display: block; }
+    .nav-btn-toggle .icon-closed { display: none; }
+    :root[data-nav="collapsed"] .nav-btn-toggle .icon-open { display: none; }
+    :root[data-nav="collapsed"] .nav-btn-toggle .icon-closed { display: block; }
     .skip-link { position: absolute; left: -9999px; }
-    .skip-link:focus { left: 8px; top: 8px; z-index: 2000; background: var(--color-bg-card); padding: 0.5rem 0.75rem; border-radius: 6px; }
+    .skip-link:focus { left: 8px; top: 8px; z-index: 2000; background: var(--color-bg-card); padding: 8px; border-radius: 6px; }
 
     /* Sidebar: expanded 240px, or a 64px icon rail when collapsed. The state is the shared `navOpen` preference. */
     .sidebar {
       width: var(--sidebar-width); min-width: var(--sidebar-width);
       background: var(--sidebar-bg);
-      color: var(--sidebar-text-active);
+      color: var(--color-text-primary);
       border-right: 1px solid var(--sidebar-border);
       display: flex; flex-direction: column;
       position: sticky; top: var(--header-height); height: calc(100vh - var(--header-height)); overflow-x: hidden; overflow-y: auto;
       transition: width 0.2s, min-width 0.2s;
     }
-    nav { padding: 0.5rem 0; flex: 1; }
-    nav a { display: flex; align-items: center; gap: 1rem; min-height: 46px; padding: 0 1.25rem; color: var(--sidebar-text); text-decoration: none; font-size: 0.875rem; border-right: 3px solid transparent; white-space: nowrap; transition: background 0.15s, color 0.15s; }
-    nav a svg { width: 22px; height: 22px; flex-shrink: 0; }
-    nav a:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-text-active); }
-    nav a.active { color: var(--color-t3-blue); border-right-color: var(--color-t3-blue); background: var(--color-t3-blue-dim); font-weight: 600; }
-    .nav-section { display: block; font-family: var(--font-mono); padding: 0.75rem 1.25rem 0.2rem; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--sidebar-section-color); pointer-events: none; white-space: nowrap; }
-    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid var(--sidebar-border); }
-    .sidebar-footer button.nav-btn { display: flex; align-items: center; gap: 1rem; width: 100%; min-height: 46px; padding: 0 1.25rem; border: none; background: transparent; color: var(--sidebar-text); font: inherit; font-size: 0.875rem; cursor: pointer; white-space: nowrap; }
-    .sidebar-footer button.nav-btn:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-text-active); }
-    .sidebar-footer button.nav-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+    nav { padding: 8px 0; flex: 1; }
+    nav a, .sidebar-footer button.nav-item {
+      display: flex; align-items: center; gap: 16px; min-height: 46px; padding: 0 20px; width: 100%;
+      color: var(--color-text-primary); text-decoration: none; font: inherit; font-size: 14px; line-height: 1.43; letter-spacing: 0.01071em;
+      border: none; border-right: 3px solid transparent; background: transparent; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    nav a svg, .sidebar-footer button.nav-item svg { width: 24px; height: 24px; flex-shrink: 0; fill: currentColor; color: var(--color-text-secondary); }
+    nav a:hover, .sidebar-footer button.nav-item:hover { background: var(--action-hover); }
+    nav a.active { color: #00bcd4; font-weight: 600; border-right-color: #00bcd4; background: rgba(0,188,212,0.12); }
+    nav a.active svg { color: #00bcd4; }
+    .nav-section { display: block; padding: 0 16px; font-size: 11px; font-weight: 700; line-height: 2.2; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-secondary); pointer-events: none; white-space: nowrap; }
+    .sidebar-footer { padding: 8px 0; border-top: 1px solid var(--sidebar-border); }
     :root[data-nav="collapsed"] .sidebar { width: var(--sidebar-collapsed); min-width: var(--sidebar-collapsed); }
     :root[data-nav="collapsed"] .sidebar .label, :root[data-nav="collapsed"] .nav-section { display: none; }
-    :root[data-nav="collapsed"] nav a, :root[data-nav="collapsed"] .sidebar-footer button.nav-btn { padding: 0; justify-content: center; }
-    @media (max-width: 700px) { .sidebar { width: var(--sidebar-collapsed); min-width: var(--sidebar-collapsed); } .sidebar .label, .nav-section { display: none; } nav a, .sidebar-footer button.nav-btn { padding: 0; justify-content: center; } }
+    :root[data-nav="collapsed"] nav a, :root[data-nav="collapsed"] .sidebar-footer button.nav-item { padding: 0; justify-content: center; }
+    @media (max-width: 700px) { .sidebar { width: var(--sidebar-collapsed); min-width: var(--sidebar-collapsed); } .sidebar .label, .nav-section { display: none; } nav a, .sidebar-footer button.nav-item { padding: 0; justify-content: center; } }
 
     /* Main */
     .main { flex: 1; padding: 1.5rem; min-width: 0; }
@@ -340,14 +354,15 @@
   </div>
 </dialog>
 
-{% macro icon(d) %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ d|safe }}</svg>{% endmacro %}
+{% macro icon(d) %}<svg viewBox="0 0 24 24" aria-hidden="true">{{ d|safe }}</svg>{% endmacro %}
 {% macro nav_item(page, label, d, href=none) %}<a href="{{ href or (base_path ~ '/' ~ page) }}" aria-label="{{ label }}" title="{{ label }}"{% if active_page == page %} class="active" aria-current="page"{% endif %}>{{ icon(d) }}<span class="label">{{ label }}</span></a>{% endmacro %}
 {% if not embed_chrome %}
 {% set ident = request.state.identity if request is defined else none %}
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="app-header">
-  <button id="nav-toggle" class="icon-btn" type="button" aria-label="Collapse navigation" aria-controls="sidebar">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+  <button id="nav-toggle" class="icon-btn nav-btn-toggle" type="button" aria-label="Collapse navigation" aria-controls="sidebar">
+    <svg class="icon-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg>
+    <svg class="icon-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18v-2H3zm0-5h18v-2H3zm0-7v2h18V6z"></path></svg>
   </button>
   <a href="{% if scope_key() %}{{ projects_url() }}{% else %}{{ base_path }}/switch-project{% endif %}" class="app-title"
      title="{% if scope_key() %}All program projects{% elif lock_project %}Project files{% else %}Switch project{% endif %}">{{ app_title }}</a>
@@ -376,20 +391,20 @@
 <aside class="sidebar" id="sidebar">
   <nav aria-label="Main">
     <span class="nav-section">Planning</span>
-    {{ nav_item('dashboard', 'Overview', '<rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect>') }}
-    {{ nav_item('features', 'Features', '<rect x="3" y="3" width="5" height="18" rx="1"></rect><rect x="10" y="3" width="5" height="12" rx="1"></rect><rect x="17" y="3" width="4" height="8" rx="1"></rect>') }}
-    {{ nav_item('roadmap', 'Roadmap', '<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path><path d="M9 3v15M15 6v15"></path>') }}
-    {{ nav_item('structure', 'Structure', '<rect x="9" y="3" width="6" height="5" rx="1"></rect><rect x="3" y="16" width="6" height="5" rx="1"></rect><rect x="15" y="16" width="6" height="5" rx="1"></rect><path d="M12 8v4M6 16v-4h12v4"></path>') }}
-    {{ nav_item('bugs', 'Bugs', '<rect x="8" y="6" width="8" height="14" rx="4"></rect><path d="M8 10H4M8 15H4M16 10h4M16 15h4M9 3l2 3M15 3l-2 3"></path>') }}
-    {% if scope_key() %}{{ nav_item('inbox', 'Inbox', '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>') }}{% endif %}
+    {{ nav_item('dashboard', 'Overview', '<path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"></path>') }}
+    {{ nav_item('features', 'Features', '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2M9 17H7V7h2zm4-5h-2V7h2zm4 3h-2V7h2z"></path>') }}
+    {{ nav_item('roadmap', 'Roadmap', '<path d="m20.5 3-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5M15 19l-6-2.11V5l6 2.11z"></path>') }}
+    {{ nav_item('structure', 'Structure', '<path d="M22 11V3h-7v3H9V3H2v8h7V8h2v10h4v3h7v-8h-7v3h-2V8h2v3z"></path>') }}
+    {{ nav_item('bugs', 'Bugs', '<path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20zm-6 8h-4v-2h4zm0-4h-4v-2h4z"></path>') }}
+    {% if scope_key() %}{{ nav_item('inbox', 'Inbox', '<path d="M19 3H4.99c-1.11 0-1.98.89-1.98 2L3 19c0 1.1.88 2 1.99 2H19c1.1 0 2-.9 2-2V5c0-1.11-.9-2-2-2m0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H4.99V5H19z"></path>') }}{% endif %}
     <span class="nav-section">Reference</span>
-    {{ nav_item('about', 'About', '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path>') }}
-    {{ nav_item('readme', 'README', '<path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z"></path><path d="M8 9h8M8 13h6"></path>') }}
+    {{ nav_item('about', 'About', '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m1 15h-2v-6h2zm0-8h-2V7h2z"></path>') }}
+    {{ nav_item('readme', 'README', '<path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1m0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5z"></path><path d="M17.5 10.5c.88 0 1.73.09 2.5.26V9.24c-.79-.15-1.64-.24-2.5-.24-1.7 0-3.24.29-4.5.83v1.66c1.13-.64 2.7-.99 4.5-.99M13 12.49v1.66c1.13-.64 2.7-.99 4.5-.99.88 0 1.73.09 2.5.26V11.9c-.79-.15-1.64-.24-2.5-.24-1.7 0-3.24.3-4.5.83m4.5 1.84c-1.7 0-3.24.29-4.5.83v1.66c1.13-.64 2.7-.99 4.5-.99.88 0 1.73.09 2.5.26v-1.52c-.79-.16-1.64-.24-2.5-.24"></path>') }}
   </nav>
   {% if is_uploaded %}
   <div class="sidebar-footer">
-    <button id="sync-btn" class="nav-btn" type="button" onclick="exportMarkdown()" title="Export Markdown" aria-label="Export Markdown">
-      {{ icon('<path d="M12 3v12M7 10l5 5 5-5"></path><path d="M5 21h14"></path>') }}<span class="label">Export Markdown</span>
+    <button id="sync-btn" class="nav-item" type="button" onclick="exportMarkdown()" title="Export Markdown" aria-label="Export Markdown">
+      {{ icon('<path d="M5 20h14v-2H5zM19 9h-4V3H9v6H5l7 7z"></path>') }}<span class="label">Export Markdown</span>
     </button>
   </div>
   {% endif %}
