@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     program_manifest: str = ""  # path to a PROGRAM.MD; enables /p/<key>/ project-scoped routes
     hub_auth_url: str = ""           # RevOps hub /internal/auth?app=strategy; enables hub identity and roles
     program_poll_seconds: int = 45   # background refresh of every member project; 0 disables
+    program_nested_depth: int = 3    # levels of program-within-program to follow; 0 turns nesting off
     program_sweep_seconds: int = 86400  # archive stale inbox items in every member project; 0 disables
     webhook_secret: str = ""         # GitHub webhook secret; empty disables POST /hooks/refresh
     git_sync_paths: str = "PRODUCT.MD,ABOUT.MD,BUGS.MD,README.MD"
@@ -213,6 +214,10 @@ class _SettingsProxy:
     @property
     def program_poll_seconds(self) -> int:
         return _base.program_poll_seconds
+
+    @property
+    def program_nested_depth(self) -> int:
+        return _base.program_nested_depth
 
     @property
     def program_sweep_seconds(self) -> int:

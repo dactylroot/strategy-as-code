@@ -7,10 +7,11 @@ by the CLI and tests without importing config.
 """
 from __future__ import annotations
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 MODES = ("direct", "branch")
+KINDS = ("project", "program")
 MAX_DEPTH = 3                      # how many levels a walk across dependent projects may go
 DEFAULT_PLANNING_BRANCH = "planning"
 
@@ -35,9 +36,20 @@ class ProjectSpec:
     mode: str = "direct"           # direct: push the default branch; branch: push a planning branch
     branch: str = ""               # explicit target branch; "" = default branch (direct) or "planning" (branch)
     planning_dir: str = "."        # folder holding PRODUCT.MD/BUGS.MD/ABOUT.MD, relative to the repo root
+    kind: str = "project"          # "program": a nested program; its own PROGRAM.MD lists further projects
+    parent: str = ""               # key of the nested program this project was listed in
 
     def planning_file(self, name: str) -> str:
         return str(Path(self.planning_dir) / name)
+
+
+def repo_identity(repo: str, planning_dir: str = ".") -> str:
+    """What makes two manifest rows the same planning location: the repository (owner/name for a
+    GitHub URL, the resolved path for a local one) and the folder inside it. Used to stop a nested
+    program from listing itself, directly or through another program."""
+    m = re.search(r"[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$", repo) if _is_url(repo) else None
+    where = m.group(1).lower() if m else str(Path(repo).resolve()) if not _is_url(repo) else repo.lower()
+    return f"{where}#{str(Path(planning_dir or '.'))}"
 
 
 def _is_url(value: str) -> bool:
@@ -102,31 +114,48 @@ def parse_manifest(text: str, base_dir: Path) -> list[ProjectSpec]:
         if mode not in MODES:
             raise ManifestError(f"project {key!r} has unknown mode {mode!r} (expected one of {MODES})")
         deps = tuple(d.strip() for d in cell(cells, "depends on").split(",") if d.strip())
+        kind = (cell(cells, "kind") or "project").lower()
+        if kind not in KINDS:
+            raise ManifestError(f"project {key!r} has unknown kind {kind!r} (expected one of {KINDS})")
         specs.append(ProjectSpec(
             key=key, repo=_resolve_repo(repo, base_dir), role=cell(cells, "role"),
             depends_on=deps, mode=mode, branch=cell(cells, "branch"),
-            planning_dir=cell(cells, "planning dir") or ".",
+            planning_dir=cell(cells, "planning dir") or ".", kind=kind,
         ))
-    _validate(specs)
+    _validate(specs, allow_nested=True)
     return specs
 
 
-def _validate(specs: list[ProjectSpec]) -> None:
+def nest(specs: list[ProjectSpec], parent: str) -> list[ProjectSpec]:
+    """The projects listed by nested program `parent`, with keys and dependencies prefixed
+    `<parent>.` so they cannot collide with the outer program's own keys."""
+    return [replace(s, key=f"{parent}.{s.key}", parent=parent,
+                    depends_on=tuple(f"{parent}.{d}" for d in s.depends_on)) for s in specs]
+
+
+def validate(specs: list[ProjectSpec]) -> None:
+    """Check a complete, flattened project list (nested programs already expanded)."""
+    _validate(specs, allow_nested=False)
+
+
+def _validate(specs: list[ProjectSpec], allow_nested: bool) -> None:
     keys = [s.key for s in specs]
     dupes = {k for k in keys if keys.count(k) > 1}
     if dupes:
         raise ManifestError(f"duplicate project keys: {sorted(dupes)}")
     known = set(keys)
+    programs = {s.key for s in specs if s.kind == "program"}
     graph = {s.key: s.depends_on for s in specs}
     for s in specs:
         for d in s.depends_on:
-            if d not in known:
+            # Before expansion, `<program>.<project>` names a project the nested program will supply.
+            if d not in known and not (allow_nested and d.split(".", 1)[0] in programs and "." in d):
                 raise ManifestError(f"project {s.key!r} depends on unknown project {d!r}")
     # Depth-first cycle check.
     state: dict[str, int] = {}  # 1 = on stack, 2 = done
 
     def visit(k: str, path: list[str]) -> None:
-        if state.get(k) == 2:
+        if k not in graph or state.get(k) == 2:
             return
         if state.get(k) == 1:
             raise ManifestError("dependency cycle: " + " -> ".join(path + [k]))

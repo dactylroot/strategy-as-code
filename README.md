@@ -134,6 +134,7 @@ Supports `linux/amd64` and `linux/arm64`.
 | `AUTH_INTROSPECT_URL` | (empty) | Host session-introspection endpoint - see [Embedded](#embedded) below |
 | `HUB_AUTH_URL` | (empty) | RevOps hub `/internal/auth?app=strategy`. Enables hub identity: the visitor's cookie is forwarded, the hub's `X-User-Email` and `X-App-Role` answer is the only identity accepted (`viewer` reads, `editor` and `admin` write), and `X-Host-User` is ignored |
 | `PROGRAM_POLL_SECONDS` | `45` | Background refresh of every member project's clone; `0` turns it off |
+| `PROGRAM_NESTED_DEPTH` | `3` | A manifest row with `Kind` = `program` is a nested program: its own `PROGRAM.MD` (in its `Planning Dir`) is read and its projects are listed as `<row key>.<project key>`, with their `Depends On` prefixed the same way. This is how many levels to follow; `0` turns nesting off. A program that would contain itself (same repository and folder further up) is always refused. Re-read on every poll |
 | `PROGRAM_SWEEP_SECONDS` | `86400` | How often every project's inbox is swept: items untriaged for 60 days move to `.planning/inbox/archive/`, one commit per project that had any; `0` turns it off |
 | `PLANNING_PR` | `true` | After a push to a branch-mode project's planning branch, open (or refresh the description of) one pull request to the default branch. Needs `GIT_TOKEN` and a github.com repository; `false` turns it off. `strategy pr -p <key>` does the same on demand |
 | `WEBHOOK_SECRET` | (empty) | Enables `POST <base>/hooks/refresh` for signed GitHub push events |

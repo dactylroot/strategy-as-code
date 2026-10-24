@@ -58,6 +58,12 @@ async def _lifespan(_app: FastAPI):
         threading.Thread(target=_periodic_sync_loop, daemon=True).start()
     stop = threading.Event()
     registry = scope.get_registry()
+    if registry is not None:
+        try:
+            for key, why in (await run_in_threadpool(registry.expand)).items():
+                logger.warning("nested program %s not expanded: %s", key, why)
+        except Exception:
+            logger.exception("expanding nested programs failed; serving the outer program")
     if registry is not None and settings.program_poll_seconds > 0:
         threading.Thread(target=poller.poll_loop, args=(registry, settings.program_poll_seconds, stop),
                          daemon=True).start()
@@ -72,7 +78,8 @@ app = FastAPI(title=settings.app_title, docs_url=full("/api-docs"), lifespan=_li
 
 # Program mode: one clone per member project, served under <base>/p/<key>/.
 if settings.program_manifest:
-    scope.set_registry(Registry.from_manifest(Path(settings.program_manifest).expanduser()))
+    scope.set_registry(Registry.from_manifest(Path(settings.program_manifest).expanduser(),
+                                              nested_depth=settings.program_nested_depth))
 
 
 @app.get(full("/docs/{path:path}"), include_in_schema=False)
@@ -207,7 +214,7 @@ async def projects_index(request: Request):
     rows = await run_in_threadpool(overview.summarize_all)
     initiatives, initiatives_error = overview.initiative_views(rows)
     return templates.TemplateResponse(request, "overview.html", {
-        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "stages": overview.STAGES, "app_title": "Program overview"})
+        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "nested_errors": scope.get_registry().nested_errors, "stages": overview.STAGES, "app_title": "Program overview"})
 
 
 @app.get(full("/work"), include_in_schema=False)

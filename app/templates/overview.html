@@ -35,6 +35,7 @@
 <main>
   <h1>Program overview</h1>
   <p class="sub">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each card links to that project's own board. <a href="{{ work_url() }}">Edit features across projects</a>.</p>
+  {% for key, why in nested_errors.items() %}<p class="bad">{{ "Nested programs" if key == "*" else "Nested program " ~ key }} could not be expanded: {{ why }}</p>{% endfor %}
   {% if initiatives_error %}<p class="bad">Program initiatives could not be read: {{ initiatives_error }}</p>{% endif %}
   {% if initiatives %}
   <h2 class="sec">Program initiatives</h2>
@@ -63,7 +64,7 @@
     <section class="card" id="{{ p.key }}">
       <h2><a href="{{ projects_url() }}/{{ p.key }}/dashboard">{{ p.key }}</a>
         {% if p.version %}<span class="muted">v{{ p.version }}</span>{% endif %}</h2>
-      <div class="role">{{ p.role or p.title }}</div>
+      <div class="role">{{ p.role or p.title }}{% if p.parent %} <span class="muted">· in {{ p.parent }}</span>{% endif %}</div>
       {% if p.error %}
         <div class="bad">{{ p.error }}</div>
       {% else %}

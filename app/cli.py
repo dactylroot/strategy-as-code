@@ -29,7 +29,7 @@ from typing import Callable
 
 from . import inbox as _inbox
 from . import pullrequest
-from .manifest import MAX_DEPTH, ManifestError, load_manifest, walk
+from .manifest import MAX_DEPTH, ManifestError, walk
 from .models import BugCreate, BugSeverity, BugStatus, BugUpdate, FeatureStatus, NewFeature
 from .parsers import about as about_parser
 from .parsers import bugs as bugs_parser
@@ -236,7 +236,9 @@ def install_merge_driver(repo: Path) -> str:
 
 
 def _run_deps(manifest: Path, args: argparse.Namespace) -> str:
-    visits = walk(load_manifest(manifest), args.project, "up" if args.up else "down", args.depth)
+    reg = Registry.from_manifest(manifest)
+    reg.expand()
+    visits = walk(reg.specs(), args.project, "up" if args.up else "down", args.depth)
     lines = []
     for v in visits:
         note = " (already listed above)" if v.repeat else f" (more beyond {args.depth} levels)" if v.truncated else ""
@@ -267,6 +269,7 @@ def run(args: argparse.Namespace) -> str:
     if args.resource == "deps":
         return _run_deps(find_manifest(args.manifest), args)
     reg = Registry.from_manifest(find_manifest(args.manifest))
+    reg.expand()
     key = _pick_project(reg, args.project)
     if args.resource == "pr":
         return _run_pr(reg, key)

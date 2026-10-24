@@ -42,6 +42,7 @@ def refresh_all(registry: Registry) -> dict[str, str | None]:
 def poll_loop(registry: Registry, interval: float, stop: threading.Event) -> None:
     while not stop.wait(max(interval, 5)):
         try:
+            registry.expand()          # a nested program's manifest may have gained or lost projects
             refresh_all(registry)
         except Exception:
             logger.exception("project poll failed; continuing")

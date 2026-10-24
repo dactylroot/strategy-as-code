@@ -17,7 +17,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .manifest import DEFAULT_PLANNING_BRANCH, ProgramInitiative, ProjectSpec, load_initiatives, load_manifest
+from .manifest import (DEFAULT_PLANNING_BRANCH, ManifestError, ProgramInitiative, ProjectSpec, load_initiatives,
+                       load_manifest, nest, parse_manifest, repo_identity, validate)
 
 
 class RegistryError(RuntimeError):
@@ -173,15 +174,19 @@ class Project:
 
 class Registry:
     def __init__(self, specs: list[ProjectSpec], cache_dir: Path | None = None,
-                 committer: tuple[str, str] = ("strategy-as-code", "noreply@strategy-as-code")):
+                 committer: tuple[str, str] = ("strategy-as-code", "noreply@strategy-as-code"),
+                 nested_depth: int = 3):
         self.committer = committer
         self.cache_dir = Path(cache_dir) if cache_dir else default_cache_dir()
+        self._declared = list(specs)
         self._projects = {s.key: Project(spec=s, path=self.cache_dir / s.key) for s in specs}
         self.manifest_path: Path | None = None
+        self.nested_depth = nested_depth       # levels of program-within-program; 0 turns nesting off
+        self.nested_errors: dict[str, str] = {}  # nested program key -> why it could not be expanded
 
     @classmethod
-    def from_manifest(cls, manifest_path: Path, cache_dir: Path | None = None) -> "Registry":
-        reg = cls(load_manifest(manifest_path), cache_dir)
+    def from_manifest(cls, manifest_path: Path, cache_dir: Path | None = None, nested_depth: int = 3) -> "Registry":
+        reg = cls(load_manifest(manifest_path), cache_dir, nested_depth=nested_depth)
         reg.manifest_path = Path(manifest_path)
         return reg
 
@@ -193,10 +198,67 @@ class Registry:
         return load_initiatives(self.manifest_path, set(self._projects))
 
     def keys(self) -> list[str]:
-        return list(self._projects)
+        """The projects to show and edit. A nested program is a container, not a project: its
+        projects are listed here as `<program>.<project>`."""
+        return [k for k, p in self._projects.items() if p.spec.kind != "program"]
+
+    def specs(self) -> list[ProjectSpec]:
+        """Every row, nested programs included, in listing order."""
+        return [p.spec for p in self._projects.values()]
 
     def __contains__(self, key: str) -> bool:
-        return key in self._projects
+        return key in self._projects and self._projects[key].spec.kind != "program"
+
+    def expand(self) -> dict[str, str]:
+        """Read the PROGRAM.MD of every nested program (kind `program`) and list its projects here as
+        `<program>.<project>`, to the depth allowed. Call at start-up and on every poll so changes to a
+        nested manifest show without a restart. A program that cannot be read, would contain itself
+        (same repository and folder further up the chain), or nests deeper than `nested_depth` is left
+        out and named in the result and in `nested_errors`; nothing else is affected. Blocking."""
+        errors: dict[str, str] = {}
+        flat: list[ProjectSpec] = []
+        made: dict[str, Project] = {}      # containers touched this pass, so their clone state is kept
+
+        def visit(spec: ProjectSpec, chain: tuple[str, ...], depth: int) -> None:
+            flat.append(spec)
+            if spec.kind != "program":
+                return
+            ident = repo_identity(spec.repo, spec.planning_dir)
+            if ident in chain:
+                errors[spec.key] = f"{spec.key} lists itself: {spec.repo} ({spec.planning_dir}) is already above it"
+                return
+            if depth >= self.nested_depth:
+                errors[spec.key] = (f"{spec.key} is nested more than {self.nested_depth} level(s) deep "
+                                    "(PROGRAM_NESTED_DEPTH)")
+                return
+            project = self._projects.get(spec.key)
+            if project is None or project.spec != spec:
+                project = Project(spec=spec, path=self.cache_dir / spec.key)
+            made[spec.key] = project
+            try:
+                self._refresh(project)
+                manifest = project.planning_root / "PROGRAM.MD"
+                if not manifest.is_file():
+                    raise ManifestError(f"no PROGRAM.MD in {spec.planning_dir or 'the repository root'}")
+                children = nest(parse_manifest(manifest.read_text(encoding="utf-8"), project.planning_root), spec.key)
+            except Exception as exc:
+                errors[spec.key] = str(exc) or exc.__class__.__name__
+                return
+            for child in children:
+                visit(child, chain + (ident,), depth + 1)
+
+        for spec in self._declared:
+            visit(spec, (), 0)
+        try:
+            validate(flat)
+        except ManifestError as exc:
+            errors["*"] = str(exc)
+            flat = list(self._declared)           # keep the outer program usable
+        old = {**self._projects, **made}
+        self._projects = {s.key: old[s.key] if s.key in old and old[s.key].spec == s
+                          else Project(spec=s, path=self.cache_dir / s.key) for s in flat}
+        self.nested_errors = errors
+        return errors
 
     def get(self, key: str) -> Project:
         try:
@@ -205,7 +267,10 @@ class Registry:
             raise RegistryError(f"unknown project {key!r}") from None
 
     def ensure_clone(self, key: str) -> Project:
-        project = self.get(key)
+        return self._ensure_clone(self.get(key))
+
+    def _ensure_clone(self, project: Project) -> Project:
+        key = project.key
         with project.locked():
             if (project.path / ".git").exists():
                 current = project.git("remote", "get-url", "origin", check=False)
@@ -237,7 +302,10 @@ class Registry:
     def refresh(self, key: str) -> Project:
         """Bring one project's clone up to date. A failure is recorded in its
         status and re-raised; it never touches another project."""
-        project = self.ensure_clone(key)
+        return self._refresh(self.get(key))
+
+    def _refresh(self, project: Project) -> Project:
+        project = self._ensure_clone(project)
         with project.locked():
             try:
                 project.sync()

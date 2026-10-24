@@ -26,6 +26,7 @@ class ProjectSummary:
     required_by: tuple[str, ...] = ()
     mode: str = "direct"
     pr_url: str = ""
+    parent: str = ""
     branch: str = ""
     sha: str = ""
     stale: bool = False
@@ -130,7 +131,7 @@ def _summarize(key: str) -> ProjectSummary:
     project = reg.get(key)
     spec = project.spec
     s = ProjectSummary(
-        key=key, role=spec.role, depends_on=spec.depends_on, mode=spec.mode,
+        key=key, role=spec.role, depends_on=spec.depends_on, mode=spec.mode, parent=spec.parent,
         branch=project.target_branch or "",
         required_by=tuple(k for k in reg.keys() if key in reg.get(k).spec.depends_on),
     )
