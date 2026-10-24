@@ -169,7 +169,7 @@
     }
     .header-spacer { flex: 1; }
     .icon-btn {
-      display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+      display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; flex-shrink: 0;
       border: none; border-radius: 50%; background: transparent; color: var(--color-text-primary); cursor: pointer;
       transition: background 0.15s;
     }
@@ -178,7 +178,8 @@
     .icon-btn svg { width: 22px; height: 22px; }
     .app-title { font-size: 1.25rem; font-weight: 700; color: var(--color-t3-blue); text-decoration: none; white-space: nowrap; }
     .scope-chip { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--color-t3-blue-dim); color: var(--color-t3-blue); border: 1px solid var(--color-t3-blue-border); }
-    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #00bcd4; color: #000; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+    .icon-btn.account-btn { width: 48px; height: 48px; }
+    .avatar { flex: 0 0 32px; width: 32px; height: 32px; min-width: 32px; border-radius: 50%; line-height: 1; background: #00bcd4; color: #000; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
     .menu-wrap { position: relative; }
     .menu-panel {
       position: absolute; right: 0; top: calc(100% + 4px); min-width: 14rem; z-index: 200; padding: 0.4rem 0;
@@ -358,7 +359,7 @@
   </button>
   {% if ident or auth_enabled %}
   <div class="menu-wrap">
-    <button id="account-toggle" class="icon-btn" type="button" aria-label="Account" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu"{% if ident %} title="{{ ident.email }}"{% endif %}>
+    <button id="account-toggle" class="icon-btn account-btn" type="button" aria-label="Account" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu"{% if ident %} title="{{ ident.email }}"{% endif %}>
       <span class="avatar">{{ (ident.email[0] if ident and ident.email else 'U')|upper }}</span>
     </button>
     <div id="account-menu" class="menu-panel" role="menu" hidden>
