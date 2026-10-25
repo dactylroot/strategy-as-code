@@ -373,3 +373,10 @@ class TestProjectWithoutOptionalFiles:
         (tmp_project / "README.md").write_text("# Lowercase readme marker", encoding="utf-8")
         r = client.get("/readme")
         assert r.status_code == 200 and "Lowercase readme marker" in r.text
+
+
+def test_inline_markdown_escapes_html_and_renders_bold():
+    from app.template_env import _inline_markdown
+    out = str(_inline_markdown("reads **Accounts** and <script>x</script> via `api`"))
+    assert "<strong>Accounts</strong>" in out and "<code>api</code>" in out
+    assert "<script>" not in out and "&lt;script&gt;" in out

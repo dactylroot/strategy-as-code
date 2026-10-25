@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from .config import settings, full
 from .routers import pages, api
 from .routers import auth_router
-from .auth import is_authenticated
+from .auth import is_authenticated, enabled as auth_enabled
 from . import git_sync
 from . import github_issues
 from . import hub_identity
@@ -214,7 +214,8 @@ async def projects_index(request: Request):
     rows = await run_in_threadpool(overview.summarize_all)
     initiatives, initiatives_error = overview.initiative_views(rows)
     return templates.TemplateResponse(request, "overview.html", {
-        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "nested_errors": scope.get_registry().nested_errors, "stages": overview.STAGES, "app_title": "Program overview"})
+        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "nested_errors": scope.get_registry().nested_errors, "stages": overview.STAGES, "app_title": "Program overview",
+        "active_page": "overview", "auth_enabled": auth_enabled(), "lock_project": settings.lock_project})
 
 
 @app.get(full("/work"), include_in_schema=False)
@@ -227,6 +228,7 @@ async def program_work(request: Request):
     identity = getattr(request.state, "identity", None)
     return templates.TemplateResponse(request, "work.html", {
         "rows": rows, "errors": errors, "projects": scope.get_registry().keys(), "app_title": "Program work",
+        "active_page": "work", "auth_enabled": auth_enabled(), "lock_project": settings.lock_project,
         "can_write": identity is None or hub_identity.may_write(identity)})
 
 

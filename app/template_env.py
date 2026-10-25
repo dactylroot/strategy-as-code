@@ -1,6 +1,9 @@
+import html
+import re
 from pathlib import Path
 import markdown as md
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 
 from . import scope
 from .config import settings
@@ -10,6 +13,17 @@ templates = Jinja2Templates(directory=str(_templates_dir))
 templates.env.filters["markdown_to_html"] = lambda text: md.markdown(
     text, extensions=["tables", "fenced_code"]
 )
+
+
+def _inline_markdown(text: str):
+    """Bold and `code` spans of a summary line as HTML, everything else escaped: repository text is never trusted markup."""
+    escaped = html.escape(text or "")
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
+    return Markup(escaped)
+
+
+templates.env.filters["inline_markdown"] = _inline_markdown
 
 
 class _BasePath:
@@ -27,6 +41,7 @@ class _BasePath:
 templates.env.globals["base_path"] = _BasePath()
 templates.env.globals["scope_key"] = scope.scope_key
 templates.env.globals["scope_branch"] = scope.branch_label
+templates.env.globals["program_mode"] = lambda: scope.get_registry() is not None
 templates.env.globals["projects_url"] = lambda: f"{settings.root_path}/p"
 templates.env.globals["work_url"] = lambda: f"{settings.root_path}/work"
 templates.env.globals["embed_chrome"] = settings.embed_chrome

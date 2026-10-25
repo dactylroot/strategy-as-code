@@ -1,40 +1,28 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Program overview</title>
-  <style>
-    :root { --bg:#fff; --fg:#1b1f24; --muted:#59636e; --line:#d1d9e0; --card:#f6f8fa; --link:#0b5cad;
-            --bad:#b42318; --warn:#9a6700; --ok:#1a7f37; --bar:#0b5cad; }
-    @media (prefers-color-scheme: dark) { :root { --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --line:#30363d;
-            --card:#151b23; --link:#58a6ff; --bad:#ff7b72; --warn:#d29922; --ok:#3fb950; --bar:#58a6ff; } }
-    body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-    main { max-width:72rem; margin:0 auto; padding:2rem 16px; }
-    h1 { font-size:1.4rem; margin:0 0 0.25rem; }
-    .sub { color:var(--muted); margin:0 0 1.5rem; font-size:0.9rem; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(21rem, 1fr)); gap:1rem; }
-    .card { border:1px solid var(--line); border-radius:8px; background:var(--card); padding:1rem; }
-    .card h2 { font-size:1.05rem; margin:0; display:flex; justify-content:space-between; gap:0.5rem; align-items:baseline; }
-    .card h2 a { color:var(--link); text-decoration:none; }
-    .role { color:var(--muted); font-size:0.85rem; margin:0.1rem 0 0.6rem; }
-    .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:0.4rem 0; }
-    .bar > span { display:block; height:100%; background:var(--bar); }
-    .row { display:flex; flex-wrap:wrap; gap:0.35rem 0.9rem; font-size:0.85rem; margin:0.35rem 0; }
-    .row b { font-variant-numeric:tabular-nums; }
-    .muted { color:var(--muted); font-size:0.85rem; }
-    .bad { color:var(--bad); } .warn { color:var(--warn); } .ok { color:var(--ok); }
-    h3 { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin:0.9rem 0 0.25rem; }
-    ul { margin:0; padding-left:1.1rem; font-size:0.85rem; }
-    code { background:var(--bg); padding:0 0.3em; border-radius:4px; font-size:0.8rem; }
-    h2.sec { font-size:1.05rem; margin:1.5rem 0 0.6rem; }
-    .deps a { color:var(--link); }
-  </style>
-</head>
-<body>
-<main>
-  <h1>Program overview</h1>
-  <p class="sub">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each card links to that project's own board. <a href="{{ work_url() }}">Edit features across projects</a>.</p>
+{% extends "base.html" %}
+{% block extra_styles %}
+    /* Program overview: the shared shell's tokens under the names this page's rules use. */
+    .prog { --muted:var(--color-text-secondary); --line:var(--color-border-muted); --link:var(--color-t3-blue); --bad:var(--gap); --warn:var(--color-amber-text); --ok:var(--live); --bar:var(--color-t3-blue); }
+    .prog .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(21rem, 1fr)); gap:16px; }
+    .prog .card h2 { font-size:16px; font-weight:600; margin:0; display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+    .prog .card h2 a { color:var(--link); text-decoration:none; }
+    .prog .role { color:var(--muted); font-size:14px; margin:2px 0 10px; }
+    .prog .bar { height:8px; background:var(--color-border-subtle); border-radius:4px; overflow:hidden; margin:6px 0; }
+    .prog .bar > span { display:block; height:100%; background:var(--bar); }
+    .prog .row { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:14px; margin:6px 0; }
+    .prog .row b { font-variant-numeric:tabular-nums; }
+    .prog .muted { color:var(--color-text-muted); font-size:13px; }
+    .prog .bad { color:var(--bad); } .prog .warn { color:var(--warn); } .prog .ok { color:var(--ok); }
+    .prog h3 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin:14px 0 4px; }
+    .prog ul { margin:0; padding-left:18px; font-size:14px; }
+    .prog code { background:var(--color-bg-surface); padding:0 5px; border-radius:4px; font-family:var(--font-mono); font-size:12px; }
+    .prog h2.sec { font-size:16px; font-weight:600; margin:24px 0 10px; }
+    .prog a { color:var(--link); }
+{% endblock %}
+{% block content %}
+<div class="prog">
+
+  <div class="page-header"><h1>Program overview</h1>
+  <p class="subtitle">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each card links to that project's own board. <a href="{{ work_url() }}">Edit features across projects</a>.</p></div>
   {% for key, why in nested_errors.items() %}<p class="bad">{{ "Nested programs" if key == "*" else "Nested program " ~ key }} could not be expanded: {{ why }}</p>{% endfor %}
   {% if initiatives_error %}<p class="bad">Program initiatives could not be read: {{ initiatives_error }}</p>{% endif %}
   {% if initiatives %}
@@ -128,6 +116,6 @@
     </section>
   {% endfor %}
   </div>
-</main>
-</body>
-</html>
+
+</div>
+{% endblock %}

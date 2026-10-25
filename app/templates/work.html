@@ -1,38 +1,27 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Program work</title>
-  <style>
-    :root { --bg:#fff; --fg:#1b1f24; --muted:#59636e; --line:#d1d9e0; --card:#f6f8fa; --link:#0b5cad;
-            --bad:#b42318; --warn:#9a6700; --ok:#1a7f37; }
-    @media (prefers-color-scheme: dark) { :root { --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --line:#30363d;
-            --card:#151b23; --link:#58a6ff; --bad:#ff7b72; --warn:#d29922; --ok:#3fb950; } }
-    body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-    main { max-width:84rem; margin:0 auto; padding:2rem 16px; }
-    h1 { font-size:1.4rem; margin:0 0 0.25rem; }
-    .sub { color:var(--muted); margin:0 0 1rem; font-size:0.9rem; }
-    a { color:var(--link); }
-    .filters { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0 0 1rem; }
-    select, input[type=text] { font:inherit; padding:0.25rem 0.4rem; border:1px solid var(--line); border-radius:6px;
-                               background:var(--bg); color:var(--fg); }
-    table { width:100%; border-collapse:collapse; font-size:0.9rem; }
-    th, td { text-align:left; padding:0.4rem 0.5rem; border-top:1px solid var(--line); vertical-align:top; }
-    th { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
-    td.notes input { width:100%; box-sizing:border-box; }
-    code { background:var(--card); padding:0 0.3em; border-radius:4px; font-size:0.8rem; }
-    .muted { color:var(--muted); } .bad { color:var(--bad); } .ok { color:var(--ok); } .warn { color:var(--warn); }
-    tr.saving { opacity:0.6; } tr.failed td.state { color:var(--bad); }
-    .scroll { overflow-x:auto; }
-  </style>
-</head>
-<body>
-<main>
-  <h1>Program work</h1>
-  <p class="sub">{{ rows | length }} features across {{ projects | length }} projects. Each change is saved to that project's own repository as you.
+{% extends "base.html" %}
+{% block extra_styles %}
+    /* Program work: the shared shell's tokens under the names this page's rules use. */
+    .prog { --muted:var(--color-text-secondary); --bad:var(--gap); --warn:var(--color-amber-text); --ok:var(--live); }
+    .prog a { color:var(--color-t3-blue); }
+    .prog .filters { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 16px; }
+    .prog .filters input[type=text] { width:auto; }
+    .prog table { font-size:14px; }
+    .prog td { vertical-align:top; }
+    .prog td.notes { min-width:24rem; }
+    .prog td.notes input, .prog td input[type=text] { width:100%; }
+    .prog code { background:var(--color-bg-surface); padding:0 5px; border-radius:4px; font-family:var(--font-mono); font-size:12px; }
+    .prog .muted { color:var(--color-text-muted); font-size:13px; }
+    .prog .bad { color:var(--bad); } .prog .ok { color:var(--ok); } .prog .warn { color:var(--warn); }
+    .prog tr.saving { opacity:0.6; } .prog tr.failed td.state { color:var(--bad); }
+    .prog .scroll { overflow-x:auto; }
+{% endblock %}
+{% block content %}
+<div class="prog">
+
+  <div class="page-header"><h1>Program work</h1>
+  <p class="subtitle">{{ rows | length }} features across {{ projects | length }} projects. Each change is saved to that project's own repository as you.
     <a href="{{ projects_url() }}">Back to the overview</a>.
-    {% if not can_write %}<span class="warn">Your role is read-only here.</span>{% endif %}</p>
+    {% if not can_write %}<span class="warn">Your role is read-only here.</span>{% endif %}</p></div>
   {% for key, err in errors.items() %}<p class="bad">{{ key }} could not be read: {{ err }}</p>{% endfor %}
   <div class="filters">
     <select id="f-project" aria-label="Project"><option value="">All projects</option>
@@ -63,7 +52,8 @@
     </tbody>
   </table>
   </div>
-</main>
+
+</div>
 <script>
 const BASE = '{{ projects_url() }}';
 const rows = [...document.querySelectorAll('tbody tr')];
@@ -105,5 +95,4 @@ rows.forEach(row => {
   });
 });
 </script>
-</body>
-</html>
+{% endblock %}

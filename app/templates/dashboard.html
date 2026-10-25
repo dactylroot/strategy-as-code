@@ -226,7 +226,7 @@ details[open] .chevron { transform: rotate(90deg); }
 {% block content %}
 <div class="page-header" style="display:flex;align-items:baseline;gap:2rem;flex-wrap:wrap;">
   {% if not embed_chrome %}<h1 style="flex-shrink:0;margin:0;">{{ product.title }}</h1>{% endif %}
-  {% if product.summary %}<p style="color:var(--color-text-secondary);font-size:0.875rem;line-height:1.6;margin:0;max-width:72ch;">{{ product.summary }}</p>{% endif %}
+  {% if product.summary %}<p style="color:var(--color-text-secondary);font-size:0.875rem;line-height:1.6;margin:0;max-width:72ch;">{{ product.summary | inline_markdown }}</p>{% endif %}
 </div>
 
 <!-- Feature Lifecycle Pipeline -->
@@ -323,7 +323,7 @@ details[open] .chevron { transform: rotate(90deg); }
     {% for area in product.wbs_areas %}
     <div style="display:flex;margin-bottom:6px;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
       <!-- Lane label -->
-      <div style="width:84px;min-width:84px;background:var(--color-text-primary);color:var(--color-bg-base);display:flex;align-items:center;
+      <div style="width:84px;min-width:84px;background:var(--color-bg-surface);color:var(--color-text-secondary);border-right:1px solid var(--color-border-subtle);display:flex;align-items:center;
                   justify-content:center;text-align:center;font-size:0.7rem;font-weight:700;
                   padding:8px;line-height:1.45;">
         {{ area.number }}.<br>{{ area.title | truncate(18, true, '…') }}
@@ -332,7 +332,7 @@ details[open] .chevron { transform: rotate(90deg); }
       <div style="display:flex;flex:1;gap:3px;background:var(--color-border-subtle);padding:3px;">
         {% for sa in area.sub_areas %}
         {% set pct = sa.completion_pct %}
-        <div style="flex:1;min-width:7rem;background:{{ pct | wbs_body_color }};
+        <div style="flex:1;min-width:7rem;background:var(--color-bg-card);
                     display:flex;flex-direction:column;border-radius:4px;overflow:hidden;">
           <!-- Section header -->
           <div style="background:{{ pct | wbs_header_color }};padding:5px 8px;min-height:38px;
