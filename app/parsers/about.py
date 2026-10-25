@@ -10,7 +10,8 @@ from ..models import (
 
 
 def parse(path: Path) -> AboutDoc:
-    text = path.read_text(encoding="utf-8")
+    # ABOUT.MD is optional (a project may have only PRODUCT.MD and BUGS.MD): no file reads as an empty changelog and roadmap.
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
     return _parse_text(text)
 
 

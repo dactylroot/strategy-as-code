@@ -155,6 +155,10 @@ class _SettingsProxy:
 
     @property
     def readme_md(self) -> Path:
+        # Projects spell it README.MD or README.md; the filesystem here is case sensitive.
+        for name in ("README.MD", "README.md", "Readme.md"):
+            if (self.project_dir / name).exists():
+                return self.project_dir / name
         return self.project_dir / "README.MD"
 
     @property

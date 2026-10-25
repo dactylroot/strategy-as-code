@@ -356,3 +356,20 @@ class TestAuthRoutes:
         client.post("/login", data={"username": "admin", "password": "secret", "next": "/dashboard"})
         r = client.get("/logout", follow_redirects=False)
         assert r.status_code == 303
+
+
+class TestProjectWithoutOptionalFiles:
+    """A project may have only PRODUCT.MD and BUGS.MD (Funnel, the hub); its pages must still load."""
+
+    def test_dashboard_without_about(self, client, tmp_project):
+        (tmp_project / "ABOUT.MD").unlink()
+        assert client.get("/dashboard").status_code == 200
+
+    def test_roadmap_without_about(self, client, tmp_project):
+        (tmp_project / "ABOUT.MD").unlink()
+        assert client.get("/roadmap").status_code == 200
+
+    def test_readme_in_lowercase_filename(self, client, tmp_project):
+        (tmp_project / "README.md").write_text("# Lowercase readme marker", encoding="utf-8")
+        r = client.get("/readme")
+        assert r.status_code == 200 and "Lowercase readme marker" in r.text

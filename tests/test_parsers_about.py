@@ -205,3 +205,9 @@ def test_rewrite_wbs_refs_only_touches_initiative_items():
     assert "- 3.1.1\n- prog:1.2.2\n- 1.2.20\n" in out
     assert "- 1.2.2 later" in out
     assert parser.transform_rewrite_wbs_refs("# x\n", "1.2.2", "3.1.1") == "# x\n"
+
+
+def test_parse_missing_file_is_empty(tmp_path):
+    # A project with only PRODUCT.MD and BUGS.MD (Funnel) has no ABOUT.MD; its dashboard must still load.
+    doc = parser.parse(tmp_path / "ABOUT.MD")
+    assert doc.changelog == [] and doc.roadmap == []
