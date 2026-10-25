@@ -19,9 +19,7 @@
 <div class="prog">
 
   <div class="page-header"><h1>Program work</h1>
-  <p class="subtitle">{{ rows | length }} features across {{ projects | length }} projects. Each change is saved to that project's own repository as you.
-    <a href="{{ projects_url() }}">Back to the overview</a>.
-    {% if not can_write %}<span class="warn">Your role is read-only here.</span>{% endif %}</p></div>
+  {% if not can_write %}<p class="subtitle"><span class="warn">Your role is read-only here.</span></p>{% endif %}</div>
   {% for key, err in errors.items() %}<p class="bad">{{ key }} could not be read: {{ err }}</p>{% endfor %}
   <div class="filters">
     <select id="f-project" aria-label="Project"><option value="">All projects</option>
