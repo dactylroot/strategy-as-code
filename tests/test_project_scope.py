@@ -81,7 +81,7 @@ def test_links_and_fetches_carry_the_project_prefix(client, program):
     assert 'href="/p/alpha/features"' in page
     assert "/p/alpha/api/" in page
     assert 'href="/p"' in page                      # brand links to the project index
-    assert "Saved changes are committed to" in page and "its default branch" in page
+    assert "Saved changes are committed to" not in page
 
 
 def test_project_root_redirects_to_dashboard(client, program):
