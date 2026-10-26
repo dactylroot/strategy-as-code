@@ -429,3 +429,43 @@ def test_work_page_reports_a_broken_project_without_losing_the_rest(client, prog
 def test_work_is_404_without_a_program(client):
     scope.set_registry(None)
     assert client.get("/work").status_code == 404
+
+
+def test_program_action_commits_once_per_project_and_reports_each(client, program):
+    run = lambda **body: client.post("/api/program/features/action", json=body)
+    before = {k: run_git(origin_of(program, k), ["rev-parse", "main"]) for k in ("alpha", "beta")}
+    r = run(targets=[{"project": "alpha", "wbs": "1.2.3"}, {"project": "alpha", "wbs": "1.1.2"},
+                     {"project": "beta", "wbs": "1.2.3"}], status="In-Progress", owner="Ada")
+    assert r.status_code == 200 and r.json()["ok"] is True
+    results = {x["project"]: x for x in r.json()["results"]}
+    assert results["alpha"]["wbs"] == ["1.2.3", "1.1.2"] and results["alpha"]["changed"] and results["beta"]["changed"]
+    for key, subdir in (("alpha", ""), ("beta", "plan")):
+        text = remote_text(program, key, "PRODUCT.MD", subdir=subdir)
+        assert "| 1.2.3 | Export | In-Progress |" in text and "Ada" in text
+        assert len(run_git(origin_of(program, key), ["rev-list", f"{before[key]}..main"]).split()) == 1
+
+
+def test_program_action_partial_failure_is_reported_and_the_rest_still_land(client, program):
+    r = client.post("/api/program/features/action", json={
+        "targets": [{"project": "alpha", "wbs": "1.2.3"}, {"project": "beta", "wbs": "9.9.9"},
+                    {"project": "nope", "wbs": "1.1.1"}], "status": "In-Progress"})
+    assert r.status_code == 200 and r.json()["ok"] is False and r.json()["failed"] == 2
+    results = {x["project"]: x for x in r.json()["results"]}
+    assert results["alpha"]["ok"] and not results["beta"]["ok"] and "9.9.9" in results["beta"]["error"]
+    assert "unknown project" in results["nope"]["error"]
+    assert "| 1.2.3 | Export | In-Progress |" in remote_text(program, "alpha", "PRODUCT.MD")
+    assert "| 1.2.3 | Export | Idea |" in remote_text(program, "beta", "PRODUCT.MD", subdir="plan")
+
+
+def test_program_action_needs_targets_a_change_and_the_program_scope(client, program):
+    assert client.post("/api/program/features/action", json={"targets": [], "status": "Live"}).status_code == 400
+    assert client.post("/api/program/features/action",
+                       json={"targets": [{"project": "alpha", "wbs": "1.1.1"}]}).status_code == 400
+    assert client.post("/p/alpha/api/program/features/action",
+                       json={"targets": [{"project": "alpha", "wbs": "1.1.1"}], "status": "Live"}).status_code == 404
+
+
+def test_work_page_offers_selection_and_the_program_action(client, program):
+    page = client.get("/work").text
+    assert 'id="pick-all"' in page and page.count('class="pick-row"') == page.count("data-wbs=")
+    assert "/api/program/features/action" in page and 'id="b-apply"' in page

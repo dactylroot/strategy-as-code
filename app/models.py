@@ -294,6 +294,18 @@ class FeatureUpdate(BaseModel):
     uat_confirmed: bool | None = None
 
 
+class ProgramTarget(BaseModel):
+    project: str
+    wbs: str
+
+
+class ProgramFeatureAction(BaseModel):
+    targets: list[ProgramTarget]
+    status: FeatureStatus | None = None
+    owner: str | None = None
+    flagged: bool | None = None
+
+
 class NewFeature(BaseModel):
     wbs_prefix: str
     name: str

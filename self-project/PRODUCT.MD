@@ -190,6 +190,76 @@ Reads the roadmap and changelog to understand what is shipping and when. Accesse
 | 3.5.1 | Incremental file autosave | Idea | | | Reduce data loss window for disk-mode projects |
 | 3.5.2 | Git branch auto-commit | Idea | | | Commit file changes to a tracking branch when the project dir is a git repo |
 
+### 4. Program Recursion
+
+#### 4.1 Manifest and References
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 4.1.1 | PROGRAM.MD parser | Live | 9 | 3 | Reads the Projects table (key, repo or path, role, depends on, mode) and program initiatives |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.1.2 | Cross-project references | Live | 9 | 3 | `project:WBS` resolves against the member project's parsed PRODUCT.MD; unresolved references are reported, not dropped |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.1.3 | Dependency graph and blocked detection | Live | 7 | 4 | A project is flagged when a dependency's required feature is not yet Live; cycles rejected |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.1.4 | Program initiatives | Live | 8 | 3 | Major or Minor, completing when every referenced feature is Live or Released |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.1.5 | Nested programs | Live | 5 | 4 | A manifest row with Kind = program is a nested program: its own PROGRAM.MD is read and its projects are listed as <row key>.<project key>. A program that would contain itself (same repository and folder further up) is refused; the depth limit is PROGRAM_NESTED_DEPTH (default 3). Re-read on every poll |  |  |  | 2026-10-26 | 2026-10-26 |
+
+#### 4.2 Project Registry
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 4.2.1 | Project registry | Live | 9 | 5 | Replaces the single global `project_dir`; each project has its own clone, lock and status |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.2.2 | Project-scoped routes | Live | 8 | 5 | Existing pages and API are served under /p/<key>/ for a member project (read-only for now: writes return 403 until edits go through the shared writer). A request-scoped context switches the project directory, title and link prefix; /p lists the projects. |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.2.3 | Single-project compatibility | Live | 7 | 2 | A directory without a manifest runs exactly as today |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.2.4 | SHA-keyed parse cache | Live | 6 | 3 | Re-parse only when a project's commit changes |  |  |  | 2026-10-26 | 2026-10-26 |
+
+#### 4.3 Git as Source of Truth
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 4.3.1 | Pull-transform-push writer | Live | 10 | 6 | Per-project lock; fetch and reset the clone, apply the transform to current content, commit as the actor, push as a fast-forward, retry up to 3 times |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.3.2 | Direct and branch commit modes | Live | 8 | 4 | Per-project setting. Direct mode pushes the default branch; branch mode pushes a planning branch and keeps one pull request to the default branch open, refreshing its description on every push (`strategy pr` does it on demand) |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.3.3 | Actor attribution | Live | 7 | 2 | Commit author is the hub user's email; the service identity is the committer |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.3.4 | Poller and webhook reads | Live | 8 | 4 | Fetch every 30 to 60 seconds; a webhook triggers an immediate fetch; both are idempotent |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.3.5 | Sync status panel | Live | 7 | 3 | Last fetch, last push, current SHA and last error per project; one failing repo never blocks the rest |  |  |  | 2026-10-26 | 2026-10-26 |
+
+#### 4.4 Merge Driver and CLI
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 4.4.1 | Field-level merge driver | Live | 9 | 6 | `.gitattributes` driver for PRODUCT.MD and BUGS.MD; merges by row key, then field by field with precedence rules (Released over Live over In-Progress over Idea; Closed over Resolved over Investigating over Open) |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.4.2 | Field ownership rules | Idea | 7 | 3 | The UI lets reporters edit only title and description, developers status and fix fields, maintainers severity and WBS |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.4.3 | `strategy` CLI | Live | 9 | 5 | Commands for bug, feature, release and triage that use the shared writer; no hand editing on feature branches |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.4.4 | Skill uses the CLI | Live | 8 | 3 | /program-strategy stops editing planning files in the working tree and calls the CLI; on a feature branch it commits no planning files |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.4.5 | Pending-deploy marker | Idea | 5 | 3 | A Live or Resolved row shows as pending until its code commit is on the deploy branch |  |  |  | 2026-10-26 | 2026-10-26 |
+
+#### 4.5 Inbox
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 4.5.1 | Inbox files | Live | 9 | 3 | One file per submission in `.planning/inbox/`, with frontmatter (submitter, type, created); never edited after writing |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.5.2 | Submit form | Live | 8 | 3 | Bug or feature request from the UI; rate limited and size capped; content escaped when rendered |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.5.3 | Promote, decline and duplicate | Live | 9 | 4 | One commit adds the row with the next ID, removes the file and records the reason or duplicate ID in the message |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.5.4 | Stale flagging and archive | Live | 5 | 2 | Flag after 14 days; every project is swept daily (PROGRAM_SWEEP_SECONDS) and items untriaged for 60 days move to `inbox/archive/`, one commit per project |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.5.5 | Screenshot hand-off | Live | 6 | 2 | The web inbox form attaches a PNG, JPEG or GIF (up to 5 MB); promotion renames it to `.screenshots/bug_<ID>` |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.5.6 | Idempotent triage | Live | 7 | 2 | A retried promotion that finds the row already present only removes the file |  |  |  | 2026-10-26 | 2026-10-26 |
+
+#### 4.6 Overview and Editing
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 4.6.1 | Program Overview | Live | 9 | 5 | Progress by project and initiative, blocked dependencies, sync health |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.6.2 | Cross-project roadmap | Live | 8 | 4 | Initiatives with member features grouped by project |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.6.3 | Bug rollup | Live | 7 | 3 | Open and Resolved bugs by project and severity |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.6.4 | Needs-triage counts | Live | 7 | 2 | Inbox size and oldest item per project |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.6.5 | Cross-project editing | Live | 9 | 6 | Per-project pages under /p/key and the program page /work edit features of every project, each change saved to that project own repository as the user |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.6.6 | Multi-project actions | Live | 6 | 4 | The program work page applies a status, owner or flag change to selected features of several projects. Each project gets its own commit and push, every project's result is listed, and a failing project does not stop the others. |  |  |  | 2026-10-26 | 2026-10-26 |
+
+#### 4.7 Program-aware Skill
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 4.7.1 | Manifest awareness in the skill | Live | 7 | 3 | /program-strategy reads PROGRAM.MD when asked about program scope |  |  |  | 2026-10-26 | 2026-10-26 |
+| 4.7.2 | Bounded recursion | Live | 5 | 3 | `strategy deps` walks Depends On depth-first with cycle detection and a depth cap of 3, enforced in code; the skill uses it. A project own files are never edited unless asked |  |  |  | 2026-10-26 | 2026-10-26 |
+
 ## Known Gaps for Team Discussion
 
 ### WBS Chart Generation
@@ -200,3 +270,15 @@ No structured way to map features to OKRs or goals. A lightweight OKR section in
 
 ### PRD Generation
 The skill can describe features but cannot yet produce a structured PRD document. Adding a /prd command that generates a stakeholder-ready document from PRODUCT.MD would reduce the handoff cost for feature requests.
+
+### Commit mode per project (WBS 4.3.2)
+Direct commits to a project's main branch are simplest but fail where main is protected, and Renewals deploys from `production` on push. Branch mode with a pull request is safer but reintroduces a human step. Decide per project, and decide whether planning-only commits should skip deploy CI.
+
+### GitHub web merges do not run merge drivers (WBS 4.4.1)
+A custom merge driver works for local merges and the service's own writer, but GitHub's merge button falls back to text merging. The plan is to keep planning files out of code pull requests (WBS 4.4.3, 4.4.4); the driver is a safety net, not the main defense.
+
+### Live before deployed (WBS 4.4.5)
+A developer who records Resolved or Live on the main line makes the UI show the new state before the code is deployed. The pending-deploy marker covers this, but the rule for when a status counts as deployed needs agreement.
+
+### Where hosted clones live (WBS 4.2.1)
+The service needs a persistent volume for clones. They are a cache and can be rebuilt from the repositories, but a cold start with many projects delays the first read. Decide the volume and whether to warm it at start.

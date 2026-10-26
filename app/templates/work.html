@@ -14,6 +14,10 @@
     .prog .bad { color:var(--bad); } .prog .ok { color:var(--ok); } .prog .warn { color:var(--warn); }
     .prog tr.saving { opacity:0.6; } .prog tr.failed td.state { color:var(--bad); }
     .prog .scroll { overflow-x:auto; }
+    .prog .bulk { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 16px; }
+    .prog .bulk input[type=text] { width:auto; }
+    .prog .results { margin:0 0 16px; padding-left:18px; font-size:14px; }
+    .prog td.pick, .prog th.pick { width:1%; }
 {% endblock %}
 {% block content %}
 <div class="prog">
@@ -29,13 +33,24 @@
     <input type="text" id="f-text" placeholder="Search name, WBS, owner, notes" aria-label="Search" size="30">
     <span class="muted" id="f-count"></span>
   </div>
+  {% if can_write %}
+  <div class="bulk">
+    <span class="muted" id="b-count">0 selected</span>
+    <select id="b-status" aria-label="Status"><option value="">Status</option>
+      {% for s in ['Idea', 'In-Progress', 'Live', 'Released'] %}<option>{{ s }}</option>{% endfor %}</select>
+    <input type="text" id="b-owner" placeholder="Owner" aria-label="Owner" size="14">
+    <button type="button" id="b-apply">Apply</button>
+  </div>
+  <ul class="results" id="b-results" aria-live="polite" hidden></ul>
+  {% endif %}
   <div class="scroll">
   <table>
-    <thead><tr><th>Project</th><th>WBS</th><th>Feature</th><th>Status</th><th>Owner</th><th>Notes</th><th></th></tr></thead>
+    <thead><tr>{% if can_write %}<th class="pick"><input type="checkbox" id="pick-all" aria-label="Select shown"></th>{% endif %}<th>Project</th><th>WBS</th><th>Feature</th><th>Status</th><th>Owner</th><th>Notes</th><th></th></tr></thead>
     <tbody>
     {% for r in rows %}
     <tr data-project="{{ r.project }}" data-wbs="{{ r.wbs }}" data-stage="{{ r.stage }}"
         data-text="{{ (r.wbs ~ ' ' ~ r.name ~ ' ' ~ r.owner ~ ' ' ~ r.notes) | lower }}">
+      {% if can_write %}<td class="pick"><input type="checkbox" class="pick-row" aria-label="Select {{ r.project }} {{ r.wbs }}"></td>{% endif %}
       <td><a href="{{ projects_url() }}/{{ r.project }}/features">{{ r.project }}</a></td>
       <td><code>{{ r.wbs }}</code></td>
       <td>{{ r.name }}{% if r.flagged %} <span class="warn" title="Flagged as a gap">&#9873;</span>{% endif %}<div class="muted">{{ r.area }}</div></td>
@@ -79,12 +94,53 @@ async function save(row, field, input) {
     if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail || d; } catch (e) {} throw new Error(d); }
     input.dataset.orig = input.value;
     if (field === 'status') { row.dataset.stage = input.value; }
-    row.dataset.text = [row.dataset.wbs, row.children[2].firstChild.textContent, row.querySelector('.f-owner').value,
+    row.dataset.text = [row.dataset.wbs, row.querySelector('td:nth-last-child(5)').firstChild.textContent, row.querySelector('.f-owner').value,
                         row.querySelector('.f-notes').value].join(' ').toLowerCase();
     state.textContent = 'saved';
   } catch (err) {
     input.value = input.dataset.orig; row.classList.add('failed'); state.textContent = err.message;
   } finally { row.classList.remove('saving'); }
+}
+
+const picks = rows.map(r => r.querySelector('.pick-row')).filter(Boolean);
+const chosen = () => rows.filter(r => { const c = r.querySelector('.pick-row'); return c && c.checked && !r.hidden; });
+function refreshBulk() {
+  const n = chosen().length;
+  document.getElementById('b-count').textContent = n + ' selected';
+  document.getElementById('b-apply').hidden = !n || !(document.getElementById('b-status').value || document.getElementById('b-owner').value.trim());
+}
+if (picks.length) {
+  refreshBulk();
+  picks.forEach(c => c.addEventListener('change', refreshBulk));
+  document.getElementById('pick-all').addEventListener('change', e => {
+    rows.forEach(r => { if (!r.hidden) r.querySelector('.pick-row').checked = e.target.checked; }); refreshBulk();
+  });
+  ['f-project', 'f-stage'].forEach(id => document.getElementById(id).addEventListener('change', refreshBulk));
+  document.getElementById('f-text').addEventListener('input', refreshBulk);
+  ['b-status', 'b-owner'].forEach(id => document.getElementById(id).addEventListener('input', refreshBulk));
+  document.getElementById('b-apply').addEventListener('click', async () => {
+    const picked = chosen(), status = document.getElementById('b-status').value, owner = document.getElementById('b-owner').value.trim();
+    const body = {targets: picked.map(r => ({project: r.dataset.project, wbs: r.dataset.wbs}))};
+    if (status) body.status = status;
+    if (owner) body.owner = owner;
+    const out = document.getElementById('b-results'), apply = document.getElementById('b-apply');
+    apply.hidden = true; out.hidden = false; out.textContent = '';
+    const line = (cls, text) => { const li = document.createElement('li'); li.className = cls; li.textContent = text; out.append(li); };
+    try {
+      const r = await fetch(BASE.replace(/\/p$/, '') + '/api/program/features/action',
+        {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || r.statusText);
+      const failed = new Set(data.results.filter(x => !x.ok).map(x => x.project));
+      data.results.forEach(x => line(x.ok ? 'ok' : 'bad', x.project + ' ' + x.wbs.join(', ') + ': ' + (x.ok ? 'saved' : x.error)));
+      picked.filter(r => !failed.has(r.dataset.project)).forEach(row => {
+        if (status) { row.querySelector('.f-status').value = status; row.querySelector('.f-status').dataset.orig = status; row.dataset.stage = status; }
+        if (owner) { row.querySelector('.f-owner').value = owner; row.querySelector('.f-owner').dataset.orig = owner; }
+        row.querySelector('.pick-row').checked = false;
+      });
+    } catch (err) { line('bad', err.message); }
+    refreshBulk();
+  });
 }
 rows.forEach(row => {
   [['.f-status', 'status'], ['.f-owner', 'owner'], ['.f-notes', 'notes']].forEach(([sel, field]) => {

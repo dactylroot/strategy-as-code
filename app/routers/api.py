@@ -684,3 +684,28 @@ def decline_inbox(request: Request, item_id: str, req: InboxDecline):
     except inbox_lib.InboxError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"ok": True}
+
+
+# ── Program-wide actions ─────────────────────────────────────────────────────
+
+from starlette.concurrency import run_in_threadpool  # noqa: E402
+from .. import program_actions                       # noqa: E402
+from ..models import ProgramFeatureAction            # noqa: E402
+
+
+@router.post("/program/features/action")
+async def program_feature_action(body: ProgramFeatureAction, request: Request):
+    """Set status, owner or flag on features of several projects. Each project is committed on its own;
+    the response lists every project's outcome, so a partial success shows which ones did not go through."""
+    registry = _scope.get_registry()
+    if registry is None or _scope.scope_key():
+        raise HTTPException(status_code=404, detail="Program actions are only available on the program.")
+    action = program_actions.FeatureAction(body.status, body.owner, body.flagged)
+    if action.is_empty() or not body.targets:
+        raise HTTPException(status_code=400, detail="Choose features and a change to make.")
+    if body.owner is not None and ("|" in body.owner or len(body.owner.splitlines()) > 1):
+        raise HTTPException(status_code=400, detail="Owner cannot contain '|' or span multiple lines")
+    results = await run_in_threadpool(
+        program_actions.run, registry, [(t.project, t.wbs) for t in body.targets], action, request_actor(request))
+    return {"results": [r.as_dict() for r in results],
+            "ok": all(r.ok for r in results), "failed": sum(not r.ok for r in results)}
