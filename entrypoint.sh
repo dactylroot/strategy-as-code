@@ -54,4 +54,4 @@ if [ -n "${GIT_REPO_URL}" ] && [ -d "${PROJECT_DIR}/.git" ]; then
         || git -C "${PROJECT_DIR}" remote set-url "${SYNC_REMOTE}" "${AUTH_REPO_URL}"
 fi
 
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --reload
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
