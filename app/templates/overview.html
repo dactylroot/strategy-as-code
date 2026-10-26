@@ -4,25 +4,64 @@
     .prog { --muted:var(--color-text-secondary); --line:var(--color-border-muted); --link:var(--color-t3-blue); --bad:var(--gap); --warn:var(--color-amber-text); --ok:var(--live); --bar:var(--color-t3-blue); }
     .prog .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(21rem, 1fr)); gap:16px; }
     .prog .card h2 { font-size:16px; font-weight:600; margin:0; display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
-    .prog .card h2 a { color:var(--link); text-decoration:none; }
-    .prog .role { color:var(--muted); font-size:14px; margin:2px 0 10px; }
     .prog .bar { height:8px; background:var(--color-border-subtle); border-radius:4px; overflow:hidden; margin:6px 0; }
     .prog .bar > span { display:block; height:100%; background:var(--bar); }
     .prog .row { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:14px; margin:6px 0; }
-    .prog .row b { font-variant-numeric:tabular-nums; }
     .prog .muted { color:var(--color-text-muted); font-size:13px; }
     .prog .bad { color:var(--bad); } .prog .warn { color:var(--warn); } .prog .ok { color:var(--ok); }
-    .prog h3 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin:14px 0 4px; }
+    .prog h3 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin:12px 0 4px; }
+    .prog h3:first-child { margin-top:0; }
     .prog ul { margin:0; padding-left:18px; font-size:14px; }
     .prog code { background:var(--color-bg-surface); padding:0 5px; border-radius:4px; font-family:var(--font-mono); font-size:12px; }
     .prog h2.sec { font-size:16px; font-weight:600; margin:24px 0 10px; }
+    /* Totals strip */
+    .prog .totals { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
+    .prog .total { flex:1 1 7.5rem; background:var(--color-bg-card); border:1px solid var(--line); border-radius:var(--radius); padding:8px 12px; }
+    .prog .total b { display:block; font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.2; }
+    .prog .total span { font-size:12px; color:var(--muted); }
+    /* One row per project */
+    .prog .tools { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 8px; }
+    .prog .legend { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12px; color:var(--muted); }
+    .prog .legend i, .prog .key i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+    .prog .tablewrap { overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--color-bg-card); }
+    .prog table.pt { width:100%; border-collapse:collapse; font-size:14px; min-width:56rem; }
+    .prog .pt th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+    .prog .pt td { padding:8px 10px; border-bottom:1px solid var(--color-border-subtle); vertical-align:middle; }
+    .prog .pt tr.proj:last-of-type td, .prog .pt tbody:last-child tr:last-child td { border-bottom:0; }
+    .prog .pt .num { text-align:right; font-variant-numeric:tabular-nums; }
+    .prog .pt td.name { white-space:nowrap; }
+    .prog .pt td.name a { font-weight:600; text-decoration:none; }
+    .prog .pt td.name .sub { display:block; font-size:12px; color:var(--color-text-muted); max-width:16rem; overflow:hidden; text-overflow:ellipsis; }
+    .prog .stack { display:flex; height:10px; border-radius:5px; overflow:hidden; background:var(--color-border-subtle); min-width:9rem; }
+    .prog .stack > span { display:block; height:100%; }
+    .prog .pct { font-weight:600; font-variant-numeric:tabular-nums; min-width:3ch; display:inline-block; }
+    .prog .prog-cell { display:flex; align-items:center; gap:10px; }
+    .prog .prog-cell .stack { flex:1; }
+    .prog .chip { display:inline-block; font-size:12px; padding:1px 8px; border-radius:999px; border:1px solid var(--line); margin:1px 4px 1px 0; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .prog .chip.warn { background:var(--color-amber-bg); border-color:var(--color-amber-border); }
+    .prog .chip.bad { background:var(--gap-bg); border-color:var(--gap-border); }
+    .prog .chip.ok { background:var(--live-bg); border-color:var(--live-border); }
+    .prog .dash { color:var(--color-text-muted); }
+    .prog .tog { background:none; border:0; color:var(--muted); cursor:pointer; padding:2px 6px; border-radius:4px; font:inherit; }
+    .prog .tog:hover { background:var(--action-hover); }
+    .prog .tog .chev { display:inline-block; transition:transform .12s; }
+    .prog .tog[aria-expanded="true"] .chev { transform:rotate(90deg); }
+    .prog tr.detail > td { background:var(--color-bg-surface); padding:12px 16px 14px 40px; }
+    .prog tr.detail[hidden] { display:none; }
+    .prog .dgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(15rem, 1fr)); gap:4px 28px; }
+    .prog .dgrid .full { grid-column:1 / -1; }
+    .prog .stage-1 { background:var(--color-text-muted); opacity:.55; }
+    .prog .stage-2 { background:var(--color-purple); }
+    .prog .stage-3 { background:var(--color-amber); }
+    .prog .stage-4 { background:var(--color-t3-blue); }
+    .prog .stage-5 { background:var(--live); }
     .prog a { color:var(--link); }
 {% endblock %}
 {% block content %}
 <div class="prog">
 
   <div class="page-header"><h1>Program overview</h1>
-  <p class="subtitle">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each card links to that project's own board. <a href="{{ work_url() }}">Edit features across projects</a>.</p></div>
+  <p class="subtitle">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each row links to that project's own board; expand a row for detail. <a href="{{ work_url() }}">Edit features across projects</a>.</p></div>
   {% for key, why in nested_errors.items() %}<p class="bad">{{ "Nested programs" if key == "*" else "Nested program " ~ key }} could not be expanded: {{ why }}</p>{% endfor %}
   {% if initiatives_error %}<p class="bad">Program initiatives could not be read: {{ initiatives_error }}</p>{% endif %}
   {% if initiatives %}
@@ -47,75 +86,157 @@
   </div>
   <h2 class="sec">Projects</h2>
   {% endif %}
-  <div class="grid">
-  {% for p in projects %}
-    <section class="card" id="{{ p.key }}">
-      <h2><a href="{{ projects_url() }}/{{ p.key }}/dashboard">{{ p.key }}</a>
-        {% if p.version %}<span class="muted">v{{ p.version }}</span>{% endif %}</h2>
-      <div class="role">{{ p.role or p.title }}{% if p.parent %} <span class="muted">· in {{ p.parent }}</span>{% endif %}</div>
-      {% if p.error %}
-        <div class="bad">{{ p.error }}</div>
-      {% else %}
-        <div class="row"><span><b>{{ p.done_pct }}%</b> live or released</span><span class="muted">{{ p.total }} features</span></div>
-        <div class="bar" role="img" aria-label="{{ p.done_pct }}% of features live or released"><span style="width:{{ p.done_pct }}%"></span></div>
-        <div class="row">
-          {% for st in stages %}{% if p.features.get(st) %}<span>{{ st }} <b>{{ p.features[st] }}</b></span>{% endif %}{% endfor %}
-        </div>
-        {% if p.awaiting_uat or p.flagged %}
-        <div class="row">
-          {% if p.awaiting_uat %}<span class="warn"><b>{{ p.awaiting_uat }}</b> awaiting UAT</span>{% endif %}
-          {% if p.flagged %}<span class="warn"><b>{{ p.flagged }}</b> flagged</span>{% endif %}
-        </div>
-        {% endif %}
-        {% if p.blocked %}
-          <h3>Blocked</h3>
-          <ul class="warn">{% for b in p.blocked %}<li>{{ b }}</li>{% endfor %}</ul>
-        {% endif %}
-        <h3>Bugs</h3>
-        {% if p.bug_total %}
-          <div class="row">
-            {% for st, n in p.bug_status.items() %}{% if n %}<span>{{ st }} <b>{{ n }}</b></span>{% endif %}{% endfor %}
-          </div>
-          <div class="row">
-            {% for sev, n in p.bugs.items() %}{% if n %}<span class="{{ 'bad' if sev in ('Critical','High') else '' }}">{{ sev }} <b>{{ n }}</b></span>{% endif %}{% endfor %}
-          </div>
-        {% else %}<div class="muted">No active bugs</div>{% endif %}
-        <h3>Needs triage</h3>
-        {% if p.inbox_count %}
-          <div class="row"><a href="{{ projects_url() }}/{{ p.key }}/inbox"><b>{{ p.inbox_count }}</b> waiting</a>
-            <span class="muted">oldest {{ p.inbox_oldest_days }}d</span>
-            {% if p.inbox_stale %}<span class="warn"><b>{{ p.inbox_stale }}</b> stale</span>{% endif %}</div>
-        {% else %}<div class="muted">Inbox is empty</div>{% endif %}
-        {% if p.initiatives %}
-          <h3>Initiatives</h3>
-          <ul>{% for name, kind, done, total in p.initiatives %}
-            <li>{{ name }} <span class="muted">({{ kind }})</span> <b class="{{ 'ok' if total and done == total else '' }}">{{ done }}/{{ total }}</b></li>
-          {% endfor %}</ul>
-        {% endif %}
-        {% if p.in_progress %}
-          <h3>In progress</h3>
-          <ul>{% for wbs, name, owner in p.in_progress[:5] %}
-            <li><code>{{ wbs }}</code> {{ name }}{% if owner %} <span class="muted">{{ owner }}</span>{% endif %}</li>
-          {% endfor %}{% if p.in_progress | length > 5 %}<li class="muted">and {{ p.in_progress | length - 5 }} more</li>{% endif %}</ul>
-        {% endif %}
-      {% endif %}
-      {% if p.depends_on or p.required_by %}
-        <h3>Dependencies</h3>
-        <div class="row deps">
-          {% if p.depends_on %}<span>Depends on {% for d in p.depends_on %}<a href="#{{ d }}">{{ d }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
-          {% if p.required_by %}<span>Needed by {% for d in p.required_by %}<a href="#{{ d }}">{{ d }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
-        </div>
-      {% endif %}
-      <div class="muted" style="margin-top:0.7rem">
-        {% if p.last_fetch_age is not none %}fetched {{ p.last_fetch_age }}s ago{% endif %}
-        {% if p.last_push_age is not none %} · last write {{ p.last_push_age }}s ago{% endif %}<br>
-        {{ p.mode }}{% if p.branch %} · <code>{{ p.branch }}</code>{% endif %}{% if p.pr_url %} · <a href="{{ p.pr_url }}" target="_blank" rel="noopener">pull request</a>{% endif %}{% if p.sha %} · <code>{{ p.sha }}</code>{% endif %}
-        {% if p.stale %}<span class="warn"> · could not refresh, showing older data</span>{% endif %}
-        {% if p.sync_error and not p.error %}<div class="bad">last sync error: {{ p.sync_error }}</div>{% endif %}
-      </div>
-    </section>
+  {% set ok_projects = projects | rejectattr('error') | list %}
+  {% set tot = namespace(f=0, done=0, uat=0, flagged=0, bugs=0, hi=0, inbox=0, blocked=0) %}
+  {% for p in ok_projects %}
+    {% set tot.f = tot.f + p.total %}{% set tot.done = tot.done + p.features.get('Live', 0) + p.features.get('Released', 0) %}
+    {% set tot.uat = tot.uat + p.awaiting_uat %}{% set tot.flagged = tot.flagged + p.flagged %}
+    {% set tot.bugs = tot.bugs + p.bug_total %}{% set tot.hi = tot.hi + p.bugs.get('Critical', 0) + p.bugs.get('High', 0) %}
+    {% set tot.inbox = tot.inbox + p.inbox_count %}{% set tot.blocked = tot.blocked + (p.blocked | length) %}
   {% endfor %}
+  <div class="totals">
+    <div class="total"><b>{{ (100 * tot.done / tot.f) | round | int if tot.f else 0 }}%</b><span>live or released · {{ tot.done }}/{{ tot.f }} features</span></div>
+    <div class="total"><b class="{{ 'warn' if tot.uat }}">{{ tot.uat }}</b><span>awaiting UAT</span></div>
+    <div class="total"><b class="{{ 'warn' if tot.blocked }}">{{ tot.blocked }}</b><span>blocked</span></div>
+    <div class="total"><b class="{{ 'bad' if tot.hi }}">{{ tot.bugs }}</b><span>active bugs · {{ tot.hi }} critical or high</span></div>
+    <div class="total"><b>{{ tot.inbox }}</b><span>waiting for triage</span></div>
   </div>
+
+  <div class="tools">
+    <div class="legend" aria-label="Stage colours">
+      {% for st in stages %}<span><i class="stage-{{ loop.index }}"></i>{{ st }}</span>{% endfor %}
+    </div>
+    <button type="button" class="btn btn-ghost" id="toggle-all" data-open="0">Expand all</button>
+  </div>
+
+  <div class="tablewrap">
+  <table class="pt">
+    <thead><tr>
+      <th></th><th>Project</th><th>Progress</th><th class="num">Features</th><th>Needs attention</th><th>Bugs</th><th>Triage</th>
+    </tr></thead>
+    {% for p in projects %}
+    <tbody id="{{ p.key }}">
+    <tr class="proj">
+      <td><button type="button" class="tog" aria-expanded="false" aria-controls="d-{{ p.key }}" aria-label="Details for {{ p.key }}"><span class="chev">&#9656;</span></button></td>
+      <td class="name"><a href="{{ projects_url() }}/{{ p.key }}/dashboard">{{ p.key }}</a>{% if p.version %} <span class="muted">v{{ p.version }}</span>{% endif %}
+        <span class="sub">{{ p.role or p.title }}{% if p.parent %} · in {{ p.parent }}{% endif %}</span></td>
+      {% if p.error %}
+      <td colspan="5" class="bad">{{ p.error }}</td>
+      {% else %}
+      <td>
+        <div class="prog-cell">
+          <span class="pct">{{ p.done_pct }}%</span>
+          <div class="stack" role="img" aria-label="{{ p.done_pct }}% live or released; {% for st in stages %}{{ p.features.get(st, 0) }} {{ st }}{{ ', ' if not loop.last }}{% endfor %}">
+            {% for st in stages %}{% set n = p.features.get(st, 0) %}{% if n and p.total %}<span class="stage-{{ loop.index }}" style="width:{{ 100 * n / p.total }}%" title="{{ st }} {{ n }}"></span>{% endif %}{% endfor %}
+          </div>
+        </div>
+      </td>
+      <td class="num">{{ p.total }}</td>
+      <td>
+        {% if p.blocked %}<span class="chip warn">{{ p.blocked | length }} blocked</span>{% endif %}
+        {% if p.awaiting_uat %}<span class="chip warn">{{ p.awaiting_uat }} awaiting UAT</span>{% endif %}
+        {% if p.flagged %}<span class="chip warn">{{ p.flagged }} flagged</span>{% endif %}
+        {% if not (p.blocked or p.awaiting_uat or p.flagged) %}<span class="dash">&ndash;</span>{% endif %}
+      </td>
+      <td>
+        {% if p.bug_total %}
+          {% set hi = p.bugs.get('Critical', 0) + p.bugs.get('High', 0) %}
+          <span class="chip {{ 'bad' if hi }}">{{ p.bug_total }} active{% if hi %} · {{ hi }} high+{% endif %}</span>
+        {% else %}<span class="dash">&ndash;</span>{% endif %}
+      </td>
+      <td>
+        {% if p.inbox_count %}<a href="{{ projects_url() }}/{{ p.key }}/inbox" class="chip {{ 'warn' if p.inbox_stale }}">{{ p.inbox_count }} waiting · oldest {{ p.inbox_oldest_days }}d</a>
+        {% else %}<span class="dash">&ndash;</span>{% endif %}
+      </td>
+      {% endif %}
+    </tr>
+    <tr class="detail" id="d-{{ p.key }}" hidden>
+      <td></td>
+      <td colspan="6">
+        <div class="dgrid">
+          {% if not p.error %}
+          <div>
+            <h3>Stages</h3>
+            <div class="row">{% for st in stages %}{% if p.features.get(st) %}<span>{{ st }} <b>{{ p.features[st] }}</b></span>{% endif %}{% endfor %}</div>
+            <h3>Bugs</h3>
+            {% if p.bug_total %}
+              <div class="row">{% for st, n in p.bug_status.items() %}{% if n %}<span>{{ st }} <b>{{ n }}</b></span>{% endif %}{% endfor %}</div>
+              <div class="row">{% for sev, n in p.bugs.items() %}{% if n %}<span class="{{ 'bad' if sev in ('Critical','High') else '' }}">{{ sev }} <b>{{ n }}</b></span>{% endif %}{% endfor %}</div>
+            {% else %}<div class="muted">No active bugs</div>{% endif %}
+            {% if p.inbox_count %}
+              <h3>Needs triage</h3>
+              <div class="row"><a href="{{ projects_url() }}/{{ p.key }}/inbox"><b>{{ p.inbox_count }}</b> waiting</a>
+                <span class="muted">oldest {{ p.inbox_oldest_days }}d</span>
+                {% if p.inbox_stale %}<span class="warn"><b>{{ p.inbox_stale }}</b> stale</span>{% endif %}</div>
+            {% endif %}
+          </div>
+          <div>
+            {% if p.in_progress %}
+              <h3>In progress</h3>
+              <ul>{% for wbs, name, owner in p.in_progress[:5] %}
+                <li><code>{{ wbs }}</code> {{ name }}{% if owner %} <span class="muted">{{ owner }}</span>{% endif %}</li>
+              {% endfor %}{% if p.in_progress | length > 5 %}<li class="muted">and {{ p.in_progress | length - 5 }} more</li>{% endif %}</ul>
+            {% endif %}
+            {% if p.blocked %}
+              <h3>Blocked</h3>
+              <ul class="warn">{% for b in p.blocked %}<li>{{ b }}</li>{% endfor %}</ul>
+            {% endif %}
+            {% if p.initiatives %}
+              <h3>Initiatives</h3>
+              <ul>{% for name, kind, done, total in p.initiatives %}
+                <li>{{ name }} <span class="muted">({{ kind }})</span> <b class="{{ 'ok' if total and done == total else '' }}">{{ done }}/{{ total }}</b></li>
+              {% endfor %}</ul>
+            {% endif %}
+          </div>
+          {% endif %}
+          <div>
+            {% if p.depends_on or p.required_by %}
+              <h3>Dependencies</h3>
+              <div class="row deps">
+                {% if p.depends_on %}<span>Depends on {% for d in p.depends_on %}<a href="#{{ d }}">{{ d }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
+                {% if p.required_by %}<span>Needed by {% for d in p.required_by %}<a href="#{{ d }}">{{ d }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
+              </div>
+            {% endif %}
+            <h3>Sync</h3>
+            <div class="muted">
+              {% if p.last_fetch_age is not none %}fetched {{ p.last_fetch_age }}s ago{% endif %}
+              {% if p.last_push_age is not none %} · last write {{ p.last_push_age }}s ago{% endif %}<br>
+              {{ p.mode }}{% if p.branch %} · <code>{{ p.branch }}</code>{% endif %}{% if p.pr_url %} · <a href="{{ p.pr_url }}" target="_blank" rel="noopener">pull request</a>{% endif %}{% if p.sha %} · <code>{{ p.sha }}</code>{% endif %}
+              {% if p.stale %}<span class="warn"> · could not refresh, showing older data</span>{% endif %}
+              {% if p.sync_error and not p.error %}<div class="bad">last sync error: {{ p.sync_error }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+    </tbody>
+    {% endfor %}
+  </table>
+  </div>
+  <script>
+    (function () {
+      var all = document.getElementById('toggle-all');
+      function set(btn, open) {
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.getElementById(btn.getAttribute('aria-controls')).hidden = !open;
+      }
+      document.querySelectorAll('.prog .tog').forEach(function (b) {
+        b.addEventListener('click', function () { set(b, b.getAttribute('aria-expanded') !== 'true'); });
+      });
+      all.addEventListener('click', function () {
+        var open = all.dataset.open !== '1';
+        document.querySelectorAll('.prog .tog').forEach(function (b) { set(b, open); });
+        all.dataset.open = open ? '1' : '0';
+        all.textContent = open ? 'Collapse all' : 'Expand all';
+      });
+      // A dependency link (#project) opens that project's details.
+      function openHash() {
+        var b = document.querySelector('.prog [aria-controls="d-' + decodeURIComponent(location.hash.slice(1)) + '"]');
+        if (b) set(b, true);
+      }
+      window.addEventListener('hashchange', openHash); openHash();
+    })();
+  </script>
 
 </div>
 {% endblock %}
