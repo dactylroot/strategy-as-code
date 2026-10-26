@@ -38,6 +38,7 @@ class ProjectSpec:
     planning_dir: str = "."        # folder holding PRODUCT.MD/BUGS.MD/ABOUT.MD, relative to the repo root
     kind: str = "project"          # "program": a nested program; its own PROGRAM.MD lists further projects
     parent: str = ""               # key of the nested program this project was listed in
+    app_url: str = ""              # the project's own web UI; where a person without program access goes back to
 
     def planning_file(self, name: str) -> str:
         return str(Path(self.planning_dir) / name)
@@ -120,7 +121,7 @@ def parse_manifest(text: str, base_dir: Path) -> list[ProjectSpec]:
         specs.append(ProjectSpec(
             key=key, repo=_resolve_repo(repo, base_dir), role=cell(cells, "role"),
             depends_on=deps, mode=mode, branch=cell(cells, "branch"),
-            planning_dir=cell(cells, "planning dir") or ".", kind=kind,
+            planning_dir=cell(cells, "planning dir") or ".", kind=kind, app_url=cell(cells, "app url"),
         ))
     _validate(specs, allow_nested=True)
     return specs

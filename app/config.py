@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     base_path: str = ""  # URL prefix this app is served under, e.g. "/strategy"
     auth_introspect_url: str = ""  # Host session-introspection endpoint; enables auth passthrough
     host_login_url: str = ""  # Host's login entry point; redirect target in passthrough mode
+    host_home_url: str = ""  # Host's home page; the Program overview title links back to it when set
     embed_chrome: bool = False  # When True, hide this app's own sidebar/nav (host provides its own)
     github_repo: str = ""  # Host-registered "owner/repo" for the bug-report issue mirror below,
                            # e.g. "dactylroot/t3-renewals-manager" - same pattern as
@@ -238,6 +239,10 @@ class _SettingsProxy:
     @property
     def host_login_url(self) -> str:
         return _base.host_login_url
+
+    @property
+    def host_home_url(self) -> str:
+        return _base.host_home_url
 
     @property
     def embed_chrome(self) -> bool:

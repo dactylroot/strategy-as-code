@@ -139,6 +139,7 @@ Supports `linux/amd64` and `linux/arm64`.
 | `PLANNING_PR` | `true` | After a push to a branch-mode project's planning branch, open (or refresh the description of) one pull request to the default branch. Needs `GIT_TOKEN` and a github.com repository; `false` turns it off. `strategy pr -p <key>` does the same on demand |
 | `WEBHOOK_SECRET` | (empty) | Enables `POST <base>/hooks/refresh` for signed GitHub push events |
 | `HOST_LOGIN_URL` | (empty) | Host's login page, used as the redirect target in embedded mode |
+| `HOST_HOME_URL` | (empty) | Host's home page; the Program overview title links to it, and the no-access page when no project applies |
 | `EMBED_CHROME` | `false` | When `true`, hides this app's own sidebar/nav - use when the host page already provides navigation, e.g. inside an iframe |
 
 ### Deployment modes

@@ -43,6 +43,19 @@ templates.env.globals["scope_key"] = scope.scope_key
 templates.env.globals["scope_branch"] = scope.branch_label
 templates.env.globals["program_mode"] = lambda: scope.get_registry() is not None
 templates.env.globals["projects_url"] = lambda: f"{settings.root_path}/p"
+
+
+def _back_link() -> tuple[str, str] | None:
+    """Where the header title returns to on a project page: the project's own web UI (the manifest's
+    App URL), for everyone. The sidebar's All projects link is the way back to the program. None = the default."""
+    registry, key = scope.get_registry(), scope.scope_key()
+    if registry is None or key is None or key not in registry:
+        return None
+    spec = registry.get(key).spec
+    return (spec.app_url, f"Back to {key.replace('-', ' ').title()}") if spec.app_url else None
+
+
+templates.env.globals["back_link"] = _back_link
 templates.env.globals["work_url"] = lambda: f"{settings.root_path}/work"
 templates.env.globals["embed_chrome"] = settings.embed_chrome
 

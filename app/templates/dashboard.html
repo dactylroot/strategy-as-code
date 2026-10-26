@@ -224,9 +224,9 @@ details[open] .chevron { transform: rotate(90deg); }
 {% endblock %}
 
 {% block content %}
-<div class="page-header" style="display:flex;align-items:baseline;gap:2rem;flex-wrap:wrap;">
-  {% if not embed_chrome %}<h1 style="flex-shrink:0;margin:0;">{{ product.title }}</h1>{% endif %}
-  {% if product.summary %}<p style="color:var(--color-text-secondary);font-size:0.875rem;line-height:1.6;margin:0;max-width:72ch;">{{ product.summary | inline_markdown }}</p>{% endif %}
+<div class="page-header">
+  {% if not embed_chrome %}<h1>{{ product.title }}</h1>{% endif %}
+  {% if product.summary %}<p style="color:var(--color-text-secondary);font-size:0.875rem;line-height:1.6;margin:0;max-width:90ch;">{{ product.summary | inline_markdown }}</p>{% endif %}
 </div>
 
 <!-- Feature Lifecycle Pipeline -->

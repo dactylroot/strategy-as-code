@@ -1,3 +1,4 @@
+import html
 import json
 import logging
 import re
@@ -102,8 +103,19 @@ _PUBLIC = {full("/login"), full("/logout"), full("/hooks/refresh"), full("/healt
 _SCOPE_RE = re.compile(rf"^{re.escape(settings.root_path)}/p/([^/]+)(/.*)?$")
 
 
-def _plain(status: int, message: str) -> HTMLResponse:
-    return HTMLResponse(f"<p style=\"font-family:sans-serif\">{message}</p>", status_code=status)
+def _plain(status: int, message: str, back: tuple[str, str] | None = None) -> HTMLResponse:
+    link = f" <a href=\"{html.escape(back[0])}\">{html.escape(back[1])}</a>" if back else ""
+    return HTMLResponse(f"<p style=\"font-family:sans-serif\">{message}{link}</p>", status_code=status)
+
+
+def _no_access_link(path: str) -> tuple[str, str] | None:
+    """The way out of a refusal: the requested project's own web UI, else the host's home page."""
+    registry, m = scope.get_registry(), _SCOPE_RE.match(path)
+    if registry is not None and m and m.group(1) in registry:
+        spec = registry.get(m.group(1)).spec
+        if spec.app_url:
+            return spec.app_url, f"Back to {m.group(1).replace('-', ' ').title()}"
+    return (settings.host_home_url, "Back to the hub") if settings.host_home_url else None
 
 
 # Declared before require_auth so it sits inside it: auth sees the original
@@ -147,7 +159,7 @@ async def require_auth(request: Request, call_next):
             return RedirectResponse(url=f"{login_url}?next={request.url.path}", status_code=303)
         if verdict.status != 200:
             return _plain(verdict.status, "You do not have access to Program Strategy." if verdict.status == 403
-                          else "Sign-in service unavailable. Try again shortly.")
+                          else "Sign-in service unavailable. Try again shortly.", back=_no_access_link(request.url.path))
         request.state.identity = verdict.identity
         if hub_identity.is_write(request.method, request.url.path) and not hub_identity.may_write(verdict.identity):
             return JSONResponse({"detail": "Your role is read-only."}, status_code=403)
@@ -214,7 +226,7 @@ async def projects_index(request: Request):
     rows = await run_in_threadpool(overview.summarize_all)
     initiatives, initiatives_error = overview.initiative_views(rows)
     return templates.TemplateResponse(request, "overview.html", {
-        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "nested_errors": scope.get_registry().nested_errors, "stages": overview.STAGES, "app_title": "Program overview",
+        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "nested_errors": scope.get_registry().nested_errors, "stages": overview.STAGES, "app_title": "Program overview", "host_home_url": settings.host_home_url,
         "active_page": "overview", "auth_enabled": auth_enabled(), "lock_project": settings.lock_project})
 
 
