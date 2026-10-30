@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from urllib.parse import urlencode
 
 import httpx
+from fastapi import HTTPException, Request
 
 from .config import settings
 
@@ -112,6 +113,37 @@ def _auth_url(project: str | None) -> str:
     if not project:
         return settings.hub_auth_url
     return settings.hub_auth_url + ("&" if "?" in settings.hub_auth_url else "?") + urlencode({"project": project})
+
+
+def _origin(url: str) -> str:
+    """scheme://host[:port] of a URL, lowercased, or '' when it has none."""
+    m = re.match(r"^(https?)://([^/?#]+)", url or "", re.IGNORECASE)
+    return f"{m.group(1)}://{m.group(2)}".lower() if m else ""
+
+
+def refuse_cross_site_writes(request: Request) -> None:
+    """Dependency of the API router: in hub mode, a write must come from this site's own pages.
+
+    The hub's session cookie is SameSite=Lax, which keeps other websites out but not another page on the same
+    site, and not every write endpoint needs a body a form cannot send. So the browser's own statement of where
+    a request came from decides: `Sec-Fetch-Site` of `same-origin` (or `none`, a typed address) is let through and
+    anything else is refused. A browser too old to send it still sends `Origin` with a POST, which must be this
+    server's own origin or the host's (the Renewals proxy hides the public host from this server, so the host's
+    home page origin is the other one accepted). A request with neither header is no browser, and carries no
+    cookie it did not choose to send."""
+    if not enabled() or request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    site = request.headers.get("sec-fetch-site")
+    if site is not None:
+        if site.lower() in ("same-origin", "none"):
+            return
+        raise HTTPException(status_code=403, detail="Cross-site requests are not accepted.")
+    origin = request.headers.get("origin")
+    if origin is None:
+        return
+    if _origin(origin) in {o for o in (_origin(str(request.base_url)), _origin(settings.host_home_url)) if o}:
+        return
+    raise HTTPException(status_code=403, detail="Cross-site requests are not accepted.")
 
 
 async def lookup(cookie_header: str | None, project: str | None = None) -> Verdict:

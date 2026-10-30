@@ -155,6 +155,10 @@ A limited role is a table of method and path patterns (`CONTRIBUTOR_ROUTES` and 
 
 What a contributor sees is filtered on the server (`app/contributor.py`): every feature, with its notes; a bug only when it has a WBS reference or the contributor submitted it, with its notes only when it is theirs; a closed bug only when it is theirs (the Closed table has no WBS column).
 
+### Writes must come from this site's own pages
+
+In hub mode the API router refuses a write (any method but GET, HEAD or OPTIONS) that the browser says came from elsewhere (`refuse_cross_site_writes` in `app/hub_identity.py`, a dependency of the API router, so every present and future `/api` write is covered). `Sec-Fetch-Site` of `same-origin` or `none` is accepted; `cross-site` and `same-site` get a 403, which is what stops a page on another host under the same site from using a visitor's hub cookie (`SameSite=Lax` alone does not). A browser that sends no `Sec-Fetch-Site` is judged by `Origin`, which must be the server's own origin or that of `HOST_HOME_URL` (the Renewals proxy hides the public host from this server). A request with neither header is not a browser and is let through. Standalone and embedded modes are unchanged.
+
 ### Submissions and their outcomes
 
 A submission is one file under `.planning/inbox/`, committed as the submitter. Its id ends with a tag of the submitter's email (`submitter_tag`), so an app can find one person's items by file name. Until it is triaged only its submitter changes it. Promoting, declining or marking a duplicate moves it, without its description or screenshot, to `.planning/triaged/<id>.md` with the outcome (`promoted` with what it became, `declined` with the reason, `duplicate` of what), kept for a year. `GET /api/inbox/mine` returns a person's waiting and triaged items, each promoted one with the current state of the row that carries its `(inbox <id>)` marker.

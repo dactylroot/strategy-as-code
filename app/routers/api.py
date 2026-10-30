@@ -10,6 +10,7 @@ from watchfiles import awatch
 from pydantic import BaseModel
 
 from ..config import settings
+from .. import hub_identity
 from .. import session_store
 from ..models import (
     FeatureUpdate, NewFeature, RoadmapUpdate, RoadmapFeaturesUpdate,
@@ -23,7 +24,7 @@ from .. import git_sync
 from ..program_write import program_write, refuse_when_scoped, request_email
 from ..template_env import templates
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(hub_identity.refuse_cross_site_writes)])
 
 
 @router.get("/sync-status")
