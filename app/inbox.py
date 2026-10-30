@@ -13,6 +13,7 @@ Everything here works on a planning directory (the checkout handed to a writer
 function); committing is the writer's job.
 """
 from __future__ import annotations
+import hashlib
 import re
 import secrets
 from dataclasses import dataclass
@@ -72,6 +73,13 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def submitter_tag(submitter: str) -> str:
+    """A short stable tag of a submitter's email, ending the id of everything they submit. It lets an app find one
+    person's items by file name, without opening every file in the inbox. Other writers of inbox files (the apps'
+    own bug-report forms) append the same tag; an id without one simply is not found that way."""
+    return "u" + hashlib.sha256(submitter.strip().lower().encode()).hexdigest()[:8]
+
+
 def _slug(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40] or "item"
 
@@ -105,8 +113,10 @@ def write_item(root: Path, kind: str, title: str, body: str, submitter: str,
                severity: str = "", wbs: str = "", now: datetime | None = None) -> Item:
     title, body, severity, wbs = _clean(kind, title, body, severity, wbs)
     now = now or _now()
-    item_id = f"{now:%Y%m%dT%H%M%SZ}-{_slug(title)}-{secrets.token_hex(2)}"
     submitter = _one_line(submitter, 120) or "anonymous"
+    item_id = f"{now:%Y%m%dT%H%M%SZ}-{_slug(title)}-{secrets.token_hex(2)}"
+    if "@" in submitter:
+        item_id += "-" + submitter_tag(submitter)
     folder = root / INBOX
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{item_id}.md"

@@ -188,3 +188,11 @@ def test_submitter_matching_ignores_case_and_a_missing_submitter_matches_nobody(
     anon = inbox.write_item(tmp_path, "bug", "Anon", "", "")
     with pytest.raises(inbox.NotSubmitter):
         inbox.delete_item(tmp_path, anon.id, "")
+
+
+def test_an_item_id_ends_with_a_tag_of_its_submitters_email(tmp_path):
+    item = inbox.write_item(tmp_path, "bug", "T", "", "Ada@Example.com")
+    assert item.id.endswith("-" + inbox.submitter_tag("ada@example.com")) and len(inbox.submitter_tag("x@y")) == 9
+    assert inbox.submitter_tag(" ADA@example.com ") == inbox.submitter_tag("ada@example.com")
+    assert inbox.submitter_tag("bob@example.com") != inbox.submitter_tag("ada@example.com")
+    assert not inbox.write_item(tmp_path, "bug", "T", "", "cli-user").id.endswith(inbox.submitter_tag("cli-user"))
