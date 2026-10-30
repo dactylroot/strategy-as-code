@@ -150,10 +150,28 @@ async def scope_project(request: Request, call_next):
     return response
 
 
+async def _contributor_request(request: Request, call_next, scoped):
+    """A contributor reaches only the routes listed in hub_identity.CONTRIBUTOR_ROUTES, inside its own project."""
+    path = request.url.path
+    if scoped is None:
+        if request.method == "GET" and path.startswith(full("/static/")):
+            return await call_next(request)
+        return _plain(403, "Your role cannot open this page.", back=_no_access_link(path))
+    tail = scoped.group(2) or "/"
+    if request.method == "GET" and tail.rstrip("/") == "":
+        return RedirectResponse(url=f"{settings.root_path}/p/{scoped.group(1)}/features")
+    if hub_identity.contributor_may(request.method, tail):
+        return await call_next(request)
+    if "/api/" in path:
+        return JSONResponse({"detail": "Your role cannot do that."}, status_code=403)
+    return _plain(403, "Your role can open Features and Bugs only.", back=_no_access_link(path))
+
+
 @app.middleware("http")
 async def require_auth(request: Request, call_next):
     if hub_identity.enabled() and request.url.path not in _PUBLIC:
-        verdict = await hub_identity.lookup(request.headers.get("cookie"))
+        m = _SCOPE_RE.match(request.url.path)   # the project the request is for, asked of the hub
+        verdict = await hub_identity.lookup(request.headers.get("cookie"), m.group(1) if m else None)
         if verdict.status == 401:
             login_url = settings.host_login_url or full("/login")
             return RedirectResponse(url=f"{login_url}?next={request.url.path}", status_code=303)
@@ -161,6 +179,8 @@ async def require_auth(request: Request, call_next):
             return _plain(verdict.status, "You do not have access to Program Strategy." if verdict.status == 403
                           else "Sign-in service unavailable. Try again shortly.", back=_no_access_link(request.url.path))
         request.state.identity = verdict.identity
+        if hub_identity.is_contributor(verdict.identity):
+            return await _contributor_request(request, call_next, m)
         if hub_identity.is_write(request.method, request.url.path) and not hub_identity.may_write(verdict.identity):
             return JSONResponse({"detail": "Your role is read-only."}, status_code=403)
         return await call_next(request)

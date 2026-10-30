@@ -349,8 +349,8 @@
     <svg class="icon-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18v-2H3zm0-5h18v-2H3zm0-7v2h18V6z"></path></svg>
   </button>
   {% set back = back_link() %}
-  <a href="{% if host_home_url and active_page == 'overview' %}{{ host_home_url }}{% elif back %}{{ back[0] }}{% elif scope_key() or program_mode() %}{{ projects_url() }}{% else %}{{ base_path }}/switch-project{% endif %}" class="app-title"
-     title="{% if host_home_url and active_page == 'overview' %}Back to the hub{% elif back %}{{ back[1] }}{% elif scope_key() %}All program projects{% elif lock_project %}Project files{% else %}Switch project{% endif %}">{{ app_title }}</a>
+  <a href="{% if host_home_url and active_page == 'overview' %}{{ host_home_url }}{% elif back %}{{ back[0] }}{% elif ident and ident.role == 'contributor' %}{{ base_path }}/features{% elif scope_key() or program_mode() %}{{ projects_url() }}{% else %}{{ base_path }}/switch-project{% endif %}" class="app-title"
+     title="{% if host_home_url and active_page == 'overview' %}Back to the hub{% elif back %}{{ back[1] }}{% elif ident and ident.role == 'contributor' %}Features{% elif scope_key() %}All program projects{% elif lock_project %}Project files{% else %}Switch project{% endif %}">{{ app_title }}</a>
   {% if scope_key() %}<span class="scope-chip" title="Program project, saved to {{ scope_branch() }}">{{ scope_key() }}</span>{% endif %}
   <div class="header-spacer"></div>
   <button id="theme-toggle" class="icon-btn theme-toggle-btn" type="button" aria-label="Toggle color theme" title="Switch theme">
@@ -375,7 +375,11 @@
 {% if not embed_chrome %}
 <aside class="sidebar" id="sidebar">
   <nav aria-label="Main">
-    {% if program_mode() and not scope_key() %}
+    {% if ident and ident.role == 'contributor' %}
+    <span class="nav-section">Planning</span>
+    {{ nav_item('features', 'Features', '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2M9 17H7V7h2zm4-5h-2V7h2zm4 3h-2V7h2z"></path>') }}
+    {{ nav_item('bugs', 'Bugs', '<path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20zm-6 8h-4v-2h4zm0-4h-4v-2h4z"></path>') }}
+    {% elif program_mode() and not scope_key() %}
     <span class="nav-section">Program</span>
     {{ nav_item('overview', 'Overview', '<path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"></path>', href=projects_url()) }}
     {{ nav_item('work', 'Work', '<path d="M22 7h-9v2h9zm0 8h-9v2h9zM5.54 11 2 7.46l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41zm0 8L2 15.46l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41z"></path>', href=work_url()) }}

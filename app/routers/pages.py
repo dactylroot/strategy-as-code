@@ -13,6 +13,8 @@ from ..parsers import bugs as bugs_parser
 from ..template_env import templates
 from ..versioning import next_release_version, version_rationale
 from ..auth import enabled as auth_enabled
+from .. import contributor, hub_identity, inbox as inbox_lib
+from ..program_write import request_email
 
 router = APIRouter()
 
@@ -140,8 +142,33 @@ def product_redirect(request: Request):
     return RedirectResponse(url=full("/dashboard"))
 
 
+def _is_contributor(request: Request) -> bool:
+    return hub_identity.is_contributor(getattr(request.state, "identity", None))
+
+
+def _contributor_features(request: Request):
+    product = product_parser.parse(settings.product_md)
+    features = sorted(product.all_features, key=lambda f: [int(p) if p.isdigit() else 0 for p in f.wbs.split(".")])
+    known = [{"label": f.name, "detail": f"{f.wbs} {f.stage}"} for f in features]
+    return templates.TemplateResponse(request, "contributor_features.html", _ctx(
+        request, "features", features=features, known_json=contributor.script_json(known),
+        mine=inbox_lib.mine(settings.project_dir, request_email(request))))
+
+
+def _contributor_bugs(request: Request):
+    email = request_email(request)
+    doc = bugs_parser.parse(settings.bugs_md) if settings.bugs_md.exists() else bugs_parser._parse_text(_EMPTY_BUGS)
+    active, closed = contributor.visible_bugs(doc, inbox_lib.own_item_ids(settings.project_dir, email))
+    known = [{"label": b.title, "detail": f"#{b.id} {b.status.value}"} for b in active]
+    return templates.TemplateResponse(request, "contributor_bugs.html", _ctx(
+        request, "bugs", active=active, closed=closed, known_json=contributor.script_json(known),
+        mine=inbox_lib.mine(settings.project_dir, email)))
+
+
 @router.get("/features", response_class=HTMLResponse)
 def features_page(request: Request):
+    if _is_contributor(request):
+        return _contributor_features(request)
     s = _get_session(request)
     if (r := _redirect_if_no_project(s)):
         return r
@@ -352,6 +379,8 @@ def inbox_page(request: Request):
 
 @router.get("/bugs", response_class=HTMLResponse)
 def bugs_page(request: Request):
+    if _is_contributor(request):
+        return _contributor_bugs(request)
     s = _get_session(request)
     if (r := _redirect_if_no_project(s)):
         return r

@@ -382,9 +382,9 @@ def _run_inbox(reg: Registry, key: str, actor: Actor, args: argparse.Namespace) 
             line = change(pro, f"inbox: promote {args.id}")
             return f"{line}\n  became: {made.get('what')}"
         if args.action == "decline":
-            return change(lambda root: _inbox.decline(root, args.id), f"inbox: decline {args.id}: {args.reason}")
+            return change(lambda root: _inbox.decline(root, args.id, reason=args.reason or ""), f"inbox: decline {args.id}: {args.reason}")
         if args.action == "duplicate":
-            return change(lambda root: _inbox.decline(root, args.id), f"inbox: duplicate {args.id} of {args.of}")
+            return change(lambda root: _inbox.decline(root, args.id, duplicate_of=args.of or ""), f"inbox: duplicate {args.id} of {args.of}")
         moved: list[str] = []
         line = change(lambda root: moved.extend(_inbox.sweep(root)), "inbox: archive stale items")
         return f"{line}\n  archived: {len(moved)}"

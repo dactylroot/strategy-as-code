@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Features - {{ app_title }}{% endblock %}
+
+{% block content %}
+<div class="page-header"><h1>Features</h1></div>
+
+{% set kind = 'feature' %}
+{% include "_contributor_submit.html" %}
+
+<div class="card">
+  <input type="search" id="c-filter" placeholder="Filter features" aria-label="Filter features" style="margin-bottom:0.75rem;max-width:24rem">
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>WBS</th><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+    {% for f in features %}
+    <tr data-text="{{ (f.wbs ~ ' ' ~ f.name ~ ' ' ~ f.notes) | lower }}">
+      <td><code>{{ f.wbs }}</code></td>
+      <td>{{ f.name }}</td>
+      <td><span class="badge">{{ f.stage }}</span></td>
+      <td class="text-muted">{{ f.notes }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+<script>
+document.getElementById('c-filter').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('tbody tr[data-text]').forEach(r => { r.hidden = q && !r.dataset.text.includes(q); });
+});
+</script>
+{% endblock %}

@@ -581,7 +581,8 @@ from collections import defaultdict, deque   # noqa: E402
 import time as _time                          # noqa: E402
 from .. import inbox as inbox_lib             # noqa: E402
 from .. import scope as _scope                # noqa: E402
-from ..program_write import request_actor     # noqa: E402
+from ..program_write import request_actor, request_email  # noqa: E402
+from .. import hub_identity as _hub          # noqa: E402
 
 _SUBMIT_LIMIT = 10          # submissions per submitter per project per hour
 _submit_log: dict[tuple[str, str], deque] = defaultdict(deque)
@@ -612,6 +613,13 @@ class InboxSubmit(BaseModel):
     wbs: str = ""
 
 
+class InboxEdit(BaseModel):
+    title: str | None = None
+    body: str | None = None
+    severity: str | None = None
+    wbs: str | None = None
+
+
 class InboxPromote(BaseModel):
     prefix: str = ""
     value: int | None = None
@@ -640,10 +648,59 @@ def submit_inbox(request: Request, req: InboxSubmit):
     return {"id": item.id}
 
 
+def _contributor_owns(request: Request, item_id: str) -> None:
+    """A contributor reaches an item's screenshot only when it is theirs; staff reach any."""
+    if _hub.is_contributor(getattr(request.state, "identity", None)):
+        try:
+            inbox_lib.own_item(settings.project_dir, item_id, request_email(request))
+        except inbox_lib.NotSubmitter as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        except inbox_lib.InboxError:
+            pass    # not waiting for triage: the endpoint answers as it always did
+
+
+@router.get("/inbox/mine")
+def my_inbox(request: Request):
+    """The signed-in person's own submissions with what became of each."""
+    _require_program()
+    email = request_email(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Sign in to see your submissions.")
+    return inbox_lib.mine(settings.project_dir, email)
+
+
+@router.patch("/inbox/{item_id}")
+@program_write("inbox {item_id} edited by its submitter")
+def edit_inbox_item(request: Request, item_id: str, req: InboxEdit):
+    _require_program()
+    try:
+        item = inbox_lib.update_item(settings.project_dir, item_id, request_email(request),
+                                     req.title, req.body, req.severity, req.wbs)
+    except inbox_lib.NotSubmitter as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except inbox_lib.InboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return item.__dict__
+
+
+@router.delete("/inbox/{item_id}")
+@program_write("inbox {item_id} withdrawn by its submitter")
+def withdraw_inbox_item(request: Request, item_id: str):
+    _require_program()
+    try:
+        inbox_lib.delete_item(settings.project_dir, item_id, request_email(request))
+    except inbox_lib.NotSubmitter as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except inbox_lib.InboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"ok": True}
+
+
 @router.post("/inbox/{item_id}/screenshot")
 @program_write("inbox {item_id} screenshot attached")
 def attach_inbox_screenshot(request: Request, item_id: str, file: UploadFile = File(...)):
     _require_program()
+    _contributor_owns(request, item_id)
     data = file.file.read(inbox_lib.MAX_ATTACHMENT + 1)
     try:
         return {"file": inbox_lib.attach(settings.project_dir, item_id, data)}
@@ -654,6 +711,7 @@ def attach_inbox_screenshot(request: Request, item_id: str, file: UploadFile = F
 @router.get("/inbox/{item_id}/screenshot")
 def get_inbox_screenshot(request: Request, item_id: str):
     _require_program()
+    _contributor_owns(request, item_id)
     try:
         path = inbox_lib.attachment_path(settings.project_dir, item_id)
     except inbox_lib.InboxError as exc:
@@ -680,7 +738,7 @@ def promote_inbox(request: Request, item_id: str, req: InboxPromote):
 def decline_inbox(request: Request, item_id: str, req: InboxDecline):
     _require_program()
     try:
-        inbox_lib.decline(settings.project_dir, item_id)
+        inbox_lib.decline(settings.project_dir, item_id, req.reason, req.duplicate_of)
     except inbox_lib.InboxError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"ok": True}

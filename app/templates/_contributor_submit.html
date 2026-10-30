@@ -1,0 +1,98 @@
+{# Submit form and "your submissions" for a contributor. Expects: kind ('bug' or 'feature'), mine (their submissions),
+   known (existing titles to warn about duplicates: [{"label", "detail"}]). #}
+<div class="card" style="margin-bottom:1.5rem">
+  <h3 style="margin-top:0">{{ 'Report a bug' if kind == 'bug' else 'Suggest a feature' }}</h3>
+  <form id="c-form">
+    <div class="form-group"><label for="c-title">Title</label><input type="text" id="c-title" maxlength="200" required autocomplete="off"></div>
+    <ul id="c-similar" aria-live="polite" hidden style="margin:0 0 1rem;padding-left:1.25rem"></ul>
+    {% if kind == 'bug' %}
+    <div class="form-group"><label for="c-sev">Severity</label>
+      <select id="c-sev" class="form-select"><option value="">Not sure</option><option>low</option><option>medium</option><option>high</option><option>critical</option></select></div>
+    {% endif %}
+    <div class="form-group"><label for="c-body">Description</label><textarea id="c-body" maxlength="5000" rows="4"></textarea></div>
+    {% if kind == 'bug' %}
+    <div class="form-group"><label for="c-shot">Screenshot</label>
+      <input type="file" id="c-shot" accept="image/png,image/jpeg,image/gif"></div>
+    {% endif %}
+    <button class="btn btn-primary" type="submit">Submit</button>
+    <span id="c-msg" class="text-muted" role="status"></span>
+  </form>
+</div>
+
+{% set own = mine | selectattr('kind', 'equalto', kind) | list %}
+{% if own %}
+<div class="card" style="margin-bottom:1.5rem">
+  <h3 style="margin-top:0">Your submissions</h3>
+  {% for i in own %}
+  <div class="c-item" data-id="{{ i.id }}" data-waiting="{{ 'yes' if i.outcome == 'waiting' else 'no' }}" style="border-top:1px solid var(--color-border-subtle);padding:0.75rem 0">
+    <div>
+      <strong class="c-item-title">{{ i.title }}</strong>
+      {% if i.outcome == 'waiting' %}<span class="badge">waiting</span>
+      {% elif i.outcome == 'promoted' %}<span class="badge">{{ i.ref or 'accepted' }}</span>{% if i.state %}<span class="badge">{{ i.state }}</span>{% endif %}
+      {% elif i.outcome == 'duplicate' %}<span class="badge">duplicate of {{ i.ref }}</span>
+      {% else %}<span class="badge">declined</span>{% endif %}
+    </div>
+    {% if i.reason %}<p class="text-muted" style="margin:0.4rem 0">{{ i.reason }}</p>{% endif %}
+    {% if i.outcome == 'waiting' %}
+    {% if i.body %}<p class="c-item-body" style="white-space:pre-wrap;margin:0.4rem 0">{{ i.body }}</p>{% endif %}
+    <div style="display:flex;gap:0.5rem;margin-top:0.4rem">
+      <button class="btn c-edit" type="button">Edit</button>
+      <button class="btn c-withdraw" type="button">Withdraw</button>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+const C_KIND = '{{ kind }}';
+const C_API = '{{ base_path }}/api/inbox';
+const C_KNOWN = {{ known_json | safe }};
+async function cSend(method, url, body) {
+  const r = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: body && JSON.stringify(body)});
+  if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail || d; } catch (e) {} throw new Error(d); }
+  return r.json();
+}
+const cVal = id => document.getElementById(id).value;
+// Existing entries that share words with what is being typed, so a duplicate is noticed before it is sent.
+const cWords = text => (text.toLowerCase().match(/[a-z0-9]{3,}/g) || []);
+document.getElementById('c-title').addEventListener('input', e => {
+  const typed = cWords(e.target.value), list = document.getElementById('c-similar');
+  const hits = typed.length < 2 ? [] : C_KNOWN
+    .map(k => ({k, n: typed.filter(w => cWords(k.label + ' ' + k.detail).includes(w)).length}))
+    .filter(h => h.n >= Math.min(2, typed.length)).sort((a, b) => b.n - a.n).slice(0, 5);
+  list.hidden = !hits.length;
+  list.replaceChildren(...hits.map(h => { const li = document.createElement('li'); li.textContent = h.k.label + ' · ' + h.k.detail; return li; }));
+});
+document.getElementById('c-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('c-msg');
+  try {
+    const made = await cSend('POST', C_API, {type: C_KIND, title: cVal('c-title'), body: cVal('c-body'),
+      severity: C_KIND === 'bug' ? cVal('c-sev') : ''});
+    const shot = document.getElementById('c-shot') && document.getElementById('c-shot').files[0];
+    if (shot) {
+      const form = new FormData(); form.append('file', shot);
+      const r = await fetch(C_API + '/' + made.id + '/screenshot', {method: 'POST', body: form});
+      if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail || d; } catch (x) {} msg.textContent = 'Submitted, but the screenshot was not attached: ' + d; return; }
+    }
+    location.reload();
+  } catch (err) { msg.textContent = err.message; }
+});
+document.querySelectorAll('.c-item[data-waiting="yes"]').forEach(row => {
+  const id = row.dataset.id;
+  row.querySelector('.c-withdraw').onclick = async () => {
+    if (!confirm('Withdraw this submission?')) return;
+    try { await cSend('DELETE', C_API + '/' + id); location.reload(); } catch (err) { alert(err.message); }
+  };
+  row.querySelector('.c-edit').onclick = async () => {
+    const title = prompt('Title', row.querySelector('.c-item-title').textContent);
+    if (title === null) return;
+    const bodyEl = row.querySelector('.c-item-body');
+    const body = prompt('Description', bodyEl ? bodyEl.textContent : '');
+    if (body === null) return;
+    try { await cSend('PATCH', C_API + '/' + id, {title, body}); location.reload(); } catch (err) { alert(err.message); }
+  };
+});
+</script>

@@ -7,23 +7,40 @@ the browser's session cookie forwarded. Headers a client sends for identity
 a proxy stripping them.
 
 Roles: viewer reads; editor reads and writes (edits, submissions, triage);
-admin also manages projects and the manifest (reserved, nothing needs it yet).
+admin also manages projects and the manifest (reserved, nothing needs it yet);
+contributor is a Power User of one project's app: it opens that project's Features and Bugs pages,
+submits to the inbox, and changes only its own untriaged submissions (see CONTRIBUTOR_ROUTES).
 The hub is asked on every request, with a few seconds of caching per cookie, so
 a revoked grant stops working within the TTL. Any hub failure denies access.
 """
 from __future__ import annotations
+import re
 import time
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 import httpx
 
 from .config import settings
 
-ROLES = ("viewer", "editor", "admin")
+ROLES = ("viewer", "editor", "admin", "contributor")
 CACHE_SECONDS = 5.0
 _READ_ONLY_POSTS = {"/api/markdown/preview"}   # POSTs that change nothing
 
-_cache: dict[str, tuple[float, "Verdict"]] = {}
+# What a contributor may call, as (method, path below /p/<project>). Everything else is refused, so a new
+# endpoint is closed to contributors until it is listed here. Ownership of an inbox item is checked by the endpoint.
+_ITEM = r"[A-Za-z0-9._-]+"
+CONTRIBUTOR_ROUTES = (
+    ("GET", re.compile(r"/(features|bugs)")),
+    ("GET", re.compile(r"/api/inbox/mine")),
+    ("GET", re.compile(rf"/api/inbox/{_ITEM}/screenshot")),
+    ("POST", re.compile(r"/api/inbox")),
+    ("POST", re.compile(rf"/api/inbox/{_ITEM}/screenshot")),
+    ("PATCH", re.compile(rf"/api/inbox/{_ITEM}")),
+    ("DELETE", re.compile(rf"/api/inbox/{_ITEM}")),
+)
+
+_cache: dict[tuple[str, str | None], tuple[float, "Verdict"]] = {}
 
 
 @dataclass(frozen=True)
@@ -50,6 +67,16 @@ def may_write(identity: Identity) -> bool:
     return identity.role in ("editor", "admin")
 
 
+def is_contributor(identity: Identity | None) -> bool:
+    return identity is not None and identity.role == "contributor"
+
+
+def contributor_may(method: str, tail: str) -> bool:
+    """Whether a contributor may make this request; `tail` is the path below /p/<project>."""
+    tail = tail.rstrip("/") or "/"
+    return any(method == m and pattern.fullmatch(tail) for m, pattern in CONTRIBUTOR_ROUTES)
+
+
 def is_write(method: str, path: str) -> bool:
     """Whether a request changes anything. Anything but a plain read is a write, except the markdown preview."""
     if method in ("GET", "HEAD", "OPTIONS"):
@@ -58,16 +85,25 @@ def is_write(method: str, path: str) -> bool:
     return tail not in _READ_ONLY_POSTS
 
 
-async def lookup(cookie_header: str | None) -> Verdict:
+def _auth_url(project: str | None) -> str:
+    """The hub's auth URL, asking about one project when the request is for one: the hub answers `contributor`
+    for a Power User of that project's app only."""
+    if not project:
+        return settings.hub_auth_url
+    return settings.hub_auth_url + ("&" if "?" in settings.hub_auth_url else "?") + urlencode({"project": project})
+
+
+async def lookup(cookie_header: str | None, project: str | None = None) -> Verdict:
     if not cookie_header:
         return Verdict(401)
     now = time.monotonic()
-    hit = _cache.get(cookie_header)
+    cache_key = (cookie_header, project)
+    hit = _cache.get(cache_key)
     if hit and now - hit[0] < CACHE_SECONDS:
         return hit[1]
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
-            resp = await client.get(settings.hub_auth_url, headers={"cookie": cookie_header})
+            resp = await client.get(_auth_url(project), headers={"cookie": cookie_header})
     except httpx.HTTPError:
         return Verdict(503)               # fail closed, and do not cache an outage
     if resp.status_code == 200:
@@ -80,5 +116,5 @@ async def lookup(cookie_header: str | None) -> Verdict:
         return Verdict(503)
     if len(_cache) > 1000:
         _cache.clear()
-    _cache[cookie_header] = (now, verdict)
+    _cache[cache_key] = (now, verdict)
     return verdict
