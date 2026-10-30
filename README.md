@@ -132,7 +132,7 @@ Supports `linux/amd64` and `linux/arm64`.
 | `SERVER_CONFIG` | `~/.config/strategy-as-code/server.yml` | Path to deployment config (`project_dir`, `lock_project`, `app_title`) |
 | `BASE_PATH` | (empty) | URL prefix to serve under, e.g. `/strategy` - see [Embedded](#embedded) below |
 | `AUTH_INTROSPECT_URL` | (empty) | Host session-introspection endpoint - see [Embedded](#embedded) below |
-| `HUB_AUTH_URL` | (empty) | RevOps hub `/internal/auth?app=strategy`. Enables hub identity: the visitor's cookie is forwarded, the hub's `X-User-Email` and `X-App-Role` answer is the only identity accepted (`viewer` reads, `editor` and `admin` write, `contributor` opens one project's Features and Bugs pages and manages its own inbox submissions; the request names its project with `&project=<key>` and the manifest key must equal the hub's app key), and `X-Host-User` is ignored |
+| `HUB_AUTH_URL` | (empty) | RevOps hub `/internal/auth?app=strategy`. Enables hub identity: the visitor's cookie is forwarded, the hub's `X-User-Email` and `X-App-Role` answer is the only identity accepted (`viewer` reads, `editor` and `admin` write, `contributor` and `reporter` are limited roles, see Roles in hub mode; the request names its project with `&project=<key>` and the manifest key must equal the hub's app key), and `X-Host-User` is ignored |
 | `PROGRAM_POLL_SECONDS` | `45` | Background refresh of every member project's clone; `0` turns it off |
 | `PROGRAM_NESTED_DEPTH` | `3` | A manifest row with `Kind` = `program` is a nested program: its own `PROGRAM.MD` (in its `Planning Dir`) is read and its projects are listed as `<row key>.<project key>`, with their `Depends On` prefixed the same way. This is how many levels to follow; `0` turns nesting off. A program that would contain itself (same repository and folder further up) is always refused. Re-read on every poll |
 | `PROGRAM_SWEEP_SECONDS` | `86400` | How often every project's inbox is swept: items untriaged for 60 days move to `.planning/inbox/archive/`, one commit per project that had any; `0` turns it off |
@@ -141,6 +141,25 @@ Supports `linux/amd64` and `linux/arm64`.
 | `HOST_LOGIN_URL` | (empty) | Host's login page, used as the redirect target in embedded mode |
 | `HOST_HOME_URL` | (empty) | Host's home page; the Program overview title links to it, and the no-access page when no project applies |
 | `EMBED_CHROME` | `false` | When `true`, hides this app's own sidebar/nav - use when the host page already provides navigation, e.g. inside an iframe |
+
+### Roles in hub mode
+
+| Role | Who the hub gives it to | What it reaches |
+|---|---|---|
+| `viewer` | (reserved) | Every page, read only |
+| `editor`, `admin` | Hub administrators | Everything, in every project |
+| `contributor` | An active Power User of the project's app | In its own project only: the Features and Bugs pages (a read-only view with a submit form, not the editing pages), `POST /api/inbox` for bugs and features, `GET /api/inbox/mine`, `PATCH` and `DELETE` on its own waiting items, screenshots of its own items, and `GET /api/about/html` |
+| `reporter` | Anyone else with a grant in the project's app | In its own project only: `POST /api/inbox` for bugs, `GET /api/inbox/mine`, screenshots of its own items, and `GET /api/about/html`. No page opens |
+
+A limited role is a table of method and path patterns (`CONTRIBUTOR_ROUTES` and `REPORTER_ROUTES` in `app/hub_identity.py`): a route not listed there is closed to it, so a new endpoint stays closed until someone lists it. Ownership of an inbox item is checked by the endpoint, by the submitter's email.
+
+What a contributor sees is filtered on the server (`app/contributor.py`): every feature, with its notes; a bug only when it has a WBS reference or the contributor submitted it, with its notes only when it is theirs; a closed bug only when it is theirs (the Closed table has no WBS column).
+
+### Submissions and their outcomes
+
+A submission is one file under `.planning/inbox/`, committed as the submitter. Its id ends with a tag of the submitter's email (`submitter_tag`), so an app can find one person's items by file name. Until it is triaged only its submitter changes it. Promoting, declining or marking a duplicate moves it, without its description or screenshot, to `.planning/triaged/<id>.md` with the outcome (`promoted` with what it became, `declined` with the reason, `duplicate` of what), kept for a year. `GET /api/inbox/mine` returns a person's waiting and triaged items, each promoted one with the current state of the row that carries its `(inbox <id>)` marker.
+
+`GET /api/about/html` is the project's ABOUT.MD rendered, with its newest released version; the apps show it on their About page.
 
 ### Deployment modes
 
