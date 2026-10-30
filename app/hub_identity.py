@@ -9,7 +9,9 @@ a proxy stripping them.
 Roles: viewer reads; editor reads and writes (edits, submissions, triage);
 admin also manages projects and the manifest (reserved, nothing needs it yet);
 contributor is a Power User of one project's app: it opens that project's Features and Bugs pages,
-submits to the inbox, and changes only its own untriaged submissions (see CONTRIBUTOR_ROUTES).
+submits to the inbox, and changes only its own untriaged submissions (see CONTRIBUTOR_ROUTES);
+reporter is anyone else with a grant in that app: it reports bugs and reads its own submissions, from the
+app's About page, and opens no page here (see REPORTER_ROUTES).
 The hub is asked on every request, with a few seconds of caching per cookie, so
 a revoked grant stops working within the TTL. Any hub failure denies access.
 """
@@ -23,7 +25,7 @@ import httpx
 
 from .config import settings
 
-ROLES = ("viewer", "editor", "admin", "contributor")
+ROLES = ("viewer", "editor", "admin", "contributor", "reporter")
 CACHE_SECONDS = 5.0
 _READ_ONLY_POSTS = {"/api/markdown/preview"}   # POSTs that change nothing
 
@@ -32,6 +34,7 @@ _READ_ONLY_POSTS = {"/api/markdown/preview"}   # POSTs that change nothing
 _ITEM = r"[A-Za-z0-9._-]+"
 CONTRIBUTOR_ROUTES = (
     ("GET", re.compile(r"/(features|bugs)")),
+    ("GET", re.compile(r"/api/about/html")),
     ("GET", re.compile(r"/api/inbox/mine")),
     ("GET", re.compile(rf"/api/inbox/{_ITEM}/screenshot")),
     ("POST", re.compile(r"/api/inbox")),
@@ -39,6 +42,15 @@ CONTRIBUTOR_ROUTES = (
     ("PATCH", re.compile(rf"/api/inbox/{_ITEM}")),
     ("DELETE", re.compile(rf"/api/inbox/{_ITEM}")),
 )
+
+REPORTER_ROUTES = (
+    ("GET", re.compile(r"/api/about/html")),
+    ("GET", re.compile(r"/api/inbox/mine")),
+    ("GET", re.compile(rf"/api/inbox/{_ITEM}/screenshot")),
+    ("POST", re.compile(r"/api/inbox")),
+    ("POST", re.compile(rf"/api/inbox/{_ITEM}/screenshot")),
+)
+_ROUTES = {"contributor": CONTRIBUTOR_ROUTES, "reporter": REPORTER_ROUTES}
 
 _cache: dict[tuple[str, str | None], tuple[float, "Verdict"]] = {}
 
@@ -71,10 +83,19 @@ def is_contributor(identity: Identity | None) -> bool:
     return identity is not None and identity.role == "contributor"
 
 
-def contributor_may(method: str, tail: str) -> bool:
-    """Whether a contributor may make this request; `tail` is the path below /p/<project>."""
+def is_reporter(identity: Identity | None) -> bool:
+    return identity is not None and identity.role == "reporter"
+
+
+def is_limited(identity: Identity | None) -> bool:
+    """Roles confined to a table of routes instead of the read/write split."""
+    return identity is not None and identity.role in _ROUTES
+
+
+def route_allowed(identity: Identity, method: str, tail: str) -> bool:
+    """Whether a limited role may make this request; `tail` is the path below /p/<project>."""
     tail = tail.rstrip("/") or "/"
-    return any(method == m and pattern.fullmatch(tail) for m, pattern in CONTRIBUTOR_ROUTES)
+    return any(method == m and pattern.fullmatch(tail) for m, pattern in _ROUTES.get(identity.role, ()))
 
 
 def is_write(method: str, path: str) -> bool:

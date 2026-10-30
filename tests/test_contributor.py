@@ -196,3 +196,42 @@ def test_an_item_id_ends_with_a_tag_of_its_submitters_email(tmp_path):
     assert inbox.submitter_tag(" ADA@example.com ") == inbox.submitter_tag("ada@example.com")
     assert inbox.submitter_tag("bob@example.com") != inbox.submitter_tag("ada@example.com")
     assert not inbox.write_item(tmp_path, "bug", "T", "", "cli-user").id.endswith(inbox.submitter_tag("cli-user"))
+
+
+# the reporter: anyone else with a grant in the project's app
+
+def test_a_reporter_reports_bugs_and_reads_their_own_submissions_and_nothing_else(client, program, hub_mode):  # noqa: F811
+    as_user(client, "reporter", ADA)
+    r = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Export fails", "severity": "high"})
+    assert r.status_code == 201, r.text
+    assert "submitter: ada@example.com" in remote_text(program, "alpha", f".planning/inbox/{r.json()['id']}.md")
+    assert [i["title"] for i in client.get("/p/alpha/api/inbox/mine").json()] == ["Export fails"]
+    assert client.post("/p/alpha/api/inbox", json={"type": "feature", "title": "Dark mode"}).status_code == 403
+    for url in ("/p/alpha/features", "/p/alpha/bugs", "/p/alpha/dashboard", "/p/alpha", "/p", "/work",
+                "/p/alpha/api/inbox", "/p/alpha/api/bugs", "/p/alpha/api/product"):
+        assert client.get(url, follow_redirects=False).status_code == 403, url
+    item_id = r.json()["id"]
+    assert client.patch(f"/p/alpha/api/inbox/{item_id}", json={"title": "x"}).status_code == 403
+    assert client.delete(f"/p/alpha/api/inbox/{item_id}").status_code == 403
+    assert client.post(f"/p/alpha/api/inbox/{item_id}/promote", json={}).status_code == 403
+
+
+def test_a_reporter_reaches_only_their_own_screenshots(client, program, hub_mode):  # noqa: F811
+    theirs = submit(client, BOB, "bug", "Theirs")
+    as_user(client, "reporter", ADA)
+    assert client.get(f"/p/alpha/api/inbox/{theirs}/screenshot").status_code == 403
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 20
+    assert client.post(f"/p/alpha/api/inbox/{theirs}/screenshot", files={"file": ("a.png", png, "image/png")}).status_code == 403
+    mine = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Mine"}).json()["id"]
+    assert client.post(f"/p/alpha/api/inbox/{mine}/screenshot", files={"file": ("a.png", png, "image/png")}).status_code == 200
+
+
+def test_the_about_content_is_readable_by_a_reporter_and_a_contributor_and_carries_the_version(client, program, hub_mode):  # noqa: F811
+    for role in ("reporter", "contributor"):
+        as_user(client, role, ADA)
+        body = client.get("/p/alpha/api/about/html")
+        assert body.status_code == 200, role
+        assert set(body.json()) == {"content_html", "version"}
+        assert client.get("/p/alpha/api/about").status_code == 403         # the parsed model stays staff-only
+    as_user(client, "editor", "grace@example.com")
+    assert client.get("/p/alpha/api/about/html").status_code == 200

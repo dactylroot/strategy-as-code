@@ -150,21 +150,22 @@ async def scope_project(request: Request, call_next):
     return response
 
 
-async def _contributor_request(request: Request, call_next, scoped):
-    """A contributor reaches only the routes listed in hub_identity.CONTRIBUTOR_ROUTES, inside its own project."""
+async def _limited_request(request: Request, call_next, scoped):
+    """A contributor or reporter reaches only the routes listed for the role in hub_identity, inside its own project."""
+    identity = request.state.identity
     path = request.url.path
     if scoped is None:
         if request.method == "GET" and path.startswith(full("/static/")):
             return await call_next(request)
         return _plain(403, "Your role cannot open this page.", back=_no_access_link(path))
     tail = scoped.group(2) or "/"
-    if request.method == "GET" and tail.rstrip("/") == "":
+    if request.method == "GET" and tail.rstrip("/") == "" and hub_identity.is_contributor(identity):
         return RedirectResponse(url=f"{settings.root_path}/p/{scoped.group(1)}/features")
-    if hub_identity.contributor_may(request.method, tail):
+    if hub_identity.route_allowed(identity, request.method, tail):
         return await call_next(request)
     if "/api/" in path:
         return JSONResponse({"detail": "Your role cannot do that."}, status_code=403)
-    return _plain(403, "Your role can open Features and Bugs only.", back=_no_access_link(path))
+    return _plain(403, "Your role cannot open this page.", back=_no_access_link(path))
 
 
 @app.middleware("http")
@@ -179,8 +180,8 @@ async def require_auth(request: Request, call_next):
             return _plain(verdict.status, "You do not have access to Program Strategy." if verdict.status == 403
                           else "Sign-in service unavailable. Try again shortly.", back=_no_access_link(request.url.path))
         request.state.identity = verdict.identity
-        if hub_identity.is_contributor(verdict.identity):
-            return await _contributor_request(request, call_next, m)
+        if hub_identity.is_limited(verdict.identity):
+            return await _limited_request(request, call_next, m)
         if hub_identity.is_write(request.method, request.url.path) and not hub_identity.may_write(verdict.identity):
             return JSONResponse({"detail": "Your role is read-only."}, status_code=403)
         return await call_next(request)

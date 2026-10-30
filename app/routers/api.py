@@ -207,6 +207,18 @@ def get_about(request: Request):
     return about_parser.parse(settings.about_md)
 
 
+@router.get("/about/html")
+def get_about_html(request: Request):
+    """The project's ABOUT.MD rendered, with its newest released version, for the About page its app shows."""
+    import markdown as md
+    s = _session(request)
+    text = s.get_file("ABOUT.MD") or "" if s else (
+        settings.about_md.read_text(encoding="utf-8") if settings.about_md.exists() else "")
+    released = [e.version for e in about_parser._parse_text(text).changelog if not e.in_progress]
+    return {"content_html": md.markdown(text, extensions=["tables", "fenced_code", "nl2br"]),
+            "version": released[0] if released else ""}
+
+
 @router.put("/roadmap")
 @program_write("backlog updated")
 def put_roadmap(body: RoadmapUpdate, request: Request):
@@ -639,6 +651,8 @@ def list_inbox(request: Request):
 @router.post("/inbox", status_code=201, dependencies=[Depends(_rate_limit)])
 @program_write(lambda kw: f"inbox: {kw['req'].type} submitted: {kw['req'].title[:80]}")
 def submit_inbox(request: Request, req: InboxSubmit):
+    if _hub.is_reporter(getattr(request.state, "identity", None)) and req.type != "bug":
+        raise HTTPException(status_code=403, detail="Your role can report bugs only.")
     actor = request_actor(request)
     who = actor.name if actor else "anonymous"
     try:
@@ -649,8 +663,8 @@ def submit_inbox(request: Request, req: InboxSubmit):
 
 
 def _contributor_owns(request: Request, item_id: str) -> None:
-    """A contributor reaches an item's screenshot only when it is theirs; staff reach any."""
-    if _hub.is_contributor(getattr(request.state, "identity", None)):
+    """A contributor or reporter reaches an item's screenshot only when it is theirs; staff reach any."""
+    if _hub.is_limited(getattr(request.state, "identity", None)):
         try:
             inbox_lib.own_item(settings.project_dir, item_id, request_email(request))
         except inbox_lib.NotSubmitter as exc:
