@@ -17,7 +17,7 @@ Interface with:
 
 ## Screenshots
 
-The UI defaults to dark mode with a theme toggle in the header. These screenshots show light mode.
+The UI defaults to light mode with a theme toggle in the header.
 
 **Overview** - lifecycle pipeline, flagged gaps, and WBS completion
 
@@ -34,6 +34,10 @@ The UI defaults to dark mode with a theme toggle in the header. These screenshot
 **Bugs** - Open, Investigating, and Resolved board with Closed history
 
 ![Bugs](sample-project/screenshots/bugs.png)
+
+**Program overview** - several projects in one view with shared initiatives, blocked work, and bug counts. Run it from `sample-program/` with `PROGRAM_MANIFEST=sample-program/PROGRAM.MD`
+
+![Program overview](sample-program/screenshots/overview.png)
 
 ## Ways to deploy
 

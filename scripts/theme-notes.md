@@ -24,7 +24,7 @@ If asked to "match renewals" or "match solution-analytics" further, re-check
 each source directly rather than assuming this doc stays in sync - it's a
 snapshot, and either upstream app's own files may have moved on.
 
-## Dark Mode Theme (default - no `data-theme` attribute needed)
+## Dark Mode Theme (the base `:root` block; the app sets `data-theme` on load and defaults to light)
 
 ### Base surfaces (renewals-web-react navy scale)
 Three-tier elevation, taken directly from renewals' `theme/index.ts` consts
