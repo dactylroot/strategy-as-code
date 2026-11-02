@@ -5,7 +5,11 @@
 
 set -e
 
-export PROJECT_DIR="${PROJECT_DIR:-/Users/cory/Workspace/renewals}"
+if [ -z "$PROJECT_DIR" ]; then
+  echo "PROJECT_DIR is required. Usage: PROJECT_DIR=/path/to/project ./run.sh" >&2
+  exit 1
+fi
+export PROJECT_DIR
 export APP_TITLE="${APP_TITLE:-strategy-as-code}"
 PORT="${PORT:-8765}"
 
