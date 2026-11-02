@@ -311,7 +311,7 @@ Status values in PRODUCT.MD: `Idea`, `In-Progress`, `Live`, `Released`, `Planned
 
 ## Running the UI
 
-When asked to run, open, start, or launch the UI, find the skill's launcher script and run it in the background with `PROJECT_DIR` set to the current working directory.
+When asked to open, run, start, or launch the planning dashboard (also "strategy-as-code UI"), find the skill's launcher script and run it in the background with `PROJECT_DIR` set to the current working directory. A bare "run the UI" is ambiguous when the project has its own application: ask which one is meant before starting anything.
 
 **Locate the script** - `<skill-dir>/scripts/run-ui.sh` (see Where This Skill Lives for `<skill-dir>`).
 

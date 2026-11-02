@@ -45,7 +45,7 @@ The same app runs four ways. Pick the one that fits how your team works.
 
 | Method | Best for | How it runs | Details |
 | ------ | -------- | ----------- | ------- |
-| **Ad-hoc via AI skill** | A developer or PM who wants a quick look at the current project | Ask Claude to "run the UI" from any session. It starts a local server on the current directory | [Install the Claude skill](#install-the-claude-skill) |
+| **Ad-hoc via AI skill** | A developer or PM who wants a quick look at the current project | Ask Claude to "open the planning dashboard" from any session. It starts a local server on the current directory | [Install the Claude skill](#install-the-claude-skill) |
 | **Standalone** | A shared service for stakeholders who do not have repo access | Its own domain and port with local login, run from Python, Docker, or the pre-built ghcr.io image | [Run the UI](#run-the-ui) and [Standalone](#standalone) |
 | **Program** | Several projects planned together under one UI | One `PROGRAM.MD` manifest lists the member projects. Each is served under `/p/<key>/` with a program overview on the front page | [Environment variables](#environment-variables) (`PROGRAM_MANIFEST`) |
 | **Embedded** | A product that wants planning pages inside its own app | Served under a path prefix of the host app, trusting the host's session and optionally hiding its own nav | [Embedded](#embedded) |
@@ -90,10 +90,10 @@ The skill manages the four markdown files directly - reading and editing them in
 ./scripts/install-skill.sh --opencode [/path/to/your/project]
 ```
 
-To launch the web UI from within a skill session, tell Claude to run the UI:
+To launch the planning dashboard from within a skill session, tell Claude:
 
 ```
-run the UI
+open the planning dashboard
 ```
 
 Claude will start the server pointed at the current project directory and open `http://localhost:8765` in your browser. The UI reads files on each page load, so edits the skill makes are visible immediately without restarting. If the port is taken, Claude can start it on another one with `PORT`.
