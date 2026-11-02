@@ -17,11 +17,13 @@ Interface with:
 
 ## Screenshots
 
-**Summary** - feature counts, lifecycle pipeline, flagged gaps, and WBS completion
+The UI defaults to dark mode with a theme toggle in the header. These screenshots show light mode.
 
-![Summary](sample-project/screenshots/dashboard.png)
+**Overview** - lifecycle pipeline, flagged gaps, and WBS completion
 
-**Features** - five-column Kanban with WBS structure sidebar
+![Overview](sample-project/screenshots/dashboard.png)
+
+**Features** - searchable explorer, WBS structure, and a five-column board from Ideas to Released
 
 ![Features](sample-project/screenshots/features.png)
 
@@ -29,13 +31,32 @@ Interface with:
 
 ![Roadmap](sample-project/screenshots/roadmap.png)
 
-**Bugs** - active bug board with severity badges and resolved history
+**Bugs** - Open, Investigating, and Resolved board with Closed history
 
 ![Bugs](sample-project/screenshots/bugs.png)
 
+## Ways to deploy
+
+The same app runs four ways. Pick the one that fits how your team works.
+
+| Method | Best for | How it runs | Details |
+| ------ | -------- | ----------- | ------- |
+| **Ad-hoc via AI skill** | A developer or PM who wants a quick look at the current project | Ask Claude to "run the UI" from any session. It starts a local server on the current directory | [Install the Claude skill](#install-the-claude-skill) |
+| **Standalone** | A shared service for stakeholders who do not have repo access | Its own domain and port with local login, run from Python, Docker, or the pre-built ghcr.io image | [Run the UI](#run-the-ui) and [Standalone](#standalone) |
+| **Program** | Several projects planned together under one UI | One `PROGRAM.MD` manifest lists the member projects. Each is served under `/p/<key>/` with a program overview on the front page | [Environment variables](#environment-variables) (`PROGRAM_MANIFEST`) |
+| **Embedded** | A product that wants planning pages inside its own app | Served under a path prefix of the host app, trusting the host's session and optionally hiding its own nav | [Embedded](#embedded) |
+
+Standalone and embedded deployments can also be [locked](#locked) to a single project directory.
+
 ## Install the Claude skill
 
-The `program-strategy` skill teaches Claude Code to manage your product documentation using the four-file format above.
+The `program-strategy` skill teaches Claude Code to manage your product documentation using the four-file format above. It covers:
+
+- Capturing ideas to a WBS area and scoring them by Value and Effort
+- Moving features through Idea, In-Progress, Live, and Released
+- Grouping features into Major/Minor Initiatives that drive version bumps
+- Tracking bugs from Open through Resolved to Closed
+- Drafting changelog entries and regenerating the WBS chart
 
 **Global install** (available in all projects):
 
@@ -71,7 +92,7 @@ To launch the web UI from within a skill session, tell Claude to run the UI:
 run the UI
 ```
 
-Claude will start the server pointed at the current project directory and open `http://localhost:8765` in your browser. The UI reads files on each page load, so edits the skill makes are visible immediately without restarting.
+Claude will start the server pointed at the current project directory and open `http://localhost:8765` in your browser. The UI reads files on each page load, so edits the skill makes are visible immediately without restarting. If the port is taken, Claude can start it on another one with `PORT`.
 
 ## Run the UI
 
@@ -84,11 +105,13 @@ pip install -r requirements.txt
 PROJECT_DIR=/path/to/your/project ./run.sh
 ```
 
-Runs on `http://localhost:8765`. Set `APP_TITLE` to override the page title:
+Runs on `http://localhost:8765` with auto-reload. Set `APP_TITLE` to override the page title or `PORT` to change the port:
 
 ```bash
-APP_TITLE="My Product" PROJECT_DIR=/path/to/your/project ./run.sh
+APP_TITLE="My Product" PORT=8766 PROJECT_DIR=/path/to/your/project ./run.sh
 ```
+
+The UI reads the markdown files on each page load. Changes made in the UI (scoring, status moves, roadmap edits, bug triage) are written back to those same files.
 
 ### Docker
 
@@ -133,6 +156,7 @@ Supports `linux/amd64` and `linux/arm64`.
 | `BASE_PATH` | (empty) | URL prefix to serve under, e.g. `/strategy` - see [Embedded](#embedded) below |
 | `AUTH_INTROSPECT_URL` | (empty) | Host session-introspection endpoint - see [Embedded](#embedded) below |
 | `HUB_AUTH_URL` | (empty) | RevOps hub `/internal/auth?app=strategy`. Enables hub identity: the visitor's cookie is forwarded, the hub's `X-User-Email` and `X-App-Role` answer is the only identity accepted (`viewer` reads, `editor` and `admin` write, `contributor` and `reporter` are limited roles, see Roles in hub mode; the request names its project with `&project=<key>` and the manifest key must equal the hub's app key), and `X-Host-User` is ignored |
+| `PROGRAM_MANIFEST` | (empty) | Path to a `PROGRAM.MD`. Enables program mode: each project listed in its Projects table is cloned and served under `<base>/p/<key>/`, and the front page becomes the program overview. Can also be set as `program_manifest` in `server.yml` |
 | `PROGRAM_POLL_SECONDS` | `45` | Background refresh of every member project's clone; `0` turns it off |
 | `PROGRAM_NESTED_DEPTH` | `3` | A manifest row with `Kind` = `program` is a nested program: its own `PROGRAM.MD` (in its `Planning Dir`) is read and its projects are listed as `<row key>.<project key>`, with their `Depends On` prefixed the same way. This is how many levels to follow; `0` turns nesting off. A program that would contain itself (same repository and folder further up) is always refused. Re-read on every poll |
 | `PROGRAM_SWEEP_SECONDS` | `86400` | How often every project's inbox is swept: items untriaged for 60 days move to `.planning/inbox/archive/`, one commit per project that had any; `0` turns it off |
@@ -201,7 +225,6 @@ PROJECT_DIR=/path/to/your/project ./run.sh
 - `BASE_PATH` prefixes every route, redirect, and link so the app resolves correctly behind a reverse proxy forwarding `host.com/strategy/*` to it.
 - `AUTH_INTROSPECT_URL` points at an endpoint on the host that validates its own session cookie, however the host authenticates its users (Okta or otherwise), and returns `200` or `401`. Setting this replaces local login entirely, and access fails closed if the host is unreachable.
 - `HOST_LOGIN_URL` is where unauthenticated visitors get redirected, so there's exactly one login screen for the combined experience.
-- `EMBED_CHROME=true` hides this app's own sidebar/nav, e.g. when it's shown inside an iframe on a host page that already has its own navigation. The host is then responsible for letting users get to Dashboard/Features/Roadmap/Structure/Bugs (e.g. by pointing the iframe's `src` at `{BASE_PATH}/dashboard`, `{BASE_PATH}/features`, etc).
+- `EMBED_CHROME=true` hides this app's own sidebar/nav, e.g. when it's shown inside an iframe on a host page that already has its own navigation. The host is then responsible for letting users get to Overview/Features/Roadmap/Structure/Bugs (e.g. by pointing the iframe's `src` at `{BASE_PATH}/dashboard`, `{BASE_PATH}/features`, etc). The host can also pass `?theme=light` to skip the dark-mode flash on load.
 
 To attribute bugs/features created through the embed to the actual host user (not a shared service account), have the host's reverse proxy forward an `X-Host-User` header (any stable identifier - username, email) on every request it proxies through. `POST /api/bugs` and `POST /api/features` use it as the `owner` when the request body doesn't set one explicitly; owner and UAT-confirmed can be reassigned later from either app's UI regardless of how they were first set.
-- `EMBED_CHROME=true` hides this app's own sidebar/nav, e.g. when it's shown inside an iframe on a host page that already has its own navigation. The host is then responsible for letting users get to Dashboard/Features/Roadmap/Structure/Bugs (e.g. by pointing the iframe's `src` at `{BASE_PATH}/dashboard`, `{BASE_PATH}/features`, etc).
