@@ -60,14 +60,25 @@ def _token_env(base: dict) -> dict:
     }
 
 
-def run_git(cwd: Path | None, args: list[str], *, env: dict | None = None, check: bool = True) -> str:
+def run_git(cwd: Path | None, args: list[str], *, env: dict | None = None, check: bool = True,
+            input: str | None = None) -> str:
     full_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     full_env.update(_token_env(full_env))
     full_env.update(env or {})
-    result = subprocess.run(["git", *args], cwd=cwd, env=full_env, capture_output=True, text=True)
+    result = subprocess.run(["git", *args], cwd=cwd, env=full_env, capture_output=True, text=True, input=input)
     if check and result.returncode != 0:
         raise GitError(args, (result.stderr or result.stdout).strip())
     return result.stdout.strip()
+
+
+def run_git_bytes(cwd: Path | None, args: list[str], *, env: dict | None = None) -> bytes:
+    full_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    full_env.update(_token_env(full_env))
+    full_env.update(env or {})
+    result = subprocess.run(["git", *args], cwd=cwd, env=full_env, capture_output=True)
+    if result.returncode != 0:
+        raise GitError(args, result.stderr.decode(errors="replace").strip())
+    return result.stdout
 
 
 @dataclass
@@ -87,6 +98,8 @@ class Project:
     path: Path
     status: SyncStatus = field(default_factory=SyncStatus)
     _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
+    assets_base: dict = field(default_factory=dict, repr=False)   # screenshot files as last restored: path -> blob sha
+    assets_tip: str = field(default="", repr=False)
 
     @property
     def key(self) -> str:
@@ -118,8 +131,8 @@ class Project:
                 fcntl.flock(fd, fcntl.LOCK_UN)
                 os.close(fd)
 
-    def git(self, *args: str, check: bool = True, env: dict | None = None) -> str:
-        return run_git(self.path, list(args), check=check, env=env)
+    def git(self, *args: str, check: bool = True, env: dict | None = None, input: str | None = None) -> str:
+        return run_git(self.path, list(args), check=check, env=env, input=input)
 
     def default_branch(self) -> str:
         ref = self.git("symbolic-ref", "--short", "refs/remotes/origin/HEAD", check=False)
@@ -169,6 +182,8 @@ class Project:
         sha = self.git("rev-parse", "HEAD")
         self.status.sha = sha
         self.status.last_fetch = time.time()
+        from . import assets
+        assets.restore(self)
         return sha
 
 
@@ -298,6 +313,9 @@ class Registry:
         info.mkdir(exist_ok=True)
         (info / "attributes").write_text(
             "PRODUCT.MD merge=strategy-rows\nBUGS.MD merge=strategy-rows\n", encoding="utf-8")
+        from . import assets
+        # Screenshots never enter the project's history; see assets.py.
+        (info / "exclude").write_text("\n".join(assets.EXCLUDE) + "\n", encoding="utf-8")
 
     def refresh(self, key: str) -> Project:
         """Bring one project's clone up to date. A failure is recorded in its

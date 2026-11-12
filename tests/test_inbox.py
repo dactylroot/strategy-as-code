@@ -132,7 +132,9 @@ def test_web_screenshot_is_committed_served_and_follows_the_bug_on_promotion(cli
     made = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Crash on save"}).json()["id"]
     r = client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", PNG, "image/png")})
     assert r.status_code == 200 and r.json() == {"file": f"{made}.png"}
-    assert f".planning/inbox/{made}.png" in run_git(origin_of(program, "alpha"), ["ls-tree", "-r", "--name-only", "main"])
+    origin = origin_of(program, "alpha")
+    assert f".planning/inbox/{made}.png" not in run_git(origin, ["ls-tree", "-r", "--name-only", "main"])
+    assert f".planning/inbox/{made}.png" in run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"])
     served = client.get(f"/p/alpha/api/inbox/{made}/screenshot")
     assert served.status_code == 200 and served.content == PNG and served.headers["content-type"] == "image/png"
     assert f"/api/inbox/{made}/screenshot" in client.get("/p/alpha/inbox").text
@@ -142,4 +144,26 @@ def test_web_screenshot_is_committed_served_and_follows_the_bug_on_promotion(cli
     assert client.post(f"/p/alpha/api/inbox/{made}/promote", json={}).status_code == 200
     assert client.get(f"/p/alpha/api/bugs").status_code == 200
     files = run_git(origin_of(program, "alpha"), ["ls-tree", "-r", "--name-only", "main"]).splitlines()
-    assert ".planning/screenshots/bug_1.png" in files and not any(f.startswith(".planning/inbox/") for f in files)
+    assert not any("screenshots" in f or f.endswith(".png") for f in files)
+    assert run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"]).splitlines() == [".planning/screenshots/bug_1.png"]
+    assert client.get("/p/alpha/api/bugs/1/screenshot").content == PNG
+    # closing the bug rewrites the ref without the image: one parentless commit, no blob left in it
+    assert client.post("/p/alpha/api/bugs/1/close", json={"resolved_in": "0.1"}).status_code == 200
+    assert run_git(origin, ["rev-parse", "--verify", "-q", "refs/planning/assets"], check=False) == ""
+
+
+def test_screenshot_ref_is_one_commit_and_not_part_of_a_default_clone(client, program, tmp_path):
+    first = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "One"}).json()["id"]
+    second = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Two"}).json()["id"]
+    for made in (first, second):
+        assert client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", PNG, "image/png")}).status_code == 200
+    origin = origin_of(program, "alpha")
+    assert run_git(origin, ["rev-list", "--count", "refs/planning/assets"]) == "1"
+    assert len(run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"]).splitlines()) == 2
+    run_git(None, ["clone", "-q", str(origin), str(tmp_path / "dev")])
+    assert run_git(tmp_path / "dev", ["rev-parse", "--verify", "-q", "refs/planning/assets"], check=False) == ""
+    # declining one leaves the other, still a single commit
+    r = client.post(f"/p/alpha/api/inbox/{first}/decline", json={"reason": "no"})
+    assert r.status_code == 200, r.text
+    assert run_git(origin, ["rev-list", "--count", "refs/planning/assets"]) == "1"
+    assert run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"]) == f".planning/inbox/{second}.png"

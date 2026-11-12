@@ -27,8 +27,8 @@ class Settings(BaseSettings):
     git_sync_enabled: bool = False
     git_sync_branch: str = "content-sync"
     git_sync_remote: str = "content-sync-origin"
-    # .screenshots deliberately excluded - bug screenshots are uploaded as
-    # GitHub Release assets instead (see github_issues.py), not committed to git.
+    # Screenshots are never committed to a project's branches: standalone ones are uploaded as
+    # GitHub Release assets (see github_issues.py), program projects keep theirs on refs/planning/assets (see assets.py).
     program_manifest: str = ""  # path to a PROGRAM.MD; enables /p/<key>/ project-scoped routes
     hub_auth_url: str = ""           # RevOps hub /internal/auth?app=strategy; enables hub identity and roles
     program_poll_seconds: int = 45   # background refresh of every member project; 0 disables

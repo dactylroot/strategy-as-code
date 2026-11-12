@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from . import pullrequest
+from . import assets, pullrequest
 from .registry import GitError, Project, Registry, RegistryError
 
 MAX_ATTEMPTS = 3
@@ -87,6 +87,8 @@ def edit(
                 fn(project.path)
                 text = message() if callable(message) else message
                 result = _commit_and_push(project, text, actor, committer, attempt)
+                if assets.publish(project) and not result.changed:
+                    result = WriteResult(result.project, True, result.sha, result.branch, result.attempts)
                 project.status.last_ok = True
                 project.status.last_error = None
                 return result

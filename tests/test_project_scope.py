@@ -243,8 +243,9 @@ def test_bug_screenshot_is_committed_to_the_remote_and_served_when_scoped(client
     bug_id = r.json()["id"]
     r = client.post(f"/p/alpha/api/bugs/{bug_id}/screenshot", files={"file": ("a.png", png, "image/png")})
     assert r.status_code == 200
-    files = run_git(origin_of(program, "alpha"), ["ls-tree", "-r", "--name-only", "main"])
-    assert f".planning/screenshots/bug_{bug_id}.png" in files
+    origin = origin_of(program, "alpha")
+    assert f".planning/screenshots/bug_{bug_id}.png" not in run_git(origin, ["ls-tree", "-r", "--name-only", "main"])
+    assert f".planning/screenshots/bug_{bug_id}.png" in run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"])
     assert client.get(f"/p/alpha/api/bugs/{bug_id}/screenshot").content == png
 
 
