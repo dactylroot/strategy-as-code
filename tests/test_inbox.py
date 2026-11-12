@@ -127,34 +127,40 @@ def test_attach_trusts_the_bytes_not_the_name_and_replaces_an_earlier_one(tmp_pa
         inbox.attach(tmp_path, "nope", PNG)
 
 
-def test_web_screenshot_is_committed_served_and_follows_the_bug_on_promotion(client, program):
-    from tests.test_project_scope import remote_text  # noqa: F401
+def test_a_bugs_screenshot_follows_it_onto_the_board_and_leaves_with_it(client, program):
     made = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Crash on save"}).json()["id"]
-    r = client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", PNG, "image/png")})
-    assert r.status_code == 200 and r.json() == {"file": f"{made}.png"}
     origin = origin_of(program, "alpha")
-    assert f".planning/inbox/{made}.png" not in run_git(origin, ["ls-tree", "-r", "--name-only", "main"])
-    assert f".planning/inbox/{made}.png" in run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"])
-    served = client.get(f"/p/alpha/api/inbox/{made}/screenshot")
-    assert served.status_code == 200 and served.content == PNG and served.headers["content-type"] == "image/png"
-    assert f"/api/inbox/{made}/screenshot" in client.get("/p/alpha/inbox").text
+    assert "Crash on save" in run_git(origin, ["show", "main:BUGS.MD"])           # on the board, Open, no waiting item
+    r = client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", PNG, "image/png")})
+    assert r.status_code == 200 and r.json() == {"file": "bug_1.png"}
+    assert not any(f.endswith(".png") for f in run_git(origin, ["ls-tree", "-r", "--name-only", "main"]).splitlines())
+    assert run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"]).splitlines() == [".planning/screenshots/bug_1.png"]
+    for url in (f"/p/alpha/api/inbox/{made}/screenshot", "/p/alpha/api/bugs/1/screenshot"):
+        served = client.get(url)
+        assert served.status_code == 200 and served.content == PNG
     bad = client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", b"<svg/>", "image/png")})
     assert bad.status_code == 422
     assert client.get("/p/alpha/api/inbox/missing/screenshot").status_code == 404
-    assert client.post(f"/p/alpha/api/inbox/{made}/promote", json={}).status_code == 200
-    assert client.get(f"/p/alpha/api/bugs").status_code == 200
-    files = run_git(origin_of(program, "alpha"), ["ls-tree", "-r", "--name-only", "main"]).splitlines()
-    assert not any("screenshots" in f or f.endswith(".png") for f in files)
-    assert run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"]).splitlines() == [".planning/screenshots/bug_1.png"]
-    assert client.get("/p/alpha/api/bugs/1/screenshot").content == PNG
-    # closing the bug rewrites the ref without the image: one parentless commit, no blob left in it
+    # closing the bug rewrites the ref without the image
     assert client.post("/p/alpha/api/bugs/1/close", json={"resolved_in": "0.1"}).status_code == 200
     assert run_git(origin, ["rev-parse", "--verify", "-q", "refs/planning/assets"], check=False) == ""
 
 
+def test_a_feature_requests_screenshot_waits_on_the_ref_and_follows_the_triage(client, program):
+    made = client.post("/p/alpha/api/inbox", json={"type": "feature", "title": "Dark mode"}).json()["id"]
+    origin = origin_of(program, "alpha")
+    client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", PNG, "image/png")})
+    assert f".planning/inbox/{made}.png" not in run_git(origin, ["ls-tree", "-r", "--name-only", "main"])
+    assert f".planning/inbox/{made}.png" in run_git(origin, ["ls-tree", "-r", "--name-only", "refs/planning/assets"])
+    assert client.get(f"/p/alpha/api/inbox/{made}/screenshot").content == PNG
+    assert f"/api/inbox/{made}/screenshot" in client.get("/p/alpha/inbox").text
+    client.post(f"/p/alpha/api/inbox/{made}/decline", json={"reason": "no"})
+    assert run_git(origin, ["rev-parse", "--verify", "-q", "refs/planning/assets"], check=False) == ""
+
+
 def test_screenshot_ref_is_one_commit_and_not_part_of_a_default_clone(client, program, tmp_path):
-    first = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "One"}).json()["id"]
-    second = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Two"}).json()["id"]
+    first = client.post("/p/alpha/api/inbox", json={"type": "feature", "title": "One"}).json()["id"]
+    second = client.post("/p/alpha/api/inbox", json={"type": "feature", "title": "Two"}).json()["id"]
     for made in (first, second):
         assert client.post(f"/p/alpha/api/inbox/{made}/screenshot", files={"file": ("x.png", PNG, "image/png")}).status_code == 200
     origin = origin_of(program, "alpha")

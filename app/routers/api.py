@@ -661,10 +661,14 @@ def submit_inbox(request: Request, req: InboxSubmit):
     actor = request_actor(request)
     who = actor.name if actor else "anonymous"
     try:
-        item = inbox_lib.write_item(settings.project_dir, req.type, req.title, req.body, who, req.severity, req.wbs)
+        if req.type == "bug":
+            item_id, _bug = inbox_lib.file_bug(settings.project_dir, req.title, req.body, who, req.severity, req.wbs)
+        else:
+            item_id = inbox_lib.write_item(settings.project_dir, req.type, req.title, req.body, who,
+                                           req.severity, req.wbs).id
     except inbox_lib.InboxError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return {"id": item.id}
+    return {"id": item_id}
 
 
 def _contributor_owns(request: Request, item_id: str) -> None:
@@ -675,7 +679,10 @@ def _contributor_owns(request: Request, item_id: str) -> None:
         except inbox_lib.NotSubmitter as exc:
             raise HTTPException(status_code=403, detail=str(exc))
         except inbox_lib.InboxError:
-            pass    # not waiting for triage: the endpoint answers as it always did
+            try:    # not waiting for triage: a triaged record, if any, still belongs to its submitter
+                inbox_lib.own_triaged(settings.project_dir, item_id, request_email(request))
+            except inbox_lib.NotSubmitter as exc:
+                raise HTTPException(status_code=403, detail=str(exc))
 
 
 @router.get("/inbox/mine")

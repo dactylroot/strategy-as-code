@@ -174,13 +174,22 @@ def attach(root: Path, item_id: str, data: bytes) -> str:
     from the file's own first bytes, never from the name or content type the client
     claims. Returns the stored file name."""
     path = _find(root, item_id)
-    if path is None:
+    bug_id = promoted_bug_id(root, item_id) if path is None else None
+    if path is None and bug_id is None:
         raise InboxError(f"no inbox item {item_id!r}")
     if len(data) > MAX_ATTACHMENT:
         raise InboxError(f"screenshot is larger than {MAX_ATTACHMENT // (1024 * 1024)} MB")
     ext = next((e for magic, e in _IMAGE_TYPES if data.startswith(magic)), None)
     if ext is None:
         raise InboxError("screenshot must be a PNG, JPEG or GIF image")
+    if path is None:    # a bug filed straight onto the board: the screenshot belongs to its row
+        folder = root / SCREENSHOTS
+        folder.mkdir(parents=True, exist_ok=True)
+        for old in folder.glob(f"bug_{bug_id}.*"):
+            old.unlink()
+        target = folder / f"bug_{bug_id}{ext}"
+        target.write_bytes(data)
+        return target.name
     for old in path.parent.glob(path.stem + ".*"):
         if old.suffix.lower() != ".md":
             old.unlink()
@@ -189,10 +198,38 @@ def attach(root: Path, item_id: str, data: bytes) -> str:
     return target.name
 
 
+def promoted_bug_id(root: Path, item_id: str) -> int | None:
+    """The bug an item became, from its triaged record."""
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", item_id):
+        raise InboxError("invalid item id")
+    record = root / TRIAGED / f"{item_id}.md"
+    if not record.is_file():
+        return None
+    item = read_item(record)
+    m = re.fullmatch(r"bug (\d+)", item.ref) if item.outcome == "promoted" else None
+    return int(m.group(1)) if m else None
+
+
+def own_triaged(root: Path, item_id: str, submitter: str) -> None:
+    """Raises NotSubmitter when a triaged record exists and is someone else's."""
+    record = root / TRIAGED / f"{item_id}.md"
+    if record.is_file() and not _same_person(read_item(record).submitter, submitter):
+        raise NotSubmitter("only the submitter can change this item")
+
+
+def file_bug(root: Path, title: str, body: str, submitter: str, severity: str = "", wbs: str = "") -> tuple[str, int]:
+    """A bug goes straight onto the board as Open; the item is only kept as the submitter's record of it.
+    Returns the item id (what the submitter's app attaches a screenshot to) and the bug id."""
+    item = write_item(root, "bug", title, body, submitter, severity, wbs)
+    became = promote(root, item.id, owner=submitter if submitter != "anonymous" else None)
+    return item.id, int(became.split()[1])
+
+
 def attachment_path(root: Path, item_id: str) -> Path | None:
     path = _find(root, item_id)
     if path is None:
-        return None
+        bug_id = promoted_bug_id(root, item_id)
+        return find_bug_screenshot(root, bug_id) if bug_id else None
     name = read_item(path).attachment
     return path.parent / name if name else None
 
@@ -232,7 +269,7 @@ def _triage(root: Path, item: Item, outcome: str, ref: str = "", reason: str = "
     (folder / f"{item.id}.md").write_text("---\n" + "\n".join(head) + "\n---\n", encoding="utf-8")
 
 
-def promote(root: Path, item_id: str, prefix: str = "", value: int | None = None) -> str:
+def promote(root: Path, item_id: str, prefix: str = "", value: int | None = None, owner: str | None = None) -> str:
     """Add the item as a bug or feature row and remove its file. A retry that
     finds the row already present only removes the file. Returns what happened."""
     path = _find(root, item_id)
@@ -251,7 +288,7 @@ def promote(root: Path, item_id: str, prefix: str = "", value: int | None = None
         text = bugs_file.read_text(encoding="utf-8") if bugs_file.exists() else bugs_parser._EMPTY_BUGS
         new_text, bug = bugs_parser.transform_add_bug(
             text, BugCreate(title=item.title.replace("|", "/"), severity=sev, notes=_row_notes(item),
-                            wbs_ref=item.wbs or None))
+                            wbs_ref=item.wbs or None, owner=owner))
         bugs_file.write_text(new_text, encoding="utf-8")
         if item.attachment:
             shots = root / SCREENSHOTS

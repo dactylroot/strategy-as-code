@@ -87,8 +87,8 @@ def test_a_submission_is_a_file_by_the_contributor_and_committed_as_them(client,
 
 
 def test_a_contributor_edits_and_withdraws_only_their_own_waiting_items(client, program, hub_mode):  # noqa: F811
-    mine = submit(client, ADA, "bug", "Mine", body="first")
-    theirs = submit(client, BOB, "bug", "Theirs")
+    mine = submit(client, ADA, "feature", "Mine", body="first")
+    theirs = submit(client, BOB, "feature", "Theirs")
     as_user(client, "contributor", ADA)
     r = client.patch(f"/p/alpha/api/inbox/{mine}", json={"title": "Mine, clearer", "body": "second"})
     assert r.status_code == 200 and r.json()["title"] == "Mine, clearer"
@@ -102,7 +102,7 @@ def test_a_contributor_edits_and_withdraws_only_their_own_waiting_items(client, 
 
 
 def test_an_item_cannot_be_edited_once_it_is_triaged(client, program, hub_mode):  # noqa: F811
-    item_id = submit(client, ADA, "bug", "Crash")
+    item_id = submit(client, ADA, "feature", "Crash")
     triage(client, item_id, "decline", {"reason": "works as designed"})
     as_user(client, "contributor", ADA)
     assert client.patch(f"/p/alpha/api/inbox/{item_id}", json={"title": "x"}).status_code == 422
@@ -121,8 +121,8 @@ def test_outcomes_stay_with_the_submitter_after_triage(client, program, hub_mode
     bug = submit(client, ADA, "bug", "Export fails", wbs="1.1.1", body="private repro steps")
     declined = submit(client, ADA, "feature", "Teleport")
     dup = submit(client, ADA, "feature", "Login again")
-    other = submit(client, BOB, "bug", "Not Ada's")
-    became = triage(client, bug, "promote", {})["became"]
+    other = submit(client, BOB, "feature", "Not Ada's")
+    became = "bug 1"       # a bug goes straight onto the board; its triaged record is the submitter's trace of it
     triage(client, declined, "decline", {"reason": "out of scope"})
     triage(client, dup, "decline", {"duplicate_of": "1.1.2"})
     record = remote_text(program, "alpha", f".planning/triaged/{bug}.md")
@@ -138,9 +138,8 @@ def test_outcomes_stay_with_the_submitter_after_triage(client, program, hub_mode
 
 
 def test_a_promoted_bug_shows_its_current_status_to_its_submitter(client, program, hub_mode):  # noqa: F811
-    bug = submit(client, ADA, "bug", "Export fails", wbs="1.1.1")
-    became = triage(client, bug, "promote", {})["became"]
-    bug_id = int(became.split()[1])
+    submit(client, ADA, "bug", "Export fails", wbs="1.1.1")
+    bug_id = 1
     as_user(client, "editor", "grace@example.com")
     assert client.patch(f"/p/alpha/api/bugs/{bug_id}", json={"status": "Resolved", "fix_version": "0.2.1"}).status_code == 200
     as_user(client, "contributor", ADA)
@@ -204,7 +203,7 @@ def test_a_reporter_reports_bugs_and_reads_their_own_submissions_and_nothing_els
     as_user(client, "reporter", ADA)
     r = client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "Export fails", "severity": "high"})
     assert r.status_code == 201, r.text
-    assert "submitter: ada@example.com" in remote_text(program, "alpha", f".planning/inbox/{r.json()['id']}.md")
+    assert "submitter: ada@example.com" in remote_text(program, "alpha", f".planning/triaged/{r.json()['id']}.md")
     assert [i["title"] for i in client.get("/p/alpha/api/inbox/mine").json()] == ["Export fails"]
     assert client.post("/p/alpha/api/inbox", json={"type": "feature", "title": "Dark mode"}).status_code == 403
     for url in ("/p/alpha/features", "/p/alpha/bugs", "/p/alpha/dashboard", "/p/alpha", "/p", "/work",
