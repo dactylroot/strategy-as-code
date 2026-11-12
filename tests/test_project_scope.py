@@ -232,8 +232,20 @@ def test_endpoints_without_a_program_equivalent_are_refused(client, program):
     client.get("/p/alpha/dashboard")
     r = client.post("/p/alpha/api/switch-project", json={"project_dir": "/tmp"})
     assert r.status_code == 403
-    r = client.post("/p/alpha/api/bugs/1/screenshot", files={"file": ("a.png", b"x", "image/png")})
-    assert r.status_code == 403
+
+
+
+def test_bug_screenshot_is_committed_to_the_remote_and_served_when_scoped(client, program):
+    client.get("/p/alpha/bugs")
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 16
+    r = client.post("/p/alpha/api/bugs", json={"title": "Shot", "severity": "Medium"})
+    assert r.status_code == 200
+    bug_id = r.json()["id"]
+    r = client.post(f"/p/alpha/api/bugs/{bug_id}/screenshot", files={"file": ("a.png", png, "image/png")})
+    assert r.status_code == 200
+    files = run_git(origin_of(program, "alpha"), ["ls-tree", "-r", "--name-only", "main"])
+    assert f".planning/screenshots/bug_{bug_id}.png" in files
+    assert client.get(f"/p/alpha/api/bugs/{bug_id}/screenshot").content == png
 
 
 def test_preview_endpoint_still_works_when_scoped(client, program):

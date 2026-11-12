@@ -458,11 +458,12 @@ def _screenshots_dir() -> Path:
     return d
 
 
-@router.post("/bugs/{bug_id}/screenshot", dependencies=[Depends(refuse_when_scoped("Screenshot upload"))])
-async def upload_bug_screenshot(bug_id: int, request: Request, file: UploadFile = File(...)):
+@router.post("/bugs/{bug_id}/screenshot")
+@program_write("bug {bug_id} screenshot attached")
+def upload_bug_screenshot(bug_id: int, request: Request, file: UploadFile = File(...)):
     if not (file.content_type or "").startswith("image/"):
         raise HTTPException(status_code=400, detail="Only image files are accepted")
-    data = await file.read()
+    data = file.file.read(10 * 1024 * 1024 + 1)
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Screenshot must be under 10 MB")
     content_type = file.content_type or "image/png"
@@ -471,9 +472,12 @@ async def upload_bug_screenshot(bug_id: int, request: Request, file: UploadFile 
     if s:
         _session_screenshots.setdefault(s.session_id, {})[bug_id] = (data, content_type)
     else:
-        d = _screenshots_dir()
-        for old in d.glob(f"bug_{bug_id}.*"):
-            old.unlink(missing_ok=True)
+        # A program project's screenshot is committed with the write, so it goes where no project ignores it.
+        d = settings.project_dir / inbox_lib.SCREENSHOTS if _scope.scope_key() else _screenshots_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        for folder in (inbox_lib.SCREENSHOTS, inbox_lib.LEGACY_SCREENSHOTS):
+            for old in (settings.project_dir / folder).glob(f"bug_{bug_id}.*"):
+                old.unlink(missing_ok=True)
         (d / f"bug_{bug_id}{ext}").write_bytes(data)
     return {"ok": True}
 
