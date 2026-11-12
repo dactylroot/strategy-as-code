@@ -129,7 +129,8 @@ def refuse_cross_site_writes(request: Request) -> None:
     a request came from decides: `Sec-Fetch-Site` of `same-origin` (or `none`, a typed address) is let through and
     anything else is refused. A browser too old to send it still sends `Origin` with a POST, which must be this
     server's own origin or the host's (the Renewals proxy hides the public host from this server, so the host's
-    home page origin is the other one accepted). A request with neither header is no browser, and carries no
+    home page origin is the other one accepted, and TRUSTED_ORIGINS adds any others, such as a staging host
+    reached by address over plain http, where browsers do not send Sec-Fetch-Site). A request with neither header is no browser, and carries no
     cookie it did not choose to send."""
     if not enabled() or request.method in ("GET", "HEAD", "OPTIONS"):
         return
@@ -141,7 +142,9 @@ def refuse_cross_site_writes(request: Request) -> None:
     origin = request.headers.get("origin")
     if origin is None:
         return
-    if _origin(origin) in {o for o in (_origin(str(request.base_url)), _origin(settings.host_home_url)) if o}:
+    allowed = {_origin(str(request.base_url)), _origin(settings.host_home_url),
+               *(_origin(o.strip()) for o in settings.trusted_origins.split(","))}
+    if _origin(origin) in allowed - {""}:
         return
     raise HTTPException(status_code=403, detail="Cross-site requests are not accepted.")
 

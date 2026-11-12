@@ -86,3 +86,14 @@ def test_outside_hub_mode_nothing_changes(client, program):  # noqa: F811
     assert not hub.enabled()
     r = client.post("/p/alpha/api/markdown/preview", json={"content": "# hi"}, headers=CROSS)
     assert r.status_code == 200
+
+
+def test_a_trusted_origin_is_accepted_for_a_host_reached_over_plain_http(client, program, hub_mode, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(type(hub.settings), "trusted_origins", property(lambda self: "http://172.30.0.4, https://other.example"))
+    as_user(client, "contributor", "trusted-origin@example.com")
+    post = lambda origin: client.post("/p/alpha/api/inbox", json={"type": "bug", "title": "T"}, headers={"Origin": origin})
+    assert post("http://172.30.0.4").status_code == 201
+    assert post("https://other.example").status_code == 201
+    assert post("http://172.30.0.40").status_code == 403
+    assert post("http://172.30.0.4.evil.example").status_code == 403
+    assert post("https://evil.example").status_code == 403

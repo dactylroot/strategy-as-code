@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # GitHub Release assets (see github_issues.py), program projects keep theirs on refs/planning/assets (see assets.py).
     program_manifest: str = ""  # path to a PROGRAM.MD; enables /p/<key>/ project-scoped routes
     hub_auth_url: str = ""           # RevOps hub /internal/auth?app=strategy; enables hub identity and roles
+    trusted_origins: str = ""        # comma-separated origins whose browser writes are accepted in hub mode, for a host reached
+                                     # over plain http (no Sec-Fetch-Site is sent there), e.g. "http://172.30.0.4"
     program_poll_seconds: int = 45   # background refresh of every member project; 0 disables
     program_nested_depth: int = 3    # levels of program-within-program to follow; 0 turns nesting off
     program_sweep_seconds: int = 86400  # archive stale inbox items in every member project; 0 disables
@@ -243,6 +245,10 @@ class _SettingsProxy:
     @property
     def host_home_url(self) -> str:
         return _base.host_home_url
+
+    @property
+    def trusted_origins(self) -> str:
+        return _base.trusted_origins
 
     @property
     def embed_chrome(self) -> bool:
