@@ -395,7 +395,11 @@ function submitBug() {
     if (screenshotFile && bug.id) {
       const fd = new FormData();
       fd.append('file', screenshotFile);
-      await fetch('{{ base_path }}/api/bugs/' + bug.id + '/screenshot', { method: 'POST', body: fd });
+      const shot = await fetch('{{ base_path }}/api/bugs/' + bug.id + '/screenshot', { method: 'POST', body: fd });
+      if (!shot.ok) {
+        const detail = await shot.json().then(j => j.detail, () => shot.statusText);
+        alert('Bug #' + bug.id + ' was added, but its screenshot was not saved: ' + detail);
+      }
     }
     document.getElementById('newBugModal').close();
     location.reload();
