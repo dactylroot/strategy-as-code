@@ -488,10 +488,9 @@ def get_bug_screenshot(bug_id: int, request: Request, sid: str | None = None):
             raise HTTPException(status_code=404, detail="No screenshot")
         data, content_type = entry
         return Response(content=data, media_type=content_type)
-    matches = list(_screenshots_dir().glob(f"bug_{bug_id}.*"))
-    if not matches:
+    path = inbox_lib.find_bug_screenshot(settings.project_dir, bug_id)
+    if path is None:
         raise HTTPException(status_code=404, detail="No screenshot")
-    path = matches[0]
     return Response(
         content=path.read_bytes(),
         media_type=_SCREENSHOT_MIME.get(path.suffix.lower(), "image/png"),
@@ -553,8 +552,9 @@ def close_bug(bug_id: int, request: Request, body: dict = {}):
     if s:
         _session_screenshots.get(s.session_id, {}).pop(bug_id, None)
     else:
-        for old in _screenshots_dir().glob(f"bug_{bug_id}.*"):
-            old.unlink(missing_ok=True)
+        for folder in (inbox_lib.SCREENSHOTS, inbox_lib.LEGACY_SCREENSHOTS):
+            for old in (settings.project_dir / folder).glob(f"bug_{bug_id}.*"):
+                old.unlink(missing_ok=True)
     return {"ok": True}
 
 

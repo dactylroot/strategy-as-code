@@ -26,6 +26,8 @@ from .parsers import product as product_parser
 
 INBOX = Path(".planning") / "inbox"
 ARCHIVE = INBOX / "archive"
+SCREENSHOTS = Path(".planning") / "screenshots"   # promoted bugs' screenshots; tracked, since a project may gitignore .screenshots/
+LEGACY_SCREENSHOTS = Path(".screenshots")
 TRIAGED = Path(".planning") / "triaged"   # outside the inbox, so the inbox folder holds only what awaits triage
 STALE_DAYS = 14
 ARCHIVE_DAYS = 60
@@ -195,6 +197,14 @@ def attachment_path(root: Path, item_id: str) -> Path | None:
     return path.parent / name if name else None
 
 
+def find_bug_screenshot(root: Path, bug_id: int) -> Path | None:
+    for folder in (SCREENSHOTS, LEGACY_SCREENSHOTS):
+        found = next(iter(sorted((root / folder).glob(f"bug_{bug_id}.*"))), None)
+        if found:
+            return found
+    return None
+
+
 def _marker(item_id: str) -> str:
     return f"(inbox {item_id})"
 
@@ -244,8 +254,8 @@ def promote(root: Path, item_id: str, prefix: str = "", value: int | None = None
                             wbs_ref=item.wbs or None))
         bugs_file.write_text(new_text, encoding="utf-8")
         if item.attachment:
-            shots = root / ".screenshots"
-            shots.mkdir(exist_ok=True)
+            shots = root / SCREENSHOTS
+            shots.mkdir(parents=True, exist_ok=True)
             (path.parent / item.attachment).rename(shots / f"bug_{bug.id}{Path(item.attachment).suffix}")
         result = f"bug {bug.id}"
     else:

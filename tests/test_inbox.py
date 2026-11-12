@@ -105,7 +105,7 @@ def test_screenshot_is_renamed_on_promotion(tmp_path):
     item = inbox.write_item(tmp_path, "bug", "Crash", "", "u")
     (tmp_path / inbox.INBOX / f"{item.id}.png").write_bytes(b"png")
     inbox.promote(tmp_path, item.id)
-    assert (tmp_path / ".screenshots" / "bug_1.png").read_bytes() == b"png"
+    assert (tmp_path / ".planning" / "screenshots" / "bug_1.png").read_bytes() == b"png"
     assert not list((tmp_path / inbox.INBOX).glob("*"))
 
 
@@ -142,4 +142,4 @@ def test_web_screenshot_is_committed_served_and_follows_the_bug_on_promotion(cli
     assert client.post(f"/p/alpha/api/inbox/{made}/promote", json={}).status_code == 200
     assert client.get(f"/p/alpha/api/bugs").status_code == 200
     files = run_git(origin_of(program, "alpha"), ["ls-tree", "-r", "--name-only", "main"]).splitlines()
-    assert ".screenshots/bug_1.png" in files and not any(f.startswith(".planning/inbox/") for f in files)
+    assert ".planning/screenshots/bug_1.png" in files and not any(f.startswith(".planning/inbox/") for f in files)

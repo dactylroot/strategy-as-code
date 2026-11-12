@@ -158,8 +158,8 @@ def _close_issue(issue_number: str, bug_id: int) -> None:
 
 
 def _find_screenshot(bug_id: int) -> Path | None:
-    matches = list((settings.project_dir / ".screenshots").glob(f"bug_{bug_id}.*"))
-    return matches[0] if matches else None
+    from .inbox import find_bug_screenshot
+    return find_bug_screenshot(settings.project_dir, bug_id)
 
 
 def _asset_release_id() -> int | None:
