@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Run the `strategy` CLI from a checkout: ./strategy feature status 3.1.1 live
 # Does not cd, so manifest discovery starts from the caller's directory.
+# Python: $STRATEGY_PYTHON if set, else this checkout's .venv (python3 -m venv .venv &&
+# .venv/bin/pip install -r requirements.txt), else the system python3.
 HERE="$(dirname "$(readlink -f "$0")")"
+if [ -z "${STRATEGY_PYTHON:-}" ] && [ -x "$HERE/.venv/bin/python" ]; then
+  STRATEGY_PYTHON="$HERE/.venv/bin/python"
+fi
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" exec "${STRATEGY_PYTHON:-python3}" -m app.cli "$@"
