@@ -8,6 +8,7 @@ clones from that path into its own cache directory.
 from __future__ import annotations
 import base64
 import fcntl
+import logging
 import os
 import subprocess
 import sys
@@ -19,6 +20,12 @@ from pathlib import Path
 
 from .manifest import (DEFAULT_PLANNING_BRANCH, ManifestError, ProgramInitiative, ProjectSpec, load_initiatives,
                        load_manifest, nest, parse_manifest, repo_identity, validate)
+
+
+logger = logging.getLogger(__name__)
+
+# A git lock file older than this cannot belong to a command still running under the clone's lock.
+STALE_LOCK_SECONDS = 120.0
 
 
 class RegistryError(RuntimeError):
@@ -126,10 +133,35 @@ class Project:
             fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX)
+                self._clear_stale_git_locks()
                 yield
             finally:
                 fcntl.flock(fd, fcntl.LOCK_UN)
                 os.close(fd)
+
+    def _clear_stale_git_locks(self, min_age: float = STALE_LOCK_SECONDS) -> list[str]:
+        """Remove git lock files an interrupted git process left behind.
+
+        The clone lives on a persistent volume, so a container stopped mid-git leaves
+        `index.lock` (and friends) that would fail every later operation. Every git
+        command on a clone runs under `locked()`, so a lock file old enough that no
+        running command can still own it is stale. Returns the names removed."""
+        git_dir = self.path / ".git"
+        removed: list[str] = []
+        if not git_dir.is_dir():
+            return removed
+        now = time.time()
+        for lock in [git_dir / "index.lock", git_dir / "HEAD.lock", git_dir / "shallow.lock",
+                     *git_dir.glob("refs/**/*.lock")]:
+            try:
+                if lock.is_file() and now - lock.stat().st_mtime >= min_age:
+                    lock.unlink()
+                    removed.append(str(lock.relative_to(git_dir)))
+            except OSError:
+                continue
+        if removed:
+            logger.warning("%s: removed stale git lock(s): %s", self.key, ", ".join(removed))
+        return removed
 
     def git(self, *args: str, check: bool = True, env: dict | None = None, input: str | None = None) -> str:
         return run_git(self.path, list(args), check=check, env=env, input=input)

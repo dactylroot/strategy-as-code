@@ -311,3 +311,25 @@ def test_no_token_adds_no_header(tmp_path, monkeypatch):
     monkeypatch.delenv("GIT_TOKEN", raising=False)
     run_git(None, ["init", "-q", str(tmp_path / "r")])
     assert run_git(tmp_path / "r", ["config", "--get", "http.https://github.com/.extraheader"], check=False) == ""
+
+
+def test_a_stale_git_lock_left_by_an_interrupted_command_is_cleared(tmp_path, origin):
+    reg = make_registry(tmp_path, origin)
+    reg.refresh("demo")
+    project = reg.get("demo")
+    stale = project.path / ".git" / "index.lock"
+    stale.write_text("")
+    old = os.stat(stale).st_mtime - 3600
+    os.utime(stale, (old, old))
+    reg.refresh("demo")                      # failed on index.lock before
+    assert not stale.exists()
+
+
+def test_a_recent_git_lock_is_left_alone(tmp_path, origin):
+    reg = make_registry(tmp_path, origin)
+    reg.refresh("demo")
+    project = reg.get("demo")
+    fresh = project.path / ".git" / "index.lock"
+    fresh.write_text("")
+    assert project._clear_stale_git_locks() == []
+    assert fresh.exists()
