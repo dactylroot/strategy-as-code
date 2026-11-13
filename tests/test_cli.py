@@ -288,3 +288,17 @@ def test_initiative_commands_reject_unknown_projects_and_bad_features(manifest, 
     assert "no initiative named" in capsys.readouterr().err
     assert main(base + ["inbox", "breakout", "abc", "--feature", "noname"]) == 1
     assert "PREFIX:NAME" in capsys.readouterr().err
+
+
+def test_inbox_breakout_can_link_existing_features(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["initiative", "add", "Auth Work", "--major", "--ask", "demo"]) == 0
+    assert main(base + ["initiative", "send", "Auth Work"]) == 0
+    capsys.readouterr()
+    (item,) = [f for f in run_git(origin, ["ls-tree", "-r", "--name-only", "main"]).splitlines() if "/.planning/inbox/" in f]
+    item_id = item.rsplit("/", 1)[1][:-3]
+    assert main(base + ["inbox", "breakout", item_id, "--link", "9.9.9"]) == 1
+    assert "no such feature to link: 9.9.9" in capsys.readouterr().err
+    assert main(base + ["inbox", "breakout", item_id, "--link", "1.1.1"]) == 0
+    assert "became: linked 1 existing: 1.1.1" in capsys.readouterr().out
+    assert "- 1.1.1" in remote(origin, "ABOUT.MD")

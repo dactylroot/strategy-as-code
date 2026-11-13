@@ -8,7 +8,7 @@
     strategy bug add "Login times out" --severity high
     strategy bug status 12 resolved --fix 0.4.2
     strategy bug close  12 --resolved-in 0.4.2
-    strategy inbox breakout ID --feature "1.1:Index API:8" [--feature ...]   (a project defines a planning task)
+    strategy inbox breakout ID --feature "1.1:Index API:8" [--feature ...] [--link 1.2.3 ...]   (a project defines a planning task)
     strategy initiative list [--all]
     strategy initiative add "Search Overhaul" --major --goal "..." --success "..." --ask alpha="Index API" --ask beta
     strategy initiative set "Search Overhaul" [--minor] [--goal "..."] [--ask p=hint ...] [--publish]
@@ -203,6 +203,8 @@ def build_parser() -> argparse.ArgumentParser:
     bo.add_argument("id")
     bo.add_argument("--feature", action="append", default=[], metavar="PREFIX:NAME[:VALUE]",
                     help="a feature to add under WBS sub-area PREFIX (repeatable), e.g. 1.1:'Index API':8")
+    bo.add_argument("--link", action="append", default=[], metavar="WBS",
+                    help="a feature this project already has, to list under the initiative (repeatable)")
 
     ini = top.add_parser("initiative", help="program initiatives in the manifest").add_subparsers(dest="action", required=True)
     ini.add_parser("list").add_argument("--all", action="store_true", help="include completed initiatives")
@@ -543,7 +545,7 @@ def _run_inbox(reg: Registry, key: str, actor: Actor, args: argparse.Namespace) 
             made = {}
 
             def bo(root: Path) -> None:
-                made["what"] = _inbox.breakout(root, args.id, feats)
+                made["what"] = _inbox.breakout(root, args.id, feats, args.link)
             line = change(bo, f"inbox: {args.id} broken out into features")
             return f"{line}\n  became: {made.get('what')}"
         moved: list[str] = []

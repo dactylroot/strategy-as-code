@@ -155,7 +155,8 @@
         {% if i.asks %}
         <h3>Asked to plan</h3>
         <ul>{% for a in i.asks %}
-          <li><a href="#{{ a.project }}">{{ a.project }}</a> <span class="{{ 'ok' if a.state == 'Defined' else ('bad' if a.state == 'Declined' else ('warn' if a.state in ('Sent', 'Breaking out') else 'muted')) }}">{{ a.state }}</span>
+          <li><a href="{{ projects_url() }}/{{ a.project }}/{{ 'inbox' if a.state == 'Sent' else ('roadmap' if a.state in ('Breaking out', 'Defined') else 'dashboard') }}"
+              title="{{ 'Open the planning task in ' ~ a.project ~ '\'s inbox' if a.state == 'Sent' else ('Open ' ~ a.project ~ '\'s roadmap' if a.state in ('Breaking out', 'Defined') else 'Open ' ~ a.project ~ '\'s planning portal') }}">{{ a.project }}</a> <span class="{{ 'ok' if a.state == 'Defined' else ('bad' if a.state == 'Declined' else ('warn' if a.state in ('Sent', 'Breaking out') else 'muted')) }}">{{ a.state }}</span>
             {% if a.detail %}<span class="muted">{{ a.detail }}</span>{% endif %}
             {% if a.text %}<span class="muted">&mdash; {{ a.text }}</span>{% endif %}
             {% if a.waiting_on and a.state == 'Drafted' %}<span class="warn">waits on {{ a.waiting_on | join(', ') }}</span>{% endif %}</li>
@@ -172,7 +173,7 @@
         {% endif %}
         {% endif %}
         {% for project, group in i.members | groupby('project') %}
-        <h3><a href="#{{ project }}">{{ project }}</a></h3>
+        <h3><a href="{{ projects_url() }}/{{ project }}/features" title="Open {{ project }}'s features">{{ project }}</a></h3>
         <ul>{% for m in group %}
           <li><code>{{ m.wbs }}</code>
             {% if m.name %}{{ m.name }}{% endif %}

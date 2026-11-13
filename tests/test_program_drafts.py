@@ -245,3 +245,83 @@ def test_program_initiatives_are_the_last_section_of_the_overview_page(client, p
     assert page.index('class="tablewrap"') < page.index("Program initiatives</h2>") < page.index('ini-name">Search Overhaul')
     assert page.index("</table>") < page.index("Program initiatives</h2>")
     assert page.index("Program initiatives</h2>") < page.index('id="newini"')
+
+
+def test_the_inbox_breaks_a_planning_task_out_into_a_feature_list_instead_of_promoting_it(client, prog):
+    client.post("/api/program/initiatives", json=DRAFT, headers=H)
+    client.post("/api/program/initiatives/Search Overhaul/send", json={}, headers=H)
+    client.post("/p/alpha/api/inbox", json={"type": "feature", "title": "Dark mode", "body": ""}, headers={"X-Host-User": "other@example.com"})
+    page = client.get("/p/alpha/inbox").text
+    task = page[page.index('class="breakout"'):]
+    task = task[:task.index('data-id=', 1)] if 'data-id=' in task[1:] else task
+    assert 'data-initiative="Search Overhaul"' in page and "planning task" in page
+    assert "Break out into features" in page and "bo-rows" in page
+    assert "Your part: Index API" in page                       # the task's own text is shown above the editor
+    # Only the plain feature request keeps Promote and Duplicate; the planning task offers Decline with a reason.
+    assert page.count('class="btn btn-primary promote"') == 1 and page.count('class="btn dup"') == 1
+    assert "Why no work is needed here" in page
+    assert page.index("const SUB_AREAS") < page.index("document.querySelectorAll('.inbox-item')")
+    # The editor lists this project's sub-areas for the features.
+    import json
+    line = next(l for l in page.splitlines() if l.startswith("const SUB_AREAS"))
+    areas = json.loads(line[line.index("["):line.rindex("]") + 1])
+    assert areas and all(a["wbs"] and a["name"] for a in areas)    # real sub-areas, not blanks
+    first = areas[0]
+    assert f'<option value="{first["wbs"]}">{first["wbs"]} {first["name"]}</option>' in page    # the Promote dropdown too
+
+
+
+def test_initiative_links_open_the_projects_own_planning_pages(client, prog):
+    client.post("/api/program/initiatives", json=DRAFT, headers=H)
+    client.post("/api/program/initiatives/Search Overhaul/send", json={"projects": ["alpha"]}, headers=H)
+    page = client.get("/p").text
+    row = page[page.index('ini-name">Search Overhaul'):]
+    row = row[:row.index("</form>")]
+    assert 'href="/p/alpha/inbox"' in row           # sent: the task is waiting in alpha's inbox
+    assert 'href="/p/beta/dashboard"' in row        # drafted: nothing in beta yet, so its portal
+    assert 'href="#alpha"' not in row and 'href="#beta"' not in row
+    working = page[page.index('ini-name">Reporting Push'):page.index('ini-name">Search Overhaul')]
+    assert '/features"' in working and 'href="#' not in working.split("</summary>", 1)[1]    # member lists link to the project's features
+
+
+def _task_for_alpha(client, o):
+    client.post("/api/program/initiatives", json=DRAFT, headers=H)
+    client.post("/api/program/initiatives/Search Overhaul/send", json={"projects": ["alpha"]}, headers=H)
+    (item,) = files(o["alpha"], ".planning/inbox/")
+    return item.rsplit("/", 1)[1][:-3]
+
+
+def test_a_task_can_link_features_the_project_already_has_alongside_new_ones(client, prog):
+    reg, o = prog
+    item_id = _task_for_alpha(client, o)
+    page = client.get("/p/alpha/inbox").text
+    assert "const FEATURES = [" in page and "AlphaLogin" in page                 # what the editor can search and suggest
+    assert f'"{item_id}"' in page and '"hint": "Index API"' in page              # the ask's hint seeds the suggestions
+    assert "bo-search" in page and "Features this project already has" in page
+
+    bad = client.post(f"/p/alpha/api/inbox/{item_id}/breakout", headers=H, json={"existing": ["9.9.9"], "features": []})
+    assert bad.status_code == 422 and "no such feature to link: 9.9.9" in bad.json()["detail"]
+    assert client.post(f"/p/alpha/api/inbox/{item_id}/breakout", headers=H, json={}).status_code == 422   # nothing to define
+
+    r = client.post(f"/p/alpha/api/inbox/{item_id}/breakout", headers=H, json={
+        "features": [{"prefix": "1.1", "name": "Index API", "value": 8}], "existing": ["1.1.1", "1.1.1"]})
+    assert r.status_code == 200, r.text
+    assert r.json()["became"].startswith("1 feature: ") and "; linked 1 existing: 1.1.1" in r.json()["became"]
+    about = show(o["alpha"], "ABOUT.MD")
+    new_code = r.json()["became"].split("feature: ")[1].split(";")[0]
+    block = about[about.index("### Search Overhaul (Major)"):]
+    assert f"- {new_code}" in block and "- 1.1.1" in block
+    assert files(o["alpha"], ".planning/inbox/") == []
+
+
+def test_a_task_can_be_defined_entirely_from_existing_features(client, prog):
+    reg, o = prog
+    item_id = _task_for_alpha(client, o)
+    before = show(o["alpha"], "PRODUCT.MD")
+    r = client.post(f"/p/alpha/api/inbox/{item_id}/breakout", headers=H, json={"existing": ["1.1.1"]})
+    assert r.status_code == 200 and r.json()["became"] == "linked 1 existing: 1.1.1"
+    assert show(o["alpha"], "PRODUCT.MD") == before                    # nothing new was added
+    assert "- 1.1.1" in show(o["alpha"], "ABOUT.MD")
+    d = initiative(client)
+    assert next(a for a in d["asks"] if a["project"] == "alpha")["state"] == "Defined"
+

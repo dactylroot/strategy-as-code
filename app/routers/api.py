@@ -768,7 +768,8 @@ class BreakoutFeature(BaseModel):
 
 
 class InboxBreakout(BaseModel):
-    features: list[BreakoutFeature]
+    features: list[BreakoutFeature] = []
+    existing: list[str] = []         # WBS codes of features this project already has, to list under the initiative
 
 
 @router.post("/inbox/{item_id}/breakout")
@@ -780,7 +781,7 @@ def breakout_inbox(request: Request, item_id: str, req: InboxBreakout):
         feats = [NewFeature(wbs_prefix=f.prefix, name=f.name, value=f.value, notes=f.notes) for f in req.features]
         if any(not f.name.strip() for f in req.features):
             raise inbox_lib.InboxError("every feature needs a name")
-        return {"became": inbox_lib.breakout(settings.project_dir, item_id, feats)}
+        return {"became": inbox_lib.breakout(settings.project_dir, item_id, feats, req.existing)}
     except inbox_lib.InboxError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 

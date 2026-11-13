@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ..config import settings, full
+from ..manifest import normalize_name
 from .. import session_store
 from ..models import FeatureStatus, BugStatus
 from ..parsers import product as product_parser
@@ -372,8 +373,21 @@ def inbox_page(request: Request):
     items = inbox_lib.list_items(settings.project_dir)
     product = product_parser.parse(settings.product_md) if settings.product_md.exists() else None
     sub_areas = [sa for area in product.wbs_areas for sa in area.sub_areas] if product else []
+    # For a planning task's break-out editor: the features that could be linked, and per task what the initiative
+    # already lists here (so it is not suggested again) and the hint this project was given.
+    features = [{"wbs": f.wbs, "name": f.name, "status": f.stage, "notes": (f.notes or "").replace("<br>", " ")}
+                for f in (product.all_features if product else [])]
+    listed: dict[str, list[str]] = {}
+    if settings.about_md.exists():
+        for ini in about_parser.parse(settings.about_md).initiatives:
+            listed[normalize_name(ini.name)] = list(ini.items)
+    tasks = {}
+    for i in items:
+        if i.kind == inbox_lib.TASK:
+            hint = next((l.split(":", 1)[1].strip() for l in i.body.splitlines() if l.startswith("Your part:")), "")
+            tasks[i.id] = {"listed": listed.get(normalize_name(i.initiative), []), "hint": hint}
     return templates.TemplateResponse(request, "inbox.html", _ctx(
-        request, "inbox", items=items, sub_areas=sub_areas,
+        request, "inbox", items=items, sub_areas=sub_areas, features=features, tasks=tasks,
         stale_days=inbox_lib.STALE_DAYS, archive_days=inbox_lib.ARCHIVE_DAYS))
 
 

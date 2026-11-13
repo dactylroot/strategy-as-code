@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-header">
   <h1>Inbox</h1>
-  <p class="subtitle">Bug reports and feature requests waiting for triage. Each one is a file in the project repository; promoting one adds it to the board in a single commit.</p>
+  <p class="subtitle">Bug reports and feature requests waiting for triage, and planning tasks from the program. Each one is a file in the project repository; promoting one adds it to the board in a single commit. A planning task is broken out into a list of features instead.</p>
 </div>
 
 <div class="card" style="margin-bottom:1.5rem">
@@ -31,7 +31,8 @@
   {% for i in items %}
   <div class="inbox-item" data-id="{{ i.id }}" style="border-top:1px solid var(--color-border-subtle);padding:0.75rem 0">
     <div>
-      <span class="badge">{{ i.kind }}</span>
+      <span class="badge">{{ 'planning task' if i.kind == 'initiative' else i.kind }}</span>
+      {% if i.kind == 'initiative' and i.initiative_kind %}<span class="badge">{{ i.initiative_kind }}</span>{% endif %}
       {% if i.severity %}<span class="badge">{{ i.severity }}</span>{% endif %}
       {% if i.stale %}<span class="badge" title="Untriaged for {{ stale_days }}+ days; archived after {{ archive_days }}">stale</span>{% endif %}
       <strong>{{ i.title }}</strong>
@@ -39,15 +40,36 @@
     </div>
     {% if i.body %}<p style="white-space:pre-wrap;margin:0.4rem 0">{{ i.body }}</p>{% endif %}
     {% if i.attachment %}<p style="margin:0.4rem 0"><a href="{{ base_path }}/api/inbox/{{ i.id }}/screenshot" target="_blank" rel="noopener"><img src="{{ base_path }}/api/inbox/{{ i.id }}/screenshot" alt="Screenshot for {{ i.title }}" style="max-width:20rem;max-height:12rem;border:1px solid var(--color-border-subtle)"></a></p>{% endif %}
+    {% if i.kind == 'initiative' %}
+    <div class="breakout" data-initiative="{{ i.initiative }}" style="margin:0.5rem 0">
+      <p class="text-muted" style="margin:0 0 0.4rem">Define this initiative's requirements in this project: list the features it needs. They are added to the board as ideas, under the sub-area you pick, and listed under <strong>{{ i.initiative }}</strong> in the roadmap. Nothing is built from this.</p>
+      <div class="bo-link" style="margin:0 0 0.6rem">
+        <label class="text-muted" style="display:block">Features this project already has that belong to it</label>
+        <input type="search" class="bo-search" placeholder="Search this project's features by name, note or WBS" style="width:100%;max-width:32rem">
+        <div class="bo-results" style="margin-top:0.3rem"></div>
+        <div class="bo-linked" style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.3rem"></div>
+      </div>
+      <p class="text-muted" style="margin:0 0 0.2rem">New features this project needs:</p>
+      <table class="bo-rows" style="width:100%;border-collapse:collapse">
+        <thead><tr class="text-muted" style="text-align:left"><th>Sub-area</th><th>Feature</th><th style="width:5rem">Value 1-10</th><th>Notes</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin-top:0.5rem">
+        <button class="btn bo-add" type="button">Add feature</button>
+        <button class="btn btn-primary bo-go" type="button">Break out into features</button>
+        <span class="bo-msg text-muted" role="status"></span>
+      </div>
+    </div>
+    {% endif %}
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
       {% if i.kind == 'feature' %}
       <select class="form-select prefix" style="width:auto"><option value="">Sub-area…</option>
-        {% for sa in sub_areas %}<option value="{{ sa.wbs }}">{{ sa.wbs }} {{ sa.name }}</option>{% endfor %}</select>
+        {% for sa in sub_areas %}<option value="{{ sa.wbs_prefix }}">{{ sa.wbs_prefix }} {{ sa.title }}</option>{% endfor %}</select>
       {% endif %}
-      <button class="btn btn-primary promote" type="button">Promote</button>
-      <input type="text" class="reason" placeholder="Reason or duplicate of…" style="width:14rem">
+      {% if i.kind != 'initiative' %}<button class="btn btn-primary promote" type="button">Promote</button>{% endif %}
+      <input type="text" class="reason" placeholder="{{ 'Why no work is needed here…' if i.kind == 'initiative' else 'Reason or duplicate of…' }}" style="width:14rem">
       <button class="btn decline" type="button">Decline</button>
-      <button class="btn dup" type="button">Duplicate</button>
+      {% if i.kind != 'initiative' %}<button class="btn dup" type="button">Duplicate</button>{% endif %}
     </div>
   </div>
   {% endfor %}
@@ -55,6 +77,9 @@
 
 <script>
 const API = '{{ base_path }}/api/inbox';
+const FEATURES = {{ features | tojson }};
+const TASKS = {{ tasks | tojson }};
+const SUB_AREAS = [{% for sa in sub_areas %}{{ {'wbs': sa.wbs_prefix, 'name': sa.title} | tojson }}{{ ',' if not loop.last }}{% endfor %}];
 async function send(url, body) {
   const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
   if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail || d; } catch (e) {} throw new Error(d); }
@@ -81,15 +106,127 @@ function f(id) { return document.getElementById(id).value; }
 document.querySelectorAll('.inbox-item').forEach(row => {
   const id = row.dataset.id, reason = () => row.querySelector('.reason').value.trim();
   const act = async (url, body) => { try { await send(url, body); location.reload(); } catch (err) { alert(err.message); } };
-  row.querySelector('.promote').onclick = () => {
+  const promote = row.querySelector('.promote');
+  if (promote) promote.onclick = () => {
     const p = row.querySelector('.prefix');
     act(API + '/' + id + '/promote', {prefix: p ? p.value : ''});
   };
-  row.querySelector('.decline').onclick = () => act(API + '/' + id + '/decline', {reason: reason()});
-  row.querySelector('.dup').onclick = () => {
+  row.querySelector('.decline').onclick = () => {
+    if (row.querySelector('.breakout') && !reason()) { alert('Say why no work is needed in this project.'); return; }
+    act(API + '/' + id + '/decline', {reason: reason()});
+  };
+  const dup = row.querySelector('.dup');
+  if (dup) dup.onclick = () => {
     if (!reason()) { alert('Enter the id this duplicates.'); return; }
     act(API + '/' + id + '/decline', {duplicate_of: reason()});
   };
+  const bo = row.querySelector('.breakout');
+  if (bo) breakout(bo, id);
 });
+
+// A planning task is broken out into a list of features: one row each, the sub-area carried down from the row above
+// so a run of features in one area is quick to enter. Enter in a name starts the next row.
+// The features page's ranking: exact or partial WBS, then the whole phrase in the name, then in the notes, then word by word.
+function featureScore(f, q) {
+  const wbs = f.wbs.toLowerCase(), name = f.name.toLowerCase(), notes = (f.notes || '').toLowerCase();
+  const tokens = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return 0;
+  const full = tokens.join(' ');
+  if (wbs === full) return 110;
+  if (wbs.startsWith(full)) return 105;
+  if (wbs.includes(full)) return 102;
+  if (name.includes(full)) return 100;
+  if (notes.includes(full)) return 80;
+  return tokens.filter(t => name.includes(t)).length * 10 + tokens.filter(t => notes.includes(t)).length * 5
+       + tokens.filter(t => wbs.includes(t)).length * 8;
+}
+const STOP = new Set(['the', 'and', 'for', 'with', 'from', 'into', 'that', 'this', 'new', 'add', 'all']);
+// Suggestions need a word to hang on to: the initiative's name and this project's hint, minus filler words.
+function suggestionQuery(text) {
+  return (text || '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w));
+}
+function breakout(box, id) {
+  const body = box.querySelector('tbody'), msg = box.querySelector('.bo-msg'), go = box.querySelector('.bo-go');
+  const el = (tag, attrs) => Object.assign(document.createElement(tag), attrs || {});
+  const task = TASKS[id] || {listed: [], hint: ''};
+  const linked = new Map();      // wbs -> feature, in the order they were added
+  const taken = wbs => linked.has(wbs) || task.listed.includes(wbs);
+  const results = box.querySelector('.bo-results'), chips = box.querySelector('.bo-linked'), search = box.querySelector('.bo-search');
+  function showLinked() {
+    chips.textContent = '';
+    linked.forEach(f => {
+      const chip = el('span', {className: 'badge', style: 'display:inline-flex;gap:0.3rem;align-items:center'});
+      chip.append(el('span', {textContent: f.wbs + ' ' + f.name}));
+      const x = el('button', {type: 'button', textContent: '×', title: 'Do not list this under the initiative', style: 'border:0;background:none;cursor:pointer'});
+      x.onclick = () => { linked.delete(f.wbs); showLinked(); showResults(); };
+      chip.append(x); chips.append(chip);
+    });
+  }
+  function showResults() {
+    const q = search.value.trim();
+    let found, heading;
+    if (q) { found = FEATURES.map(f => [f, featureScore(f, q)]); heading = 'Matches'; }
+    else {
+      const words = suggestionQuery(box.dataset.initiative + ' ' + task.hint);
+      found = FEATURES.map(f => [f, words.length ? featureScore(f, words.join(' ')) : 0]);
+      heading = 'Possibly related';
+    }
+    const top = found.filter(([f, s]) => s > 0 && !taken(f.wbs)).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([f]) => f);
+    results.textContent = '';
+    if (!top.length) { if (q) results.append(el('span', {className: 'text-muted', textContent: 'No features match. Add it as a new feature below.'})); return; }
+    results.append(el('div', {className: 'text-muted', textContent: heading + ':'}));
+    top.forEach(f => {
+      const row = el('div', {style: 'display:flex;gap:0.5rem;align-items:baseline;padding:0.15rem 0'});
+      const add = el('button', {type: 'button', className: 'btn', textContent: 'Add'});
+      add.onclick = () => { linked.set(f.wbs, f); showLinked(); showResults(); };
+      const note = (f.notes || '').length > 80 ? f.notes.slice(0, 80) + '…' : (f.notes || '');
+      row.append(add, el('code', {textContent: f.wbs}), el('span', {className: 'badge', textContent: f.status}),
+                 el('strong', {textContent: f.name}), el('span', {className: 'text-muted', textContent: note}));
+      results.append(row);
+    });
+  }
+  search.addEventListener('input', showResults);
+  showResults();
+  function addRow(area) {
+    const tr = el('tr');
+    const sel = el('select', {className: 'form-select bo-area'});
+    sel.append(el('option', {value: '', textContent: 'Sub-area…'}));
+    SUB_AREAS.forEach(sa => sel.append(el('option', {value: sa.wbs, textContent: sa.wbs + ' ' + sa.name})));
+    sel.value = area || '';
+    const name = el('input', {type: 'text', className: 'bo-name', maxLength: 200, placeholder: 'Feature name'});
+    const value = el('input', {type: 'number', className: 'bo-value', min: 1, max: 10});
+    const notes = el('input', {type: 'text', className: 'bo-notes', placeholder: 'Optional'});
+    const rm = el('button', {type: 'button', className: 'btn', textContent: 'Remove', title: 'Remove this row'});
+    rm.onclick = () => { tr.remove(); if (!body.children.length) addRow(); };
+    name.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); addRow(sel.value); body.lastElementChild.querySelector('.bo-name').focus(); }
+    });
+    [sel, name, value, notes, rm].forEach(c => { const td = el('td', {style: 'padding:0.15rem 0.3rem 0.15rem 0'}); td.append(c); tr.append(td); });
+    body.append(tr);
+    return tr;
+  }
+  box.querySelector('.bo-add').onclick = () => {
+    const last = body.lastElementChild;
+    addRow(last ? last.querySelector('.bo-area').value : ''); body.lastElementChild.querySelector('.bo-name').focus();
+  };
+  go.onclick = async () => {
+    const features = [];
+    for (const tr of body.children) {
+      const name = tr.querySelector('.bo-name').value.trim(), prefix = tr.querySelector('.bo-area').value;
+      if (!name) continue;
+      if (!prefix) { msg.textContent = 'Pick a sub-area for "' + name + '".'; return; }
+      const v = tr.querySelector('.bo-value').value;
+      features.push({prefix, name, value: v === '' ? null : parseInt(v, 10), notes: tr.querySelector('.bo-notes').value.trim()});
+    }
+    if (!features.length && !linked.size) { msg.textContent = 'Add or link at least one feature, or decline the task below.'; return; }
+    go.disabled = true; msg.textContent = 'Saving…';
+    try {
+      const r = await send(API + '/' + id + '/breakout', {features, existing: [...linked.keys()]});
+      msg.textContent = 'Done: ' + r.became + '. Reloading…';
+      setTimeout(() => location.reload(), 1200);
+    } catch (err) { msg.textContent = err.message; go.disabled = false; }
+  };
+  addRow();
+}
 </script>
 {% endblock %}

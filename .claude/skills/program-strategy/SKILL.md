@@ -140,10 +140,11 @@ $S initiative send "Search Overhaul" [--only alpha] [--ordered]   # file each as
 
 ```bash
 $S inbox breakout <id> -p <key> --feature "1.1:Index API:8" --feature "1.2:Query planner"   # PREFIX:NAME[:VALUE]
+$S inbox breakout <id> -p <key> --link 1.3.2 --link 1.3.5                                   # features the project already has
 $S inbox decline  <id> -p <key> --reason "No work needed in this project"
 ```
 
-Pick the sub-area prefix from the project's own PRODUCT.MD, and ask the user before breaking out a task whose requirements you would have to invent. A decline sends the ask back to Declined on the program overview, where it can be reworded and sent again.
+Search the project's PRODUCT.MD for features that already belong to the initiative and `--link` those rather than adding duplicates; add `--feature` only for what is missing. Pick the sub-area prefix from the project's own PRODUCT.MD, and ask the user before breaking out a task whose requirements you would have to invent. A decline sends the ask back to Declined on the program overview, where it can be reworded and sent again.
 
 **Asking about the whole program.** When the user asks about program scope (what depends on what, which initiative is blocked, how a feature in one project affects another), read the `PROGRAM.MD` manifest first: its Projects table gives each project's role and `Depends On`, and its `## Initiatives` section lists cross-project members as `project:WBS`. Then read each member project's own PRODUCT.MD from its planning branch, or use the program Overview page (`/p`) if the web UI is running. Recurse depth-first through `Depends On`, stop at a project already visited, and stay within three levels; `strategy deps <project> [--up]` does that walk for you and enforces the limits. Reading is free; change another project's files only when the user asks for that project by name, and then through that project's own `-p <key>`.
 

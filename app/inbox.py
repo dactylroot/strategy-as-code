@@ -333,11 +333,12 @@ def promote(root: Path, item_id: str, prefix: str = "", value: int | None = None
     return result
 
 
-def breakout(root: Path, item_id: str, features: list[NewFeature]) -> str:
-    """Resolve a planning task: add each feature to PRODUCT.MD, list them under the task's initiative in
-    ABOUT.MD (created, with the program's Major/Minor tag, if the project has none), and record the task
-    as done. The caller commits it all at once. A retry that finds the features already there only removes
-    the task file. Returns "<n> features: <codes>"."""
+def breakout(root: Path, item_id: str, features: list[NewFeature], existing: list[str] | None = None) -> str:
+    """Resolve a planning task: add each new feature to PRODUCT.MD, list those and the `existing` features
+    (WBS codes the project already has) under the task's initiative in ABOUT.MD (created, with the program's
+    Major/Minor tag, if the project has none), and record the task as done. The caller commits it all at once.
+    A retry that finds the new features already there only removes the task file. Returns
+    "<n> features: <codes>", with "; linked <k> existing: <codes>" when existing ones were attached."""
     path = _find(root, item_id)
     product_file, about_file = root / "PRODUCT.MD", root / "ABOUT.MD"
     marker = _marker(item_id)
@@ -351,10 +352,16 @@ def breakout(root: Path, item_id: str, features: list[NewFeature]) -> str:
     item = read_item(path)
     if item.kind != TASK:
         raise InboxError("only a planning task is broken out; promote a bug or feature request instead")
-    if not features:
+    linked = list(dict.fromkeys(c.strip() for c in (existing or []) if c and c.strip()))
+    if not features and not linked:
         raise InboxError("break the task out into at least one feature, or decline it with a reason")
     if not about_file.exists():
         raise InboxError("this project has no ABOUT.MD to list the initiative in")
+    if linked:
+        known = {f.wbs for f in product_parser._parse_text(product_file.read_text(encoding="utf-8")).all_features}
+        missing = [c for c in linked if c not in known]
+        if missing:
+            raise InboxError(f"no such feature to link: {', '.join(missing)}")
     text, codes = product_file.read_text(encoding="utf-8"), []
     for f in features:
         try:
@@ -365,8 +372,12 @@ def breakout(root: Path, item_id: str, features: list[NewFeature]) -> str:
         codes.append(feat.wbs)
     product_file.write_text(text, encoding="utf-8")
     about_file.write_text(about_parser.transform_add_to_initiative(
-        about_file.read_text(encoding="utf-8"), item.initiative, item.initiative_kind or "minor", codes), encoding="utf-8")
-    result = f"{len(codes)} feature{'' if len(codes) == 1 else 's'}: {', '.join(codes)}"
+        about_file.read_text(encoding="utf-8"), item.initiative, item.initiative_kind or "minor", codes + linked),
+        encoding="utf-8")
+    result = f"{len(codes)} feature{'' if len(codes) == 1 else 's'}: {', '.join(codes)}" if codes else ""
+    if linked:
+        tail = f"linked {len(linked)} existing: {', '.join(linked)}"
+        result = f"{result}; {tail}" if result else tail
     _triage(root, item, "promoted", result)
     _remove(root, item_id)
     return result
