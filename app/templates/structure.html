@@ -48,9 +48,11 @@
 .modal-textarea:focus { border-color:var(--color-t3-blue); box-shadow:0 0 0 3px var(--color-t3-blue-dim); }
 
 /* Scope items inside modal */
-.scope-row { display:flex; align-items:center; gap:0.45rem; margin-bottom:0.3rem; }
+.str-modal-dialog.wide { width:min(760px,100%); }
+.modal-hint { margin:0 0 0.5rem; font-size:0.78rem; color:var(--color-text-muted); }
+.scope-row { display:flex; align-items:flex-start; gap:0.45rem; margin-bottom:0.3rem; }
 .scope-row input[type=checkbox] { flex-shrink:0; width:14px; height:14px; cursor:pointer; accent-color:var(--live); }
-.scope-text { flex:1; padding:0.35rem 0.5rem; border:1px solid var(--color-border-subtle); border-radius:4px; font-size:0.875rem; font-family:inherit; color:var(--color-text-primary); background:var(--color-bg-card); outline:none; }
+.scope-text { flex:1; resize:none; overflow:hidden; line-height:1.5; padding:0.35rem 0.5rem; border:1px solid var(--color-border-subtle); border-radius:4px; font-size:0.875rem; font-family:inherit; color:var(--color-text-primary); background:var(--color-bg-card); outline:none; }
 .scope-text:focus { border-color:var(--color-t3-blue); }
 .row-del { background:none; border:none; cursor:pointer; color:var(--color-text-muted); font-size:0.875rem; padding:0 0.15rem; line-height:1; flex-shrink:0; }
 .row-del:hover { color:var(--gap); }
@@ -101,7 +103,7 @@
   <div class="str-header">
     <div>
       <p class="str-title">Product Scope</p>
-      <p class="str-subtitle">High-level scope areas and initiatives. Check off completed items.</p>
+      <p class="str-subtitle">High-level scope areas and what is in scope for each. Check off completed items.</p>
     </div>
     <div style="display:flex;gap:0.5rem;align-items:center;">
       <span id="scope-status" class="save-status"></span>
@@ -159,6 +161,7 @@ function openModal(type, i) {
   else if (type === 'w') { _workflowsDirty = true; _markDirty('workflows-status'); }
   else if (type === 's') { _scopeDirty = true; _markDirty('scope-status'); }
   document.getElementById('str-modal').style.display = 'flex';
+  document.querySelector('#str-modal .str-modal-dialog').classList.toggle('wide', type === 's');
   _renderModalBody();
   // Focus first input after a tick (modal content just rendered)
   setTimeout(() => document.querySelector('#str-modal-body input, #str-modal-body textarea, #str-modal-body select')?.focus(), 30);
@@ -249,30 +252,37 @@ function _renderModalBody() {
 
   } else if (type === 's') {
     const g = _scope[i];
-    title.textContent = g.title || 'New Scope Group';
+    title.textContent = 'Product scope area';   // fixed: the name is the first field, so the header need not repeat it
     body.innerHTML = `
       <div class="modal-field">
-        <label>Group Title</label>
+        <label>Area name</label>
         <input class="modal-input" type="text" value="${esc(g.title)}" placeholder="Scope area name…"
-               oninput="_scope[${i}].title=this.value;document.getElementById('str-modal-title').textContent=this.value||'New Scope Group'">
+               oninput="_scope[${i}].title=this.value">
       </div>
       <div class="modal-field">
-        <label>Initiatives</label>
+        <label>Scope items</label>
+        <p class="modal-hint">What is in scope for this area. Tick an item once it has shipped.</p>
         <div id="modal-scope-items">${_scopeItemsHtml(i)}</div>
-        <button class="btn-add-row" onclick="addScopeItem(${i})">+ Add initiative</button>
+        <button class="btn-add-row" onclick="addScopeItem(${i})">+ Add scope item</button>
       </div>`;
+    _fitScopeText();
     rmBtn.onclick = () => removeScopeGroup(i);
   }
+}
+
+// Scope items are sentences, not labels: show each in full by growing its box to fit the text.
+function _fitScopeText() {
+  document.querySelectorAll('#str-modal-body .scope-text').forEach(t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; });
 }
 
 function _scopeItemsHtml(gi) {
   return _scope[gi].items.map((item, ii) => `
     <div class="scope-row">
-      <input type="checkbox" ${item.complete?'checked':''}
+      <input type="checkbox" title="Shipped" ${item.complete?'checked':''}
              onchange="_scope[${gi}].items[${ii}].complete=this.checked">
-      <input class="scope-text" type="text" value="${esc(item.text)}" placeholder="Initiative…"
-             oninput="_scope[${gi}].items[${ii}].text=this.value">
-      <button class="row-del" onclick="removeScopeItem(${gi},${ii})">✕</button>
+      <textarea class="scope-text" rows="1" placeholder="Scope item…"
+             oninput="_scope[${gi}].items[${ii}].text=this.value;_fitScopeText()">${esc(item.text)}</textarea>
+      <button class="row-del" title="Remove this item" onclick="removeScopeItem(${gi},${ii})">✕</button>
     </div>`).join('');
 }
 
@@ -372,7 +382,7 @@ function renderScope() {
     const titleHtml = g.title ? `<p class="view-name">${esc(g.title)}</p>` : `<p class="view-name" style="color:var(--color-text-muted);font-style:italic;">Untitled group</p>`;
     const itemsHtml = g.items.filter(i=>i.text.trim()).map(item =>
       `<p class="view-scope-item ${item.complete?'done':''}">${item.complete?'🎆':''} ${esc(item.text)}</p>`
-    ).join('') || `<p class="view-scope-item" style="color:var(--color-text-muted);font-style:italic;">No initiatives</p>`;
+    ).join('') || `<p class="view-scope-item" style="color:var(--color-text-muted);font-style:italic;">No scope items</p>`;
     card.innerHTML = titleHtml + itemsHtml + `<p class="edit-hint">✎ click to edit</p>`;
     card.onclick = () => openModal('s', gi);
     list.appendChild(card);
@@ -385,12 +395,12 @@ function removeScopeGroup(gi) { _scope.splice(gi,1); closeModal(); }
 function addScopeItem(gi) {
   _scope[gi].items.push({text:'',complete:false});
   const el = document.getElementById('modal-scope-items');
-  if (el) el.innerHTML = _scopeItemsHtml(gi);
+  if (el) { el.innerHTML = _scopeItemsHtml(gi); _fitScopeText(); el.querySelector('.scope-row:last-child .scope-text')?.focus(); }
 }
 function removeScopeItem(gi,ii) {
   _scope[gi].items.splice(ii,1);
   const el = document.getElementById('modal-scope-items');
-  if (el) el.innerHTML = _scopeItemsHtml(gi);
+  if (el) { el.innerHTML = _scopeItemsHtml(gi); _fitScopeText(); }
 }
 
 // ── Serializers ───────────────────────────────────────────────────────────────

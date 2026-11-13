@@ -354,3 +354,10 @@ def test_the_break_out_editor_constants_are_declared_before_the_rows_are_wired(c
     wired = page.index("querySelectorAll('.inbox-item').forEach")
     for name in ("const STOP", "const FEATURES", "const TASKS", "const SUB_AREAS"):
         assert page.index(name) < wired, name
+
+
+def test_the_product_scope_modal_does_not_repeat_the_area_name_and_does_not_call_scope_items_initiatives(client, prog):
+    page = client.get("/p/alpha/structure").text
+    assert "Product scope area" in page and "Area name" in page and "Scope items" in page
+    assert "Group Title" not in page and "Add initiative" not in page and 'placeholder="Initiative' not in page
+    assert '<textarea class="scope-text"' in page      # items are sentences: shown in full, not cut off in a one-line box
