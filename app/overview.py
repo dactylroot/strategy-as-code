@@ -77,6 +77,7 @@ class ProgramInitiativeView:
     success: str = ""
     asks: list[dict] = field(default_factory=list)      # project, text, state, detail, waiting_on: the planning task each project is asked to do
     pending: list[str] = field(default_factory=list)    # projects still to define their part (task sent, not yet broken out)
+    names: list[str] = field(default_factory=list)       # the name and its aliases, normalized: what a new initiative's name is matched against
     separate_of: str = ""                # a project's initiative kept apart from a same-named one by `Not:`
     snippets: dict[str, str] = field(default_factory=dict)  # PROGRAM.MD lines that merge or split, for copying
 
@@ -351,7 +352,7 @@ def unified_initiatives(projects: list[ProjectSummary]) -> tuple[list[ProgramIni
     views = []
     for g in _unify(inits, projects):
         v = ProgramInitiativeView(g.name, "major" if "major" in g.kinds else "minor", declared=g.declared,
-                                  kinds_differ=len(g.kinds) > 1, separate_of=g.separate_of)
+                                  kinds_differ=len(g.kinds) > 1, separate_of=g.separate_of, names=sorted(g.names))
         for (key, wbs), source in g.members.items():
             proj = by_key.get(key)
             hit = proj.stages_by_wbs.get(wbs) if proj else None

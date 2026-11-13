@@ -528,6 +528,20 @@ function toggleInitiativeKind(badge) {
   saveRoadmap();
 }
 
+/* ?initiative=Name opens the roadmap at that initiative: scrolled to, expanded and outlined. */
+(function() {
+  const want = (new URLSearchParams(location.search).get('initiative') || '').trim().toLowerCase();
+  if (!want) return;
+  const card = Array.from(document.querySelectorAll('[data-initiative-name]'))
+    .find(c => c.dataset.initiativeName.trim().toLowerCase() === want);
+  if (!card) return;
+  const header = card.querySelector('.initiative-card-header');
+  const list = card.querySelector('.initiative-list');
+  if (list && list.style.display === 'none' && header) toggleInitiative(header);
+  card.style.outline = '2px solid var(--planned)';
+  card.scrollIntoView({ block: 'center' });
+})();
+
 function toggleInitiative(header) {
   const list = header.nextElementSibling.classList.contains('ini-complete-banner')
     ? header.nextElementSibling.nextElementSibling

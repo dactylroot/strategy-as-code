@@ -10,6 +10,7 @@ from watchfiles import awatch
 from pydantic import BaseModel
 
 from ..config import settings
+from ..manifest import normalize_name
 from .. import hub_identity
 from .. import session_store
 from ..models import (
@@ -910,6 +911,26 @@ async def list_program_initiatives(request: Request, status: str = ""):
         raise HTTPException(status_code=500, detail=f"Program initiatives could not be read: {error}")
     want = {s.strip().lower() for s in status.split(",") if s.strip()} or {"draft", "planned", "in progress"}
     return {"initiatives": [v.as_dict() for v in views if v.status.lower() in want]}
+
+
+@router.get("/program/initiatives/match")
+async def match_program_initiative(name: str = ""):
+    """What a new initiative called `name` would join: a program initiative of that name or alias, and
+    the projects whose own roadmaps already use it. Lets the New form warn before it merges them."""
+    registry = _scope.get_registry()
+    if registry is None or _scope.scope_key():
+        raise HTTPException(status_code=404, detail="Program initiatives are only available on the program.")
+    key = normalize_name(name)
+    if not key:
+        return {"match": None}
+    rows = await run_in_threadpool(_overview.summarize_all)
+    views, _error = _overview.unified_initiatives(rows)
+    for v in views:
+        if key in v.names and not v.separate_of:
+            return {"match": {"name": v.name, "declared": v.declared, "draft": v.draft,
+                              "alias": normalize_name(v.name) != key, "status": v.status,
+                              "projects": v.merged_from}}
+    return {"match": None}
 
 
 @router.post("/program/initiatives", status_code=201)

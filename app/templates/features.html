@@ -595,6 +595,13 @@ function completeFeature(wbs, name) {
 
 /* ── Restore search after panel-triggered reload ── */
 (function() {
+  // ?q= opens the page already searched, so other pages can link to a feature.
+  const linked = new URLSearchParams(location.search).get('q');
+  if (linked) {
+    const inp = document.getElementById('featureSearch');
+    if (inp) { inp.value = linked; onFeatureSearch(linked); }
+    return;
+  }
   const q = sessionStorage.getItem('fdp_search_restore');
   if (q) {
     sessionStorage.removeItem('fdp_search_restore');

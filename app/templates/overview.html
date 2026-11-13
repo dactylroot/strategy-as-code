@@ -105,7 +105,8 @@
   {% macro ini_form(i=none) %}
     {% set asked = {} %}{% if i %}{% for a in i.asks %}{% set _ = asked.update({a.project: a.text}) %}{% endfor %}{% endif %}
     <form{% if not i %} id="newini"{% endif %} class="ini-form" autocomplete="off"{% if i %} data-name="{{ i.name }}"{% endif %}>
-      {% if not i %}<label>Name <input type="text" name="name" required maxlength="120"></label>{% endif %}
+      {% if not i %}<label>Name <input type="text" name="name" required maxlength="120"></label>
+      <p class="ini-dup wide warn" role="status" hidden></p>{% endif %}
       <label>Size <select name="kind"><option value="major"{% if i and i.kind == 'major' %} selected{% endif %}>Major</option><option value="minor"{% if not i or i.kind == 'minor' %} selected{% endif %}>Minor</option></select></label>
       <label class="wide">Goal <textarea name="goal" rows="2" placeholder="What changes for customers or the business">{{ i.goal if i }}</textarea></label>
       <label class="wide">Success <textarea name="success" rows="2" placeholder="How we will know it worked">{{ i.success if i }}</textarea></label>
@@ -155,7 +156,7 @@
         {% if i.asks %}
         <h3>Asked to plan</h3>
         <ul>{% for a in i.asks %}
-          <li><a href="{{ projects_url() }}/{{ a.project }}/{{ 'inbox' if a.state == 'Sent' else ('roadmap' if a.state in ('Breaking out', 'Defined') else 'dashboard') }}"
+          <li><a href="{{ projects_url() }}/{{ a.project }}/{{ 'inbox' if a.state == 'Sent' else ('roadmap?initiative=' ~ (i.name | urlencode) if a.state in ('Breaking out', 'Defined') else 'dashboard') }}"
               title="{{ 'Open the planning task in ' ~ a.project ~ '\'s inbox' if a.state == 'Sent' else ('Open ' ~ a.project ~ '\'s roadmap' if a.state in ('Breaking out', 'Defined') else 'Open ' ~ a.project ~ '\'s planning portal') }}">{{ a.project }}</a> <span class="{{ 'ok' if a.state == 'Defined' else ('bad' if a.state == 'Declined' else ('warn' if a.state in ('Sent', 'Breaking out') else 'muted')) }}">{{ a.state }}</span>
             {% if a.detail %}<span class="muted">{{ a.detail }}</span>{% endif %}
             {% if a.text %}<span class="muted">&mdash; {{ a.text }}</span>{% endif %}
@@ -173,9 +174,9 @@
         {% endif %}
         {% endif %}
         {% for project, group in i.members | groupby('project') %}
-        <h3><a href="{{ projects_url() }}/{{ project }}/features" title="Open {{ project }}'s features">{{ project }}</a></h3>
+        <h3><a href="{{ projects_url() }}/{{ project }}/roadmap?initiative={{ i.name | urlencode }}" title="Open this initiative in {{ project }}'s roadmap">{{ project }}</a></h3>
         <ul>{% for m in group %}
-          <li><code>{{ m.wbs }}</code>
+          <li><a href="{{ projects_url() }}/{{ project }}/features?q={{ m.wbs | urlencode }}" title="Find {{ m.wbs }} in {{ project }}'s features"><code>{{ m.wbs }}</code></a>
             {% if m.name %}{{ m.name }}{% endif %}
             <span class="{{ 'ok' if m.done else ('bad' if m.missing else 'muted') }}">{{ m.stage }}</span>
             {% if m.blocked_by %}<span class="warn">blocked by {{ m.blocked_by | join(', ') }}</span>{% endif %}
@@ -347,6 +348,25 @@
       function inForm(nf) {
         var f = nf.elements, msg = nf.querySelector('.ini-msg'), go = nf.querySelector('button[type=submit]');
         var existing = nf.dataset.name;
+        var dup = nf.querySelector('.ini-dup'), dupTimer;
+        if (dup) f.name.addEventListener('input', function () {
+          clearTimeout(dupTimer);
+          var typed = f.name.value.trim();
+          if (!typed) { dup.hidden = true; return; }
+          dupTimer = setTimeout(async function () {
+            try {
+              var r = await fetch(apiBase + '/match?name=' + encodeURIComponent(typed));
+              var m = r.ok ? (await r.json()).match : null;
+              if (f.name.value.trim() !== typed) return;      // typed on since
+              if (!m) { dup.hidden = true; return; }
+              var via = m.alias ? '\u201c' + typed + '\u201d is an alias of \u201c' + m.name + '\u201d' : '\u201c' + m.name + '\u201d already exists';
+              dup.textContent = m.declared
+                ? via + ' in the program (' + m.status.toLowerCase() + '). Creating this will be refused; edit that initiative instead.'
+                : 'Projects already use this name (' + m.projects.join(', ') + '). Creating it adopts their work into one program initiative.';
+              dup.hidden = false;
+            } catch (e) { dup.hidden = true; }
+          }, 300);
+        });
         function fail(e) { msg.textContent = (existing ? 'Not saved: ' : 'Not created: ') + e.message; go.disabled = false; }
         async function call(method, url, body) {
           var r = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });

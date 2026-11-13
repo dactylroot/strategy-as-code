@@ -281,7 +281,8 @@ def test_initiative_links_open_the_projects_own_planning_pages(client, prog):
     assert 'href="/p/beta/dashboard"' in row        # drafted: nothing in beta yet, so its portal
     assert 'href="#alpha"' not in row and 'href="#beta"' not in row
     working = page[page.index('ini-name">Reporting Push'):page.index('ini-name">Search Overhaul')]
-    assert '/features"' in working and 'href="#' not in working.split("</summary>", 1)[1]    # member lists link to the project's features
+    body = working.split("</summary>", 1)[1]
+    assert "/roadmap?initiative=Reporting%20Push" in body and "/features?q=" in body and 'href="#' not in body
 
 
 def _task_for_alpha(client, o):
@@ -325,3 +326,23 @@ def test_a_task_can_be_defined_entirely_from_existing_features(client, prog):
     d = initiative(client)
     assert next(a for a in d["asks"] if a["project"] == "alpha")["state"] == "Defined"
 
+
+
+def test_a_new_name_is_matched_against_program_initiatives_aliases_and_project_roadmaps(client, prog):
+    client.post("/api/program/initiatives", json=DRAFT, headers=H)
+    got = client.get("/api/program/initiatives/match?name=  search   OVERHAUL. ").json()["match"]
+    assert (got["name"], got["declared"], got["alias"]) == ("Search Overhaul", True, False)
+    got = client.get("/api/program/initiatives/match?name=Reporting push").json()["match"]
+    assert got["name"] == "Reporting Push" and got["projects"]        # a project already plans under that name
+    assert client.get("/api/program/initiatives/match?name=Brand new thing").json()["match"] is None
+    assert client.get("/api/program/initiatives/match?name=").json()["match"] is None
+
+
+def test_the_new_form_warns_about_a_name_that_is_already_in_use(client, prog):
+    page = client.get("/p").text
+    assert 'class="ini-dup' in page and "/match?name=" in page
+
+
+def test_the_features_and_roadmap_pages_open_at_a_linked_search_or_initiative(client, prog):
+    assert "get('q')" in client.get("/p/alpha/features").text
+    assert "get('initiative')" in client.get("/p/alpha/roadmap").text
