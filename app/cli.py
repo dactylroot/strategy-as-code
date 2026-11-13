@@ -8,12 +8,20 @@
     strategy bug add "Login times out" --severity high
     strategy bug status 12 resolved --fix 0.4.2
     strategy bug close  12 --resolved-in 0.4.2
+    strategy inbox breakout ID --feature "1.1:Index API:8" [--feature ...]   (a project defines a planning task)
+    strategy initiative list [--all]
+    strategy initiative add "Search Overhaul" --major --goal "..." --success "..." --ask alpha="Index API" --ask beta
+    strategy initiative set "Search Overhaul" [--minor] [--goal "..."] [--ask p=hint ...] [--publish]
+    strategy initiative remove "Search Overhaul"
+    strategy initiative send "Search Overhaul" [--only alpha] [--ordered]
     strategy deps funnel [--up] [--depth 2]
     strategy pr -p funnel            (open or refresh the pull request for a branch-mode project)
 
 Every command is one commit pushed to the project's planning target (see
 `app.writer.edit`); nothing is edited in the caller's working tree, so it is
-safe to run from a feature branch. The program manifest comes from --manifest,
+safe to run from a feature branch. `initiative` commands change the program
+manifest's Initiatives section instead (the manifest repository when
+PROGRAM_MANIFEST_REPO is set, else the PROGRAM.MD file found as below). The program manifest comes from --manifest,
 $STRATEGY_MANIFEST, or the nearest PROGRAM.MD at or below a parent of the
 current directory. Pass --chart to regenerate docs/wbs.* in the same commit;
 it is off by default.
@@ -28,12 +36,15 @@ from pathlib import Path
 from typing import Callable
 
 from . import inbox as _inbox
+from . import manifest as _manifest
+from . import overview, program_drafts, scope
 from . import pullrequest
 from .manifest import MAX_DEPTH, ManifestError, walk
 from .models import BugCreate, BugSeverity, BugStatus, BugUpdate, FeatureStatus, NewFeature
 from .parsers import about as about_parser
 from .parsers import bugs as bugs_parser
 from .parsers import product as product_parser
+from .program_manifest import edit_manifest
 from .registry import Registry, RegistryError
 from .writer import Actor, edit
 
@@ -188,6 +199,37 @@ def build_parser() -> argparse.ArgumentParser:
 
     top.add_parser("pr", help="open, or refresh, the pull request from the project's planning branch to its default branch")
 
+    bo = ib.add_parser("breakout", help="define a program initiative's planning task: add features and list them under the initiative")
+    bo.add_argument("id")
+    bo.add_argument("--feature", action="append", default=[], metavar="PREFIX:NAME[:VALUE]",
+                    help="a feature to add under WBS sub-area PREFIX (repeatable), e.g. 1.1:'Index API':8")
+
+    ini = top.add_parser("initiative", help="program initiatives in the manifest").add_subparsers(dest="action", required=True)
+    ini.add_parser("list").add_argument("--all", action="store_true", help="include completed initiatives")
+    for verb in ("add", "set"):
+        ip = ini.add_parser(verb, help="create an initiative" if verb == "add" else "change the given parts of an initiative")
+        ip.add_argument("name")
+        size = ip.add_mutually_exclusive_group()
+        size.add_argument("--major", dest="kind", action="store_const", const="major")
+        size.add_argument("--minor", dest="kind", action="store_const", const="minor")
+        ip.add_argument("--goal"); ip.add_argument("--success")
+        ip.add_argument("--ask", action="append", metavar="PROJECT[=HINT]",
+                        help="ask a project to plan its part (repeatable; with 'set' replaces every ask)")
+        ip.add_argument("--member", action="append", metavar="PROJECT:WBS", help="a feature in the initiative (repeatable)")
+        ip.add_argument("--alias", action="append", metavar="NAME", help="another name that means this initiative")
+        ip.add_argument("--not", dest="excludes", action="append", metavar="PROJECT",
+                        help="keep this project's same-named initiative separate")
+        if verb == "add":
+            ip.add_argument("--publish", action="store_true", help="not a draft: the initiative is already planned")
+        else:
+            ip.add_argument("--draft", dest="draft", action="store_const", const=True, default=None)
+            ip.add_argument("--publish", dest="draft", action="store_const", const=False)
+            ip.add_argument("--clear-asks", action="store_true")
+    ini.add_parser("remove").add_argument("name")
+    isend = ini.add_parser("send", help="file each ask's planning task in its project's inbox")
+    isend.add_argument("name"); isend.add_argument("--only", action="append", metavar="PROJECT")
+    isend.add_argument("--ordered", action="store_true", help="hold an ask until the projects it depends on have defined theirs")
+
     dp = top.add_parser("deps", help="list the projects a project depends on (--up: that depend on it), depth-first")
     dp.add_argument("project"); dp.add_argument("--up", action="store_true")
     dp.add_argument("--depth", type=int, default=MAX_DEPTH, help=f"levels to follow, at most {MAX_DEPTH}")
@@ -246,6 +288,115 @@ def _run_deps(manifest: Path, args: argparse.Namespace) -> str:
     return "\n".join(lines)
 
 
+def _program_registry(args: argparse.Namespace) -> Registry:
+    """The program whose manifest `initiative` commands change: an explicit --manifest or $STRATEGY_MANIFEST
+    (a file), else the manifest repository ($PROGRAM_MANIFEST_REPO, as the service uses), else the nearest PROGRAM.MD."""
+    from .config import settings
+    if not (args.manifest or os.environ.get("STRATEGY_MANIFEST")) and settings.program_manifest_repo:
+        reg = Registry.from_manifest_repo(settings.program_manifest_repo, settings.program_manifest_path,
+                                          settings.program_manifest_branch, nested_depth=settings.program_nested_depth)
+    else:
+        reg = Registry.from_manifest(find_manifest(args.manifest))
+    reg.expand()
+    return reg
+
+
+def _parse_asks(values: list[str]) -> list[tuple[str, str]]:
+    out = []
+    for v in values:
+        project, _, hint = v.partition("=")
+        out.append((project.strip(), hint.strip()))
+    return out
+
+
+def _parse_members(values: list[str]) -> list[tuple[str, str]]:
+    out = []
+    for v in values:
+        project, sep, wbs = v.partition(":")
+        if not sep or not wbs.strip():
+            raise CliError(f"--member wants PROJECT:WBS, got {v!r}")
+        out.append((project.strip(), wbs.strip()))
+    return out
+
+
+def _check_known(reg: Registry, args: argparse.Namespace, asks, members) -> None:
+    named = {p for p, _ in asks} | {p for p, _ in members} | set(args.excludes or [])
+    unknown = sorted(named - set(reg.keys()))
+    if unknown:
+        raise CliError(f"unknown project(s): {', '.join(unknown)}; known: {', '.join(reg.keys())}")
+
+
+def _where(written) -> str:
+    return (f"{written.branch} @ {written.sha[:7]}" if written.versioned else "written to the manifest file, not versioned") \
+        if written.changed else "no change"
+
+
+def _run_initiative(args: argparse.Namespace) -> str:
+    reg = _program_registry(args)
+    if args.action == "list":
+        scope.set_registry(reg)
+        views, error = overview.unified_initiatives(overview.summarize_all())
+        if error:
+            raise CliError(f"program initiatives could not be read: {error}")
+        lines = []
+        for v in views:
+            if v.status == "Complete" and not args.all:
+                continue
+            progress = "draft" if v.status == "Draft" else f"{v.done}/{v.total}"
+            lines.append(f"{v.name} ({v.kind})  {v.status}  {progress}")
+            lines += [f"    asked {a['project']}: {a['state']}" + (f"  {a['text']}" if a["text"] else "") for a in v.asks]
+            if v.pending:
+                lines.append(f"    requirements pending: {', '.join(v.pending)}")
+        return "\n".join(lines) or "no initiatives in progress"
+    actor = resolve_actor()
+    msg = args.message
+    if args.action == "send":
+        scope.set_registry(reg)
+        try:
+            results = program_drafts.send(reg, args.name, args.only, args.ordered, actor)
+        except program_drafts.DraftError as exc:
+            raise CliError(str(exc)) from exc
+        lines = [f"  {r['project']}: " + ("sent" if r["sent"] else f"failed: {r['error']}" if r["error"] else f"skipped, {r['skipped']}")
+                 for r in results]
+        if any(r["error"] for r in results):
+            raise CliError("not every ask was sent:\n" + "\n".join(lines))
+        return f"{args.name}:\n" + "\n".join(lines)
+    if args.action == "remove":
+        written = edit_manifest(reg, lambda t: _manifest.transform_remove_initiative(t, args.name),
+                                msg or f"initiative removed: {args.name}", actor)
+        return f"initiative {args.name} removed ({_where(written)})"
+    asks = None if args.ask is None and not getattr(args, "clear_asks", False) else _parse_asks(args.ask or [])
+    members = None if args.member is None else _parse_members(args.member)
+    _check_known(reg, args, asks or [], members or [])
+    if args.action == "add":
+        transform = lambda t: _manifest.transform_add_initiative(   # noqa: E731
+            t, args.name, kind=args.kind or "minor", members=members or [], aliases=args.alias or [],
+            excludes=args.excludes or [], draft=not args.publish, goal=args.goal or "", success=args.success or "",
+            asks=asks or [])
+        verb = "added"
+    else:
+        transform = lambda t: _manifest.transform_update_initiative(   # noqa: E731
+            t, args.name, kind=args.kind, members=members, aliases=args.alias, excludes=args.excludes,
+            draft=args.draft, goal=args.goal, success=args.success, asks=asks)
+        verb = "updated"
+    written = edit_manifest(reg, transform, msg or f"initiative {verb}: {args.name}", actor)
+    return f"initiative {args.name} {verb} ({_where(written)})"
+
+
+def _parse_feature(spec: str) -> NewFeature:
+    prefix, sep, rest = spec.partition(":")
+    if not sep or not rest.strip():
+        raise CliError(f"--feature wants PREFIX:NAME[:VALUE], got {spec!r}")
+    name, _, tail = rest.rpartition(":")
+    value = None
+    if name and tail.strip().isdigit():
+        value = int(tail)
+    else:
+        name = rest
+    _check_text("feature name", name, single_line=True)
+    return NewFeature(wbs_prefix=prefix.strip(), name=name.strip(), value=value)
+
+
 def _run_pr(reg: Registry, key: str) -> str:
     project = reg.refresh(key)
     if project.spec.mode != "branch":
@@ -268,6 +419,8 @@ def run(args: argparse.Namespace) -> str:
         return install_merge_driver(Path(args.repo))
     if args.resource == "deps":
         return _run_deps(find_manifest(args.manifest), args)
+    if args.resource == "initiative":
+        return _run_initiative(args)
     reg = Registry.from_manifest(find_manifest(args.manifest))
     reg.expand()
     key = _pick_project(reg, args.project)
@@ -385,6 +538,14 @@ def _run_inbox(reg: Registry, key: str, actor: Actor, args: argparse.Namespace) 
             return change(lambda root: _inbox.decline(root, args.id, reason=args.reason or ""), f"inbox: decline {args.id}: {args.reason}")
         if args.action == "duplicate":
             return change(lambda root: _inbox.decline(root, args.id, duplicate_of=args.of or ""), f"inbox: duplicate {args.id} of {args.of}")
+        if args.action == "breakout":
+            feats = [_parse_feature(f) for f in args.feature]
+            made = {}
+
+            def bo(root: Path) -> None:
+                made["what"] = _inbox.breakout(root, args.id, feats)
+            line = change(bo, f"inbox: {args.id} broken out into features")
+            return f"{line}\n  became: {made.get('what')}"
         moved: list[str] = []
         line = change(lambda root: moved.extend(_inbox.sweep(root)), "inbox: archive stale items")
         return f"{line}\n  archived: {len(moved)}"

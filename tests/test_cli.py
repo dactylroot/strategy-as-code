@@ -245,3 +245,46 @@ def test_walk_terminates_on_a_cycle_even_though_the_manifest_rejects_one():
     from app.manifest import ProjectSpec, walk
     specs = [ProjectSpec(key="a", repo="/a", depends_on=("b",)), ProjectSpec(key="b", repo="/b", depends_on=("a",))]
     assert [(v.key, v.repeat) for v in walk(specs, "a")] == [("a", False), ("b", False), ("a", True)]
+
+
+def test_initiative_commands_draft_send_and_break_out(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["initiative", "add", "Search Overhaul", "--major", "--goal", "Find things.",
+                        "--success", "Under 300 ms", "--ask", "demo=Index API"]) == 0
+    assert "initiative Search Overhaul added (written to the manifest file, not versioned)" in capsys.readouterr().out
+    text = manifest.read_text()
+    assert "### Search Overhaul (Major, Draft)" in text and "Goal: Find things." in text and "Ask demo: Index API" in text
+
+    assert main(base + ["initiative", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "Search Overhaul (major)  Draft  draft" in out and "asked demo: Drafted  Index API" in out
+
+    assert main(base + ["initiative", "send", "Search Overhaul"]) == 0
+    assert "demo: sent" in capsys.readouterr().out
+    (item,) = [f for f in run_git(origin, ["ls-tree", "-r", "--name-only", "main"]).splitlines() if "/.planning/inbox/" in f]
+    item_id = item.rsplit("/", 1)[1][:-3]
+    assert main(base + ["initiative", "send", "Search Overhaul"]) == 0
+    assert "demo: skipped, already sent" in capsys.readouterr().out
+
+    assert main(base + ["inbox", "breakout", item_id, "--feature", "1.1:Index API:8", "--feature", "1.2:Query planner"]) == 0
+    assert "became: 2 features" in capsys.readouterr().out
+    assert "Index API" in remote(origin, "PRODUCT.MD") and "### Search Overhaul (Major)" in remote(origin, "ABOUT.MD")
+
+    assert main(base + ["initiative", "set", "Search Overhaul", "--minor", "--goal", "", "--publish", "--clear-asks"]) == 0
+    capsys.readouterr()
+    text = manifest.read_text()
+    assert "### Search Overhaul (Minor)" in text and "Goal:" not in text and "Ask demo" not in text
+    assert main(base + ["initiative", "remove", "Search Overhaul"]) == 0
+    assert "Search Overhaul" not in manifest.read_text()
+
+
+def test_initiative_commands_reject_unknown_projects_and_bad_features(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["initiative", "add", "X", "--ask", "nope"]) == 1
+    assert "unknown project(s): nope" in capsys.readouterr().err
+    assert main(base + ["initiative", "add", "X", "--member", "demo"]) == 1
+    assert "PROJECT:WBS" in capsys.readouterr().err
+    assert main(base + ["initiative", "send", "Missing"]) == 1
+    assert "no initiative named" in capsys.readouterr().err
+    assert main(base + ["inbox", "breakout", "abc", "--feature", "noname"]) == 1
+    assert "PREFIX:NAME" in capsys.readouterr().err

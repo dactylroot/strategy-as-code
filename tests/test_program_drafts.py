@@ -236,3 +236,11 @@ def test_saving_the_edit_form_changes_and_clears_fields_and_delete_removes_it(cl
     assert [(a["project"], a["text"]) for a in d["asks"]] == [("beta", "")]
     assert client.delete("/api/program/initiatives/Search Overhaul", headers=H).status_code == 200
     assert "Search Overhaul" not in client.get("/p").text
+
+
+def test_program_initiatives_are_the_last_section_of_the_overview_page(client, prog):
+    client.post("/api/program/initiatives", json=DRAFT, headers=H)
+    page = client.get("/p").text
+    assert page.index('class="tablewrap"') < page.index("Program initiatives</h2>") < page.index('ini-name">Search Overhaul')
+    assert page.index("</table>") < page.index("Program initiatives</h2>")
+    assert page.index("Program initiatives</h2>") < page.index('id="newini"')

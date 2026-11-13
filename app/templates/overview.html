@@ -185,34 +185,9 @@
         {% if can_manage and i.declared and not i.separate_of %}
         <details class="change newini"><summary>Edit or delete this initiative</summary>{{ ini_form(i) }}</details>
         {% endif %}
-        <details class="change"><summary>Change how this is grouped</summary>
-          <p class="muted">PROGRAM.MD is edited by hand. Add these lines under <code>## Initiatives</code>:</p>
-          {% for k, text in i.snippets.items() %}
-            {% if k == 'alias' %}<p class="muted">Treat another name as this initiative:</p>
-            {% elif k.startswith('split:') %}<p class="muted">Keep {{ k[6:] }}'s initiative of this name separate:</p>
-            {% else %}<p class="muted">{{ text }}</p>{% endif %}
-            {% if k != 'merge' %}<pre>{{ text }}</pre> <button type="button" class="btn btn-ghost copy" data-copy="{{ text }}">Copy</button>{% endif %}
-          {% endfor %}
-        </details>
       </div>
     </details>
   {% endmacro %}
-  <h2 class="sec">Program initiatives</h2>
-  <div class="tools">
-    <span class="muted">{{ (active | length) - (drafts | length) }} in progress or planned{% if drafts %}, {{ drafts | length }} draft{{ '' if drafts | length == 1 else 's' }} below{% endif %}. Initiatives with the same name in several projects are combined.</span>
-    {% if finished %}<button type="button" class="btn btn-ghost" id="toggle-done" aria-expanded="false">Show completed ({{ finished | length }})</button>{% endif %}
-  </div>
-  {% if can_manage %}
-  <details class="newini">
-    <summary class="btn btn-ghost">New initiative</summary>
-    {{ ini_form() }}
-  </details>
-  {% endif %}
-  <div class="inis">
-    {% for i in active %}{{ ini_row(i) }}{% else %}<p class="muted" style="padding:10px 12px;margin:0">No initiatives in progress.</p>{% endfor %}
-    {% for i in finished %}{{ ini_row(i, true) }}{% endfor %}
-  </div>
-  <h2 class="sec">Projects</h2>
   {% endif %}
   {% set ok_projects = projects | rejectattr('error') | list %}
   {% set tot = namespace(f=0, done=0, uat=0, flagged=0, bugs=0, hi=0, inbox=0, blocked=0) %}
@@ -341,6 +316,23 @@
     {% endfor %}
   </table>
   </div>
+  {% if initiatives or can_manage %}
+  <h2 class="sec">Program initiatives</h2>
+  <div class="tools">
+    <span class="muted">{{ (active | length) - (drafts | length) }} in progress or planned{% if drafts %}, {{ drafts | length }} draft{{ '' if drafts | length == 1 else 's' }} below{% endif %}. Initiatives with the same name in several projects are combined.</span>
+    {% if finished %}<button type="button" class="btn btn-ghost" id="toggle-done" aria-expanded="false">Show completed ({{ finished | length }})</button>{% endif %}
+  </div>
+  {% if can_manage %}
+  <details class="newini">
+    <summary class="btn btn-ghost">New initiative</summary>
+    {{ ini_form() }}
+  </details>
+  {% endif %}
+  <div class="inis">
+    {% for i in active %}{{ ini_row(i) }}{% else %}<p class="muted" style="padding:10px 12px;margin:0">No initiatives in progress.</p>{% endfor %}
+    {% for i in finished %}{{ ini_row(i, true) }}{% endfor %}
+  </div>
+  {% endif %}
   <script>
     (function () {
       var td = document.getElementById('toggle-done');
@@ -397,11 +389,6 @@
               go.disabled = false;
             } else { msg.textContent = 'Sent. Reloading\u2026'; location.reload(); }
           } catch (e) { msg.textContent = 'Not sent: ' + e.message; go.disabled = false; }
-        });
-      });
-      document.querySelectorAll('.prog .copy').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).then(function () { b.textContent = 'Copied'; });
         });
       });
       var all = document.getElementById('toggle-all');
