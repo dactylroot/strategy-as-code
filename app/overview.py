@@ -85,6 +85,13 @@ class ProgramInitiativeView:
         return round(100 * self.done / self.total) if self.total else 0
 
     @property
+    def reach(self) -> int:
+        """How many distinct projects the initiative involves: those with member features and those asked to
+        plan their part. The measure of its size; the number of features says more about how finely it was
+        planned than how big it is."""
+        return len({m["project"] for m in self.members} | {a["project"] for a in self.asks})
+
+    @property
     def merged_from(self) -> list[str]:
         return sorted({m["project"] for m in self.members})
 
@@ -92,7 +99,7 @@ class ProgramInitiativeView:
         d = {k: getattr(self, k) for k in (
             "name", "kind", "status", "done", "total", "awaiting_uat", "blocked", "kinds_differ", "members", "projects",
             "declared", "draft", "goal", "success", "asks", "pending", "separate_of")}
-        return {**d, "pct": self.pct, "merged_from": self.merged_from}
+        return {**d, "pct": self.pct, "merged_from": self.merged_from, "reach": self.reach}
 
 
 def _load_content(s: ProjectSummary, root) -> None:
@@ -386,7 +393,8 @@ def unified_initiatives(projects: list[ProjectSummary]) -> tuple[list[ProgramIni
                     "In progress" if started or done_all else "Planned")
         v.snippets = _snippets(v)
         views.append(v)
-    views.sort(key=lambda v: (_RANK[v.status], not v.blocked, not v.awaiting_uat, -v.pct, v.name.lower()))
+    # Active work first (by status), then the widest reach, then what needs attention, then furthest along.
+    views.sort(key=lambda v: (_RANK[v.status], -v.reach, not v.blocked, not v.awaiting_uat, -v.pct, v.name.lower()))
     return views, None
 
 

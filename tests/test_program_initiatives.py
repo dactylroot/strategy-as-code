@@ -139,6 +139,23 @@ def test_blocked_and_uat_sort_first_within_a_status(reg):
     assert views[0].blocked == 1 and "1.1 waits on api:3.1" in web.blocked[0]
 
 
+def test_wider_reach_sorts_first_within_a_status_and_feature_count_does_not_count(reg):
+    reg("## Initiatives\n\n### Draft Wide (Major, Draft)\nAsk web: a\nAsk api: b\n\n### Draft Narrow (Major, Draft)\nAsk web: a\n")
+    web = _project("web", {f"1.{n}": "In-Progress" for n in range(1, 8)},
+                   [("Many Features", "minor", [f"1.{n}" for n in range(1, 8)]), ("Wide", "minor", ["1.1"]),
+                    ("Planned Wide", "minor", [])])
+    api = _project("api", {"3.1": "In-Progress", "3.2": "Idea"},
+                   [("Wide", "minor", ["3.1"]), ("Planned Wide", "minor", ["3.2"])])
+    views, _ = overview.unified_initiatives([web, api])
+    assert [(v.name, v.status, v.reach) for v in views] == [
+        ("Wide", "In progress", 2),              # two projects outranks seven features in one
+        ("Many Features", "In progress", 1),
+        ("Planned Wide", "Planned", 1),
+        ("Draft Wide", "Draft", 2),              # a draft's reach is the projects it asks
+        ("Draft Narrow", "Draft", 1)]
+    assert views[0].as_dict()["reach"] == 2
+
+
 def test_a_draft_without_members_is_a_draft_and_leaves_drafts_when_a_project_defines_work(reg):
     reg("## Initiatives\n\n### Search (Major, Draft)\nGoal: Find.\nAsk web: Page\nAsk api: Index\n")
     web, api = _project("web", {}), _project("api", {})
