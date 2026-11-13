@@ -73,6 +73,7 @@
     .prog .ini-body .copy { font-size:12px; }
     .prog .ini-body .send { margin:10px 0; display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:13px; }
     .prog .newini { margin:8px 0 12px; }
+    .prog .ini-body .newini > summary { color:var(--muted); display:list-item; }
     .prog .newini > summary { display:inline-flex; cursor:pointer; list-style:none; }
     .prog .newini > summary::-webkit-details-marker { display:none; }
     .prog .newini form { display:grid; grid-template-columns:minmax(12rem, 2fr) minmax(8rem, 1fr); gap:10px 16px; padding:12px; margin-top:8px; border:1px solid var(--line); border-radius:6px; background:var(--color-bg-surface); font-size:13px; }
@@ -101,6 +102,26 @@
   {% set active = initiatives | rejectattr('status', 'equalto', 'Complete') | list %}
   {% set drafts = initiatives | selectattr('status', 'equalto', 'Draft') | list %}
   {% set finished = initiatives | selectattr('status', 'equalto', 'Complete') | list %}
+  {% macro ini_form(i=none) %}
+    {% set asked = {} %}{% if i %}{% for a in i.asks %}{% set _ = asked.update({a.project: a.text}) %}{% endfor %}{% endif %}
+    <form{% if not i %} id="newini"{% endif %} class="ini-form" autocomplete="off"{% if i %} data-name="{{ i.name }}"{% endif %}>
+      {% if not i %}<label>Name <input type="text" name="name" required maxlength="120"></label>{% endif %}
+      <label>Size <select name="kind"><option value="major"{% if i and i.kind == 'major' %} selected{% endif %}>Major</option><option value="minor"{% if not i or i.kind == 'minor' %} selected{% endif %}>Minor</option></select></label>
+      <label class="wide">Goal <textarea name="goal" rows="2" placeholder="What changes for customers or the business">{{ i.goal if i }}</textarea></label>
+      <label class="wide">Success <textarea name="success" rows="2" placeholder="How we will know it worked">{{ i.success if i }}</textarea></label>
+      <fieldset class="wide"><legend>Ask projects to plan their part</legend>
+        <p class="muted">Each project you tick gets a task to break this out and define its requirements, once you Send it. The note is a hint, not a feature.{% if i and i.asks %} A task already sent stays in that project's inbox; unticking it here only drops it from this list.{% endif %}</p>
+        {% for p in projects if not p.error %}
+        <div class="askrow"><label><input type="checkbox" name="ask" value="{{ p.key }}"{% if p.key in asked %} checked{% endif %}> {{ p.key }}</label>
+          <input type="text" name="hint-{{ p.key }}" value="{{ asked.get(p.key, '') }}" placeholder="What you expect from {{ p.key }}" aria-label="Note for {{ p.key }}"></div>
+        {% endfor %}
+      </fieldset>
+      <label class="wide check"><input type="checkbox" name="draft"{% if not i or i.draft %} checked{% endif %}> Draft: still being planned{% if not i %}, listed after the working initiatives{% endif %}</label>
+      <div class="wide"><button type="submit" class="btn btn-primary">{{ 'Save changes' if i else 'Create' }}</button>
+        {% if i %}<button type="button" class="btn btn-ghost ini-del">Delete</button>{% endif %}
+        <span class="ini-msg muted" role="status"></span></div>
+    </form>
+  {% endmacro %}
   {% macro ini_row(i, hide=false) %}
     <details class="ini"{% if hide %} hidden data-done{% endif %}>
       <summary>
@@ -161,6 +182,9 @@
         {% endfor %}</ul>
         {% else %}{% if i.status != 'Draft' %}<p class="muted">No features yet.</p>{% endif %}
         {% endfor %}
+        {% if can_manage and i.declared and not i.separate_of %}
+        <details class="change newini"><summary>Edit or delete this initiative</summary>{{ ini_form(i) }}</details>
+        {% endif %}
         <details class="change"><summary>Change how this is grouped</summary>
           <p class="muted">PROGRAM.MD is edited by hand. Add these lines under <code>## Initiatives</code>:</p>
           {% for k, text in i.snippets.items() %}
@@ -181,21 +205,7 @@
   {% if can_manage %}
   <details class="newini">
     <summary class="btn btn-ghost">New initiative</summary>
-    <form id="newini" autocomplete="off">
-      <label>Name <input type="text" name="name" required maxlength="120"></label>
-      <label>Size <select name="kind"><option value="major">Major</option><option value="minor" selected>Minor</option></select></label>
-      <label class="wide">Goal <textarea name="goal" rows="2" placeholder="What changes for customers or the business"></textarea></label>
-      <label class="wide">Success <textarea name="success" rows="2" placeholder="How we will know it worked"></textarea></label>
-      <fieldset class="wide"><legend>Ask projects to plan their part</legend>
-        <p class="muted">Each project you tick gets a task to break this out and define its requirements, once you Send it. The note is a hint, not a feature.</p>
-        {% for p in projects if not p.error %}
-        <div class="askrow"><label><input type="checkbox" name="ask" value="{{ p.key }}"> {{ p.key }}</label>
-          <input type="text" name="hint-{{ p.key }}" placeholder="What you expect from {{ p.key }}" aria-label="Note for {{ p.key }}"></div>
-        {% endfor %}
-      </fieldset>
-      <label class="wide check"><input type="checkbox" name="draft" checked> Draft: still being planned, listed after the working initiatives</label>
-      <div class="wide"><button type="submit" class="btn btn-primary">Create</button> <span class="newini-msg muted" role="status"></span></div>
-    </form>
+    {{ ini_form() }}
   </details>
   {% endif %}
   <div class="inis">
@@ -340,23 +350,37 @@
         td.textContent = (open ? 'Hide' : 'Show') + ' completed (' + document.querySelectorAll('.prog .inis details.ini[data-done]').length + ')';
         document.querySelectorAll('.prog .inis details.ini[data-done]').forEach(function (d) { d.hidden = !open; });
       });
-      var nf = document.getElementById('newini');
-      if (nf) nf.addEventListener('submit', async function (ev) {
-        ev.preventDefault();
-        var f = nf.elements, msg = nf.querySelector('.newini-msg'), go = nf.querySelector('button[type=submit]');
-        var asks = Array.prototype.filter.call(nf.querySelectorAll('input[name=ask]'), function (c) { return c.checked; })
-          .map(function (c) { return { project: c.value, text: f['hint-' + c.value].value.trim() }; });
-        go.disabled = true; msg.textContent = 'Creating\u2026';
-        try {
-          var r = await fetch('{{ projects_url() }}'.replace(/\/p$/, '') + '/api/program/initiatives', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: f.name.value.trim(), kind: f.kind.value, goal: f.goal.value.trim(),
-                                   success: f.success.value.trim(), draft: f.draft.checked, asks: asks }) });
+      var apiBase = '{{ projects_url() }}'.replace(/\/p$/, '') + '/api/program/initiatives';
+      function inForm(nf) {
+        var f = nf.elements, msg = nf.querySelector('.ini-msg'), go = nf.querySelector('button[type=submit]');
+        var existing = nf.dataset.name;
+        function fail(e) { msg.textContent = (existing ? 'Not saved: ' : 'Not created: ') + e.message; go.disabled = false; }
+        async function call(method, url, body) {
+          var r = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
           var d = await r.json().catch(function () { return {}; });
           if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : 'check the form (' + r.status + ')');
-          msg.textContent = 'Created. Reloading\u2026'; location.reload();
-        } catch (e) { msg.textContent = 'Not created: ' + e.message; go.disabled = false; }
-      });
+        }
+        nf.addEventListener('submit', async function (ev) {
+          ev.preventDefault();
+          var asks = Array.prototype.filter.call(nf.querySelectorAll('input[name=ask]'), function (c) { return c.checked; })
+            .map(function (c) { return { project: c.value, text: f['hint-' + c.value].value.trim() }; });
+          var body = { kind: f.kind.value, goal: f.goal.value.trim(), success: f.success.value.trim(), draft: f.draft.checked, asks: asks };
+          go.disabled = true; msg.textContent = existing ? 'Saving\u2026' : 'Creating\u2026';
+          try {
+            if (existing) await call('PATCH', apiBase + '/' + encodeURIComponent(existing), body);
+            else { body.name = f.name.value.trim(); await call('POST', apiBase, body); }
+            msg.textContent = 'Done. Reloading\u2026'; location.reload();
+          } catch (e) { fail(e); }
+        });
+        var del = nf.querySelector('.ini-del');
+        if (del) del.addEventListener('click', async function () {
+          if (!confirm('Remove "' + existing + '" from the program manifest?\n\nPlanning tasks already sent stay in the projects\' inboxes. If projects list it in their own roadmaps it will still appear, built from those.')) return;
+          go.disabled = del.disabled = true; msg.textContent = 'Deleting\u2026';
+          try { await call('DELETE', apiBase + '/' + encodeURIComponent(existing)); msg.textContent = 'Deleted. Reloading\u2026'; location.reload(); }
+          catch (e) { msg.textContent = 'Not deleted: ' + e.message; go.disabled = del.disabled = false; }
+        });
+      }
+      document.querySelectorAll('.prog form.ini-form').forEach(inForm);
       document.querySelectorAll('.prog .send').forEach(function (box) {
         var go = box.querySelector('.send-go'), msg = box.querySelector('.send-msg');
         go.addEventListener('click', async function () {

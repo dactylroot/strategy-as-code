@@ -209,3 +209,30 @@ def test_the_overview_offers_a_new_initiative_form_with_a_checkbox_per_project(c
     # The form posts to the same endpoint the API tests exercise.
     assert "/api/program/initiatives'" in page
 
+
+
+def test_a_declared_initiative_has_an_edit_form_prefilled_with_a_delete_button(client, prog):
+    client.post("/api/program/initiatives", json=DRAFT, headers=H)
+    page = client.get("/p").text
+    row = page[page.index('ini-name">Search Overhaul'):]
+    form = row[row.index('data-name="Search Overhaul"'):row.index("</form>")]
+    assert "Edit or delete this initiative" in row and "ini-del" in form and "Save changes" in form
+    assert "Find things." in form and "Under 300 ms" in form                 # goal and success are prefilled
+    assert 'value="alpha" checked' in form and 'value="Index API"' in form    # the ask and its hint are prefilled
+    assert 'value="beta" checked' in form and 'name="draft" checked' in form
+    assert 'option value="major" selected' in form
+    # An initiative that only exists in project roadmaps has nothing in the manifest to edit.
+    assert page.count('data-name="Reporting Push"') == 0
+
+
+def test_saving_the_edit_form_changes_and_clears_fields_and_delete_removes_it(client, prog):
+    client.post("/api/program/initiatives", json=DRAFT, headers=H)
+    # What the form sends: every field, with blanks meaning "remove this line".
+    body = {"kind": "minor", "goal": "", "success": "Under 200 ms", "draft": True,
+            "asks": [{"project": "beta", "text": ""}]}
+    assert client.patch("/api/program/initiatives/Search Overhaul", json=body, headers=H).status_code == 200
+    d = initiative(client)
+    assert d["kind"] == "minor" and d["goal"] == "" and d["success"] == "Under 200 ms"
+    assert [(a["project"], a["text"]) for a in d["asks"]] == [("beta", "")]
+    assert client.delete("/api/program/initiatives/Search Overhaul", headers=H).status_code == 200
+    assert "Search Overhaul" not in client.get("/p").text
