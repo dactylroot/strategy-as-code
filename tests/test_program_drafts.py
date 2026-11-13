@@ -206,6 +206,7 @@ def test_the_overview_offers_a_new_initiative_form_with_a_checkbox_per_project(c
     for key in ("alpha", "beta"):
         assert f'name="ask" value="{key}"' in form and f'name="hint-{key}"' in form
     assert 'name="draft" checked' in form
+    assert "define its requirements, once you Create it." in form       # matches the button
     # The form posts to the same endpoint the API tests exercise.
     assert "/api/program/initiatives'" in page
 

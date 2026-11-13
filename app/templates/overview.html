@@ -110,7 +110,7 @@
       <label class="wide">Goal <textarea name="goal" rows="2" placeholder="What changes for customers or the business">{{ i.goal if i }}</textarea></label>
       <label class="wide">Success <textarea name="success" rows="2" placeholder="How we will know it worked">{{ i.success if i }}</textarea></label>
       <fieldset class="wide"><legend>Ask projects to plan their part</legend>
-        <p class="muted">Each project you tick gets a task to break this out and define its requirements, once you Send it. The note is a hint, not a feature.{% if i and i.asks %} A task already sent stays in that project's inbox; unticking it here only drops it from this list.{% endif %}</p>
+        <p class="muted">Each project you tick gets a task to break this out and define its requirements, once you {{ 'Send' if i else 'Create' }} it. The note is a hint, not a feature.{% if i and i.asks %} A task already sent stays in that project's inbox; unticking it here only drops it from this list.{% endif %}</p>
         {% for p in projects if not p.error %}
         <div class="askrow"><label><input type="checkbox" name="ask" value="{{ p.key }}"{% if p.key in asked %} checked{% endif %}> {{ p.key }}</label>
           <input type="text" name="hint-{{ p.key }}" value="{{ asked.get(p.key, '') }}" placeholder="What you expect from {{ p.key }}" aria-label="Note for {{ p.key }}"></div>
