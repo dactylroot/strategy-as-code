@@ -197,3 +197,15 @@ def test_only_hub_admins_may_change_or_send_program_initiatives(client, prog):
             with pytest.raises(HTTPException) as e:
                 api._program_registry(req)
             assert e.value.status_code == 403 and "hub admins" in e.value.detail
+
+
+def test_the_overview_offers_a_new_initiative_form_with_a_checkbox_per_project(client, prog):
+    page = client.get("/p").text
+    form = page[page.index('<form id="newini"'):page.index("</form>", page.index('<form id="newini"'))]
+    assert 'name="name"' in form and 'name="kind"' in form and 'name="goal"' in form and 'name="success"' in form
+    for key in ("alpha", "beta"):
+        assert f'name="ask" value="{key}"' in form and f'name="hint-{key}"' in form
+    assert 'name="draft" checked' in form
+    # The form posts to the same endpoint the API tests exercise.
+    assert "/api/program/initiatives'" in page
+
