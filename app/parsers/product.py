@@ -558,3 +558,107 @@ def transform_move_feature(text: str, wbs: str, target_prefix: str) -> tuple[str
     if uat:
         text = transform_feature_uat(text, moved.wbs, True)
     return text, moved
+
+
+# ── The first two levels of the WBS: areas (`### 1. Title`) and sub-areas (`#### 1.1 Title`) ──────────────
+
+_SUB_TABLE_HEADER = ("| WBS | Feature | Status | Value | Effort | Notes | Flag | Owner | UAT Confirmed | Created At | Last Updated |\n"
+                     "| --- | ------- | ------ | ----- | ------ | ----- | ---- | ----- | -------------- | ---------- | ------------ |")
+
+
+def _structure_title(raw: str, what: str) -> str:
+    title = " ".join((raw or "").split())
+    if not title:
+        raise ValueError(f"Every {what} needs a name.")
+    if len(title) > 120:
+        raise ValueError(f"{what.capitalize()} name is too long: {title[:30]}…")
+    return title
+
+
+def transform_structure(text: str, areas: list[dict]) -> str:
+    """Rewrite the WBS skeleton of `## Features` to match `areas`, leaving every feature row untouched.
+
+    `areas` is the whole desired structure, in order: `{"number": int | None, "title": str,
+    "sub_areas": [{"prefix": str | None, "title": str}]}`. An entry with a number/prefix is an existing
+    one (rename, reorder); one without is new and takes the next free code. Codes never change, so
+    reordering moves headings but no feature gets a new code and no reference to it goes stale. An
+    existing area or sub-area left out is removed, but only while it holds no features: the features
+    must be moved or deleted first.
+    """
+    m = re.search(r"(^## Features\n)(.*?)(?=\n## |\Z)", text, re.DOTALL | re.MULTILINE)
+    if not m:
+        raise ValueError("Section '## Features' not found")
+    body = m.group(2)
+    tail = ""
+    t = re.search(r"\n(?:[ \t]*---[ \t]*\n?)+\s*\Z", body)
+    if t:
+        tail, body = "\n\n---", body[:t.start()]
+
+    l1 = list(re.finditer(r"^### (\d+)\. (.+)$", body, re.MULTILINE))
+    preamble = body[:l1[0].start()] if l1 else body
+    old: dict[int, dict] = {}                         # number -> {"pre": text before first sub-area, "subs": {prefix: block}}
+    for i, a in enumerate(l1):
+        block = body[a.end():(l1[i + 1].start() if i + 1 < len(l1) else len(body))]
+        l2 = list(re.finditer(r"^#### (\d+\.\d+) (.+)$", block, re.MULTILINE))
+        subs = {s.group(1): block[s.end():(l2[j + 1].start() if j + 1 < len(l2) else len(block))]
+                for j, s in enumerate(l2)}
+        old[int(a.group(1))] = {"pre": block[:l2[0].start()] if l2 else block, "subs": subs}
+
+    def held(content: str, prefix: str) -> int:
+        return len(re.findall(rf"^\| {re.escape(prefix)}\.\d+ \|", content, re.MULTILINE))
+
+    keep_areas: set[int] = set()
+    keep_subs: set[str] = set()
+    for a in areas:
+        if a.get("number") is not None:
+            if a["number"] not in old:
+                raise ValueError(f"Area {a['number']} no longer exists; reload the page.")
+            if a["number"] in keep_areas:
+                raise ValueError(f"Area {a['number']} is listed twice.")
+            keep_areas.add(a["number"])
+        for s in a.get("sub_areas", []):
+            if s.get("prefix") is not None:
+                owner = int(s["prefix"].split(".")[0])
+                if s["prefix"] not in old.get(owner, {"subs": {}})["subs"]:
+                    raise ValueError(f"Sub-area {s['prefix']} no longer exists; reload the page.")
+                if s["prefix"] in keep_subs:
+                    raise ValueError(f"Sub-area {s['prefix']} is listed twice.")
+                if owner != a.get("number"):
+                    raise ValueError(f"Sub-area {s['prefix']} cannot move to another area: its code would change. "
+                                     "Move its features there instead.")
+                keep_subs.add(s["prefix"])
+    for n, info in old.items():
+        for prefix, content in info["subs"].items():
+            if prefix not in keep_subs and held(content, prefix):
+                raise ValueError(f"Sub-area {prefix} still holds {held(content, prefix)} feature(s): "
+                                 "move or delete them before removing it.")
+    next_area = max(old, default=0) + 1
+
+    blocks: list[str] = []
+    for a in areas:
+        title = _structure_title(a.get("title"), "area")
+        number = a.get("number")
+        if number is None:
+            number, next_area = next_area, next_area + 1
+        info = old.get(number, {"pre": "", "subs": {}})
+        parts = [f"### {number}. {title}"]
+        if info["pre"].strip():
+            parts.append(info["pre"].strip("\n"))
+        next_sub = max((int(p.split(".")[1]) for p in info["subs"]), default=0) + 1
+        for s in a.get("sub_areas", []):
+            stitle = _structure_title(s.get("title"), "sub-area")
+            prefix = s.get("prefix")
+            if prefix is None:
+                prefix, next_sub = f"{number}.{next_sub}", next_sub + 1
+                parts.append(f"#### {prefix} {stitle}\n\n{_SUB_TABLE_HEADER}")
+            else:
+                parts.append(f"#### {prefix} {stitle}" + info["subs"][prefix].rstrip("\n"))
+        blocks.append("\n\n".join(parts))
+    new_body = "\n\n".join(x for x in (preamble.strip("\n"), *blocks) if x) + tail
+    return _replace_section(text, "Features", new_body)
+
+
+def update_structure(path: Path, areas: list[dict]) -> None:
+    lock = _lock_for(path)
+    with lock:
+        _atomic_write(path, transform_structure(path.read_text(encoding="utf-8"), areas))

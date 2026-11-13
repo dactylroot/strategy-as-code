@@ -356,8 +356,22 @@ def test_the_break_out_editor_constants_are_declared_before_the_rows_are_wired(c
         assert page.index(name) < wired, name
 
 
-def test_the_product_scope_modal_does_not_repeat_the_area_name_and_does_not_call_scope_items_initiatives(client, prog):
+def test_the_structure_page_defines_the_wbs_and_its_scope_summary_is_not_called_initiatives(client, prog):
     page = client.get("/p/alpha/structure").text
-    assert "Product scope area" in page and "Area name" in page and "Scope items" in page
+    assert "Work Breakdown Structure" in page and "/api/structure/wbs" in page and "const _wbs" in page.replace("let _wbs", "const _wbs")
+    assert "Scope summary group" in page and "Group name" in page and "Scope items" in page
     assert "Group Title" not in page and "Add initiative" not in page and 'placeholder="Initiative' not in page
     assert '<textarea class="scope-text"' in page      # items are sentences: shown in full, not cut off in a one-line box
+
+
+def test_the_wbs_structure_is_saved_through_the_api_and_a_feature_can_then_be_added(client, prog):
+    page = client.get("/p/alpha/structure").text
+    assert '"sub_areas"' in page                                    # the page is given the current structure
+    r = client.put("/p/alpha/api/structure/wbs", headers=H, json={"areas": [
+        {"number": 1, "title": "Core", "sub_areas": [{"prefix": "1.1", "title": "Auth"}, {"prefix": "1.2", "title": "Dashboard"},
+                                                    {"prefix": None, "title": "Billing"}]}]})
+    assert r.status_code == 200, r.text
+    areas = client.get("/p/alpha/structure").text
+    assert "Billing" in areas
+    bad = client.put("/p/alpha/api/structure/wbs", headers=H, json={"areas": [{"number": 1, "title": " ", "sub_areas": []}]})
+    assert bad.status_code == 400

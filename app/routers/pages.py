@@ -122,9 +122,17 @@ def structure_page(request: Request):
         for g in product.scope_groups
     ])
 
+    wbs_json = json.dumps([
+        {"number": a.number, "title": a.title,
+         "sub_areas": [{"prefix": sa.wbs_prefix, "title": sa.title, "count": len(sa.features),
+                        "done": sum(1 for f in sa.features if f.status in (FeatureStatus.live, FeatureStatus.released))}
+                       for sa in a.sub_areas]}
+        for a in product.wbs_areas
+    ])
     return templates.TemplateResponse(request, "structure.html", _ctx(
         request, "structure",
         product=product,
+        wbs_json=wbs_json,
         users_json=users_json,
         workflows_json=workflows_json,
         scope_json=scope_json,

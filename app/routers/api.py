@@ -428,6 +428,38 @@ def put_workflows(body: SectionUpdate, request: Request):
     return {"ok": True}
 
 
+class StructureSubArea(BaseModel):
+    prefix: str | None = None
+    title: str
+
+
+class StructureArea(BaseModel):
+    number: int | None = None
+    title: str
+    sub_areas: list[StructureSubArea] = []
+
+
+class StructureUpdate(BaseModel):
+    areas: list[StructureArea]
+
+
+@router.put("/structure/wbs")
+@program_write("WBS structure updated")
+def put_wbs_structure(body: StructureUpdate, request: Request):
+    """Define the first two WBS levels: areas and sub-areas, in order. Existing ones carry their code;
+    new ones are given the next free code. Features are never touched."""
+    s = _session(request)
+    areas = [a.model_dump() for a in body.areas]
+    try:
+        if s:
+            s.set_file("PRODUCT.MD", product_parser.transform_structure(s.get_file("PRODUCT.MD"), areas))
+        else:
+            product_parser.update_structure(settings.product_md, areas)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
 @router.put("/structure/scope")
 @program_write("scope section updated")
 def put_scope(body: SectionUpdate, request: Request):

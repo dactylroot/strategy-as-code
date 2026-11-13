@@ -57,13 +57,29 @@
 .row-del { background:none; border:none; cursor:pointer; color:var(--color-text-muted); font-size:0.875rem; padding:0 0.15rem; line-height:1; flex-shrink:0; }
 .row-del:hover { color:var(--gap); }
 .btn-add-row { background:none; border:1px dashed var(--color-border-muted); color:var(--color-text-muted); border-radius:5px; padding:0.3rem 0.7rem; font-size:0.78rem; cursor:pointer; width:100%; margin-top:0.4rem; font-family:inherit; }
+/* Work breakdown structure editor */
+.wbs-area { border:1px solid var(--color-border-subtle); border-radius:8px; margin-bottom:0.75rem; background:var(--color-bg-card-hover); }
+.wbs-row { display:flex; align-items:center; gap:0.45rem; padding:0.4rem 0.6rem; }
+.wbs-area > .wbs-row { border-bottom:1px solid var(--color-border-subtle); }
+.wbs-sub { padding-left:1.8rem; }
+.wbs-code { flex:0 0 3rem; font-family:var(--font-mono); font-size:0.78rem; font-weight:700; color:var(--color-t3-blue); }
+.wbs-code.new { color:var(--color-text-muted); font-weight:500; }
+.wbs-title { flex:1; min-width:0; padding:0.35rem 0.5rem; border:1px solid transparent; border-radius:4px; font-size:0.875rem; font-family:inherit; color:var(--color-text-primary); background:transparent; outline:none; }
+.wbs-area > .wbs-row .wbs-title { font-weight:700; font-size:0.92rem; }
+.wbs-title:hover { border-color:var(--color-border-subtle); }
+.wbs-title:focus { border-color:var(--color-t3-blue); background:var(--color-bg-card); }
+.wbs-count { flex:0 0 auto; font-size:0.74rem; color:var(--color-text-muted); white-space:nowrap; }
+.wbs-btn { background:none; border:1px solid transparent; cursor:pointer; color:var(--color-text-muted); font-size:0.8rem; padding:0.1rem 0.35rem; border-radius:4px; line-height:1.2; }
+.wbs-btn:hover:not(:disabled) { border-color:var(--color-border-muted); color:var(--color-text-primary); }
+.wbs-btn:disabled { opacity:0.3; cursor:not-allowed; }
+.wbs-add { margin:0.3rem 0.6rem 0.6rem 2.8rem; width:auto; }
 .btn-add-row:hover { border-color:var(--color-t3-blue); color:var(--color-t3-blue); background:var(--color-t3-blue-dim); }
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1>Structure</h1>
-  <p class="subtitle">User personas, core workflows, and product scope - the strategic foundation of {{ product.title }}.</p>
+  <p class="subtitle">User personas, core workflows, the work breakdown structure and a scope summary - the strategic foundation of {{ product.title }}.</p>
 </div>
 
 <!-- User Personas -->
@@ -98,12 +114,28 @@
   <div class="str-body"><div id="workflows-list"></div></div>
 </div>
 
-<!-- Product Scope -->
+<!-- Work breakdown structure -->
 <div class="str-section">
   <div class="str-header">
     <div>
-      <p class="str-title">Product Scope</p>
-      <p class="str-subtitle">High-level scope areas and what is in scope for each. Check off completed items.</p>
+      <p class="str-title">Work Breakdown Structure</p>
+      <p class="str-subtitle">The first two levels of the WBS: areas and their sub-areas. Every feature code is <code>area.sub-area.feature</code>, so a code never changes once given. Rename and reorder freely; a new area or sub-area takes the next free number.</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <span id="wbs-status" class="save-status"></span>
+      <button class="btn btn-ghost btn-sm" onclick="addWbsArea()">+ Add Area</button>
+      <button class="btn btn-primary btn-sm" onclick="saveWbs()">Save</button>
+    </div>
+  </div>
+  <div class="str-body"><div id="wbs-list"></div></div>
+</div>
+
+<!-- Scope summary -->
+<div class="str-section">
+  <div class="str-header">
+    <div>
+      <p class="str-title">Scope Summary</p>
+      <p class="str-subtitle">The product's scope in plain language, for readers of PRODUCT.MD. It is prose: the WBS above is what features, roadmap and bugs are organised by.</p>
     </div>
     <div style="display:flex;gap:0.5rem;align-items:center;">
       <span id="scope-status" class="save-status"></span>
@@ -133,6 +165,7 @@
 let _users     = {{ users_json | safe }};
 let _workflows = {{ workflows_json | safe }};
 let _scope     = {{ scope_json | safe }};
+let _wbs       = {{ wbs_json | safe }};
 
 let _modal = null; // {type:'u'|'w'|'s', index:number}
 
@@ -141,8 +174,8 @@ let _modal = null; // {type:'u'|'w'|'s', index:number}
 // listener auto-reloads the page on any file change (e.g. another section's
 // save writing to the same PRODUCT.MD) - without this, that reload would
 // silently wipe an in-progress edit in a section that hasn't been saved yet.
-let _usersDirty = false, _workflowsDirty = false, _scopeDirty = false;
-window.hasUnsavedChanges = () => _usersDirty || _workflowsDirty || _scopeDirty;
+let _usersDirty = false, _workflowsDirty = false, _scopeDirty = false, _wbsDirty = false;
+window.hasUnsavedChanges = () => _usersDirty || _workflowsDirty || _scopeDirty || _wbsDirty;
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -252,16 +285,16 @@ function _renderModalBody() {
 
   } else if (type === 's') {
     const g = _scope[i];
-    title.textContent = 'Product scope area';   // fixed: the name is the first field, so the header need not repeat it
+    title.textContent = 'Scope summary group';   // fixed: the name is the first field, so the header need not repeat it
     body.innerHTML = `
       <div class="modal-field">
-        <label>Area name</label>
-        <input class="modal-input" type="text" value="${esc(g.title)}" placeholder="Scope area name…"
+        <label>Group name</label>
+        <input class="modal-input" type="text" value="${esc(g.title)}" placeholder="Group name…"
                oninput="_scope[${i}].title=this.value">
       </div>
       <div class="modal-field">
         <label>Scope items</label>
-        <p class="modal-hint">What is in scope for this area. Tick an item once it has shipped.</p>
+        <p class="modal-hint">What is in scope for this group. Tick an item once it has shipped.</p>
         <div id="modal-scope-items">${_scopeItemsHtml(i)}</div>
         <button class="btn-add-row" onclick="addScopeItem(${i})">+ Add scope item</button>
       </div>`;
@@ -366,6 +399,66 @@ function renderWorkflows() {
 function addWorkflow()     { _workflows.push({persona:'',name:'',description:''}); renderWorkflows(); openModal('w', _workflows.length-1); }
 function removeWorkflow(i) { _workflows.splice(i,1); closeModal(); }
 
+// ── Work breakdown structure ──────────────────────────────────────────────────
+
+function _wbsDirtyNow() { _wbsDirty = true; _markDirty('wbs-status'); }
+
+function renderWbs() {
+  const list = document.getElementById('wbs-list');
+  list.innerHTML = '';
+  if (!_wbs.length) { list.innerHTML = '<p class="text-muted">No areas yet. Click + Add Area to create the first one.</p>'; return; }
+  _wbs.forEach((a, ai) => {
+    const subs = a.sub_areas.length, held = a.sub_areas.reduce((n, s) => n + (s.count || 0), 0);
+    const code = a.number == null ? '<span class="wbs-code new" title="Assigned when saved">new</span>' : `<span class="wbs-code">${a.number}</span>`;
+    const rows = a.sub_areas.map((s, si) => {
+      const c = s.prefix == null ? '<span class="wbs-code new" title="Assigned when saved">new</span>' : `<span class="wbs-code">${esc(s.prefix)}</span>`;
+      const n = s.count ? `${s.done || 0}/${s.count} shipped` : 'no features';
+      const lock = s.count ? `Holds ${s.count} feature(s): move or delete them first` : 'Remove this sub-area';
+      return `<div class="wbs-row wbs-sub">${c}
+        <input class="wbs-title" type="text" value="${esc(s.title)}" maxlength="120" placeholder="Sub-area name…" aria-label="Sub-area name"
+               oninput="_wbs[${ai}].sub_areas[${si}].title=this.value;_wbsDirtyNow()">
+        <span class="wbs-count">${n}</span>
+        <button class="wbs-btn" title="Move up" ${si===0?'disabled':''} onclick="wbsMoveSub(${ai},${si},-1)">↑</button>
+        <button class="wbs-btn" title="Move down" ${si===subs-1?'disabled':''} onclick="wbsMoveSub(${ai},${si},1)">↓</button>
+        <button class="wbs-btn" title="${lock}" ${s.count?'disabled':''} onclick="wbsRemoveSub(${ai},${si})">✕</button></div>`;
+    }).join('');
+    const lockA = held ? `Holds ${held} feature(s): move or delete them first` : 'Remove this area';
+    const box = document.createElement('div');
+    box.className = 'wbs-area';
+    box.innerHTML = `<div class="wbs-row">${code}
+        <input class="wbs-title" type="text" value="${esc(a.title)}" maxlength="120" placeholder="Area name…" aria-label="Area name"
+               oninput="_wbs[${ai}].title=this.value;_wbsDirtyNow()">
+        <span class="wbs-count">${subs} sub-area${subs===1?'':'s'}</span>
+        <button class="wbs-btn" title="Move up" ${ai===0?'disabled':''} onclick="wbsMoveArea(${ai},-1)">↑</button>
+        <button class="wbs-btn" title="Move down" ${ai===_wbs.length-1?'disabled':''} onclick="wbsMoveArea(${ai},1)">↓</button>
+        <button class="wbs-btn" title="${lockA}" ${held?'disabled':''} onclick="wbsRemoveArea(${ai})">✕</button></div>
+      ${rows}
+      <button class="btn-add-row wbs-add" onclick="addWbsSub(${ai})">+ Add sub-area</button>`;
+    list.appendChild(box);
+  });
+}
+function _wbsSwap(arr, i, d) { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; }
+function wbsMoveArea(ai, d) { _wbsSwap(_wbs, ai, d); _wbsDirtyNow(); renderWbs(); }
+function wbsMoveSub(ai, si, d) { _wbsSwap(_wbs[ai].sub_areas, si, d); _wbsDirtyNow(); renderWbs(); }
+function addWbsArea() { _wbs.push({number:null, title:'', sub_areas:[]}); _wbsDirtyNow(); renderWbs(); const t = document.querySelectorAll('#wbs-list .wbs-area > .wbs-row .wbs-title'); t[t.length-1].focus(); }
+function addWbsSub(ai) { _wbs[ai].sub_areas.push({prefix:null, title:'', count:0, done:0}); _wbsDirtyNow(); renderWbs(); const t = document.querySelectorAll('#wbs-list .wbs-area')[ai].querySelectorAll('.wbs-sub .wbs-title'); t[t.length-1].focus(); }
+function wbsRemoveSub(ai, si) { _wbs[ai].sub_areas.splice(si, 1); _wbsDirtyNow(); renderWbs(); }
+function wbsRemoveArea(ai) {
+  const a = _wbs[ai];
+  if (a.sub_areas.length && !confirm(`Remove "${a.title}" and its ${a.sub_areas.length} empty sub-area(s)?`)) return;
+  _wbs.splice(ai, 1); _wbsDirtyNow(); renderWbs();
+}
+function saveWbs() {
+  const st = document.getElementById('wbs-status');
+  const areas = _wbs.map(a => ({number: a.number, title: a.title.trim(),
+                                sub_areas: a.sub_areas.map(s => ({prefix: s.prefix, title: s.title.trim()}))}));
+  st.textContent = 'Saving…'; st.style.color = 'var(--color-text-secondary)';
+  fetch('{{ base_path }}/api/structure/wbs', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({areas})})
+    .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : 'check the structure (' + r.status + ')'); return d; })
+    .then(() => { _wbsDirty = false; st.textContent = 'Saved ✓'; st.style.color = 'var(--live)'; setTimeout(() => location.reload(), 600); })   // reload: new codes were assigned
+    .catch(e => { st.textContent = 'Not saved: ' + e.message; st.style.color = 'var(--gap)'; });
+}
+
 // ── Product Scope ─────────────────────────────────────────────────────────────
 
 function renderScope() {
@@ -443,6 +536,7 @@ function saveScope()     { _save('{{ base_path }}/api/structure/scope',     seri
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderUsers();
 renderWorkflows();
+renderWbs();
 renderScope();
 </script>
 {% endblock %}
