@@ -120,6 +120,7 @@ class WBSArea(BaseModel):
 class ScopeItem(BaseModel):
     text: str
     complete: bool = False
+    wbs: str | None = None      # the sub-area this item summarises: a trailing "(WBS 1.2)" in the file
 
 
 class ScopeGroup(BaseModel):

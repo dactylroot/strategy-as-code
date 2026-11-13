@@ -302,3 +302,25 @@ def test_inbox_breakout_can_link_existing_features(manifest, origin, capsys):
     assert main(base + ["inbox", "breakout", item_id, "--link", "1.1.1"]) == 0
     assert "became: linked 1 existing: 1.1.1" in capsys.readouterr().out
     assert "- 1.1.1" in remote(origin, "ABOUT.MD")
+
+
+def test_structure_commands_define_the_wbs_check_the_scope_summary_and_renumber(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["structure", "show"]) == 0
+    assert "1.1 Auth (" in capsys.readouterr().out
+    assert main(base + ["structure", "sub", "add", "1", "Billing"]) == 0
+    assert "#### 1.3 Billing" in remote(origin, "PRODUCT.MD")
+    assert main(base + ["structure", "area", "add", "Ops"]) == 0
+    assert main(base + ["structure", "sub", "add", "2", "Deploy"]) == 0
+    assert main(base + ["structure", "sub", "rename", "2.1", "Release"]) == 0
+    assert "### 2. Ops" in remote(origin, "PRODUCT.MD") and "#### 2.1 Release" in remote(origin, "PRODUCT.MD")
+    assert main(base + ["structure", "sub", "remove", "1.1"]) == 1            # holds features
+    assert "still holds" in capsys.readouterr().err
+    capsys.readouterr()
+    assert main(base + ["structure", "check"]) == 1                            # no Product Scope group for the areas yet
+    assert "no Product Scope group" in capsys.readouterr().err
+    assert main(base + ["structure", "renumber", "1.2", "1.4"]) == 0           # leaves a gap, then
+    product = remote(origin, "PRODUCT.MD")
+    assert "#### 1.4 Reporting" in product and "| 1.4.1 | Export |" in product and "| 1.2.1 |" not in product
+    assert main(base + ["structure", "check"]) == 1
+    assert "no 1.2" in capsys.readouterr().err

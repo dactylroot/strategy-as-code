@@ -11,6 +11,7 @@ from ..parsers import product as product_parser
 from ..parsers import about as about_parser
 from ..parsers import readme as readme_parser
 from ..parsers import bugs as bugs_parser
+from .. import structure_check
 from ..template_env import templates
 from ..versioning import next_release_version, version_rationale
 from ..auth import enabled as auth_enabled
@@ -118,7 +119,7 @@ def structure_page(request: Request):
     ])
     workflows_json = json.dumps(workflows_data)
     scope_json = json.dumps([
-        {"title": g.title, "items": [{"text": i.text, "complete": i.complete} for i in g.items]}
+        {"title": g.title, "items": [{"text": i.text, "complete": i.complete, "wbs": i.wbs or ""} for i in g.items]}
         for g in product.scope_groups
     ])
 
@@ -133,6 +134,7 @@ def structure_page(request: Request):
         request, "structure",
         product=product,
         wbs_json=wbs_json,
+        alignment=structure_check.check(product),
         users_json=users_json,
         workflows_json=workflows_json,
         scope_json=scope_json,

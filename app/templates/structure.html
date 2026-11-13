@@ -73,6 +73,10 @@
 .wbs-btn:hover:not(:disabled) { border-color:var(--color-border-muted); color:var(--color-text-primary); }
 .wbs-btn:disabled { opacity:0.3; cursor:not-allowed; }
 .wbs-add { margin:0.3rem 0.6rem 0.6rem 2.8rem; width:auto; }
+.align-note { margin:0 1.25rem 1rem; padding:0.6rem 0.85rem; border:1px solid var(--color-amber-border, #e0b252); background:var(--color-amber-bg, #fff7e0); border-radius:6px; font-size:0.82rem; }
+.align-note summary { cursor:pointer; font-weight:600; }
+.align-note ul { margin:0.4rem 0 0; padding-left:1.2rem; }
+.scope-wbs { flex:0 0 11rem; max-width:11rem; padding:0.3rem 0.35rem; border:1px solid var(--color-border-subtle); border-radius:4px; font-size:0.78rem; font-family:inherit; color:var(--color-text-primary); background:var(--color-bg-card); }
 .btn-add-row:hover { border-color:var(--color-t3-blue); color:var(--color-t3-blue); background:var(--color-t3-blue-dim); }
 {% endblock %}
 
@@ -127,6 +131,12 @@
       <button class="btn btn-primary btn-sm" onclick="saveWbs()">Save</button>
     </div>
   </div>
+  {% if alignment %}
+  <details class="align-note" open><summary>Product Scope and the WBS have drifted apart ({{ alignment | length }})</summary>
+    <ul>{% for a in alignment %}<li>{{ a }}</li>{% endfor %}</ul>
+    <p class="str-subtitle">Each Scope Summary group should be a WBS area (same name, same order) and each item should summarise one sub-area and end in its code. Link items to sub-areas below; <code>strategy structure check</code> reports the same list.</p>
+  </details>
+  {% endif %}
   <div class="str-body"><div id="wbs-list"></div></div>
 </div>
 
@@ -294,7 +304,7 @@ function _renderModalBody() {
       </div>
       <div class="modal-field">
         <label>Scope items</label>
-        <p class="modal-hint">What is in scope for this group. Tick an item once it has shipped.</p>
+        <p class="modal-hint">One item per WBS sub-area: pick the sub-area each item summarises. Tick an item once all of that sub-area has shipped.</p>
         <div id="modal-scope-items">${_scopeItemsHtml(i)}</div>
         <button class="btn-add-row" onclick="addScopeItem(${i})">+ Add scope item</button>
       </div>`;
@@ -308,11 +318,20 @@ function _fitScopeText() {
   document.querySelectorAll('#str-modal-body .scope-text').forEach(t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; });
 }
 
+function _wbsOptions(current) {
+  const subs = _wbs.flatMap(a => a.sub_areas.filter(s => s.prefix).map(s => ({prefix: s.prefix, title: s.title})));
+  const opts = subs.map(s => `<option value="${esc(s.prefix)}" ${s.prefix===current?'selected':''}>${esc(s.prefix)} ${esc(s.title)}</option>`);
+  if (current && !subs.some(s => s.prefix === current)) opts.unshift(`<option value="${esc(current)}" selected>${esc(current)} (missing)</option>`);
+  return `<option value="">Not linked</option>` + opts.join('');
+}
+
 function _scopeItemsHtml(gi) {
   return _scope[gi].items.map((item, ii) => `
     <div class="scope-row">
       <input type="checkbox" title="Shipped" ${item.complete?'checked':''}
              onchange="_scope[${gi}].items[${ii}].complete=this.checked">
+      <select class="scope-wbs" title="The WBS sub-area this item summarises" aria-label="WBS sub-area"
+              onchange="_scope[${gi}].items[${ii}].wbs=this.value">${_wbsOptions(item.wbs)}</select>
       <textarea class="scope-text" rows="1" placeholder="Scope item…"
              oninput="_scope[${gi}].items[${ii}].text=this.value;_fitScopeText()">${esc(item.text)}</textarea>
       <button class="row-del" title="Remove this item" onclick="removeScopeItem(${gi},${ii})">✕</button>
@@ -474,7 +493,7 @@ function renderScope() {
     card.className = 'item-card' + (isActive ? ' modal-active' : '');
     const titleHtml = g.title ? `<p class="view-name">${esc(g.title)}</p>` : `<p class="view-name" style="color:var(--color-text-muted);font-style:italic;">Untitled group</p>`;
     const itemsHtml = g.items.filter(i=>i.text.trim()).map(item =>
-      `<p class="view-scope-item ${item.complete?'done':''}">${item.complete?'🎆':''} ${esc(item.text)}</p>`
+      `<p class="view-scope-item ${item.complete?'done':''}">${item.complete?'🎆':''} ${item.wbs?`<code>${esc(item.wbs)}</code> `:''}${esc(item.text)}</p>`
     ).join('') || `<p class="view-scope-item" style="color:var(--color-text-muted);font-style:italic;">No scope items</p>`;
     card.innerHTML = titleHtml + itemsHtml + `<p class="edit-hint">✎ click to edit</p>`;
     card.onclick = () => openModal('s', gi);
@@ -486,7 +505,7 @@ function addScopeGroup()      { _scope.push({title:'',items:[]}); renderScope();
 function removeScopeGroup(gi) { _scope.splice(gi,1); closeModal(); }
 
 function addScopeItem(gi) {
-  _scope[gi].items.push({text:'',complete:false});
+  _scope[gi].items.push({text:'',complete:false,wbs:''});
   const el = document.getElementById('modal-scope-items');
   if (el) { el.innerHTML = _scopeItemsHtml(gi); _fitScopeText(); el.querySelector('.scope-row:last-child .scope-text')?.focus(); }
 }
@@ -511,7 +530,7 @@ function serializeWorkflows() {
 }
 function serializeScope() {
   return _scope.filter(g=>g.title.trim()).map(g=>{
-    const items = g.items.filter(i=>i.text.trim()).map(i=>i.complete?`- ~~${i.text}~~ 🎆`:`- ${i.text}`).join('\n');
+    const items = g.items.filter(i=>i.text.trim()).map(i=>{ const tag = i.wbs ? ` (WBS ${i.wbs})` : ''; return i.complete?`- ~~${i.text}~~ 🎆${tag}`:`- ${i.text}${tag}`; }).join('\n');
     return `### ${g.title}\n${items}`;
   }).join('\n\n');
 }

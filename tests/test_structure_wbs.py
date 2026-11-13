@@ -110,3 +110,24 @@ def test_bad_requests_are_refused_and_change_nothing():
         P.transform_structure(DOC, moved)
     with pytest.raises(ValueError, match="listed twice"):
         P.transform_structure(DOC, keep() + keep()[:1])
+
+
+def test_renumbering_a_sub_area_moves_its_features_with_it_and_refuses_collisions():
+    out, changed = P.transform_renumber_sub_area(DOC, "1.2", "1.5")
+    assert changed == ["1.2.1"] and "#### 1.5 Dashboard" in out and "| 1.5.1 | Overview |" in out and "| 1.2.1 |" not in out
+    for old, new, msg in [("1.2", "1.1", "already exists"), ("1.2", "2.9", "keeps its area"), ("9.9", "9.1", "not found")]:
+        with pytest.raises(ValueError, match=msg):
+            P.transform_renumber_sub_area(DOC, old, new)
+
+
+def test_scope_items_carry_the_sub_area_they_summarise_and_the_checker_reports_drift():
+    from app import structure_check
+    text = DOC.replace("### Core\n- Something", "### Core\n- ~~Sign in~~ \U0001f386 (WBS 1.1)\n- Dashboards (WBS 1.2)\n\n### Out of Scope\n- Billing")
+    doc = P._parse_text(text)
+    assert [(i.text, i.complete, i.wbs) for i in doc.scope_groups[0].items] == [("Sign in", True, "1.1"), ("Dashboards", False, "1.2")]
+    found = structure_check.check(doc)
+    assert any("'Ops' has no Product Scope group" in f for f in found)           # area 2 is not summarised
+    assert not any("Out of Scope" in f for f in found)                            # not a WBS area, by design
+    assert any("1.1" in f and "unfinished" not in f and "ticked" not in f for f in found) is False
+    gap = P.transform_renumber_sub_area(text, "1.2", "1.3")[0]
+    assert any("no 1.2" in f for f in structure_check.check(P._parse_text(gap)))

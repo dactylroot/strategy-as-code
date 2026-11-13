@@ -131,7 +131,10 @@ def _parse_text(text: str) -> ProductDoc:
                 stripped = stripped[1:].strip()
             complete = "~~" in stripped or "🎆" in stripped
             text_clean = re.sub(r"~~(.+?)~~", r"\1", stripped).replace("🎆", "").strip()
-            items.append(ScopeItem(text=text_clean, complete=complete))
+            tag = re.search(r"\s*\(WBS (\d+\.\d+)\)\s*$", text_clean)
+            if tag:
+                text_clean = text_clean[:tag.start()].rstrip()
+            items.append(ScopeItem(text=text_clean, complete=complete, wbs=tag.group(1) if tag else None))
         scope_groups.append(ScopeGroup(title=gm.group(1).strip(), items=items))
 
     workflows_md = sections.get("Core Workflows", "")
@@ -662,3 +665,30 @@ def update_structure(path: Path, areas: list[dict]) -> None:
     lock = _lock_for(path)
     with lock:
         _atomic_write(path, transform_structure(path.read_text(encoding="utf-8"), areas))
+
+
+def transform_renumber_sub_area(text: str, old: str, new: str) -> tuple[str, list[str]]:
+    """Give a sub-area, and every feature in it, a new code: `6.3` becomes `6.1`, `6.3.2` becomes `6.1.2`.
+
+    The new code must be unused and stay in the same area (an area's number is part of its features'
+    codes, so moving a sub-area between areas is a feature move). Returns the new text and the old
+    feature codes that changed, so the caller can rewrite references to them elsewhere."""
+    if not re.fullmatch(r"\d+\.\d+", old) or not re.fullmatch(r"\d+\.\d+", new):
+        raise ValueError("A sub-area code looks like 6.1")
+    if old.split(".")[0] != new.split(".")[0]:
+        raise ValueError("A sub-area keeps its area number; to put features in another area, move them.")
+    if not re.search(rf"^#### {re.escape(old)} ", text, re.MULTILINE):
+        raise ValueError(f"Sub-area {old!r} not found")
+    if re.search(rf"^#### {re.escape(new)} ", text, re.MULTILINE):
+        raise ValueError(f"Sub-area {new!r} already exists")
+    changed = re.findall(rf"^\| {re.escape(old)}\.(\d+) \|", text, re.MULTILINE)
+    text = re.sub(rf"^(#### ){re.escape(old)}( )", rf"\g<1>{new}\g<2>", text, flags=re.MULTILINE)
+    text = re.sub(rf"^(\| ){re.escape(old)}(\.\d+ \|)", rf"\g<1>{new}\g<2>", text, flags=re.MULTILINE)
+    return text, [f"{old}.{n}" for n in changed]
+
+
+def structure_of(text: str) -> list[dict]:
+    """The WBS skeleton in the shape `transform_structure` takes: every area and sub-area, in file order."""
+    return [{"number": a.number, "title": a.title,
+             "sub_areas": [{"prefix": sa.wbs_prefix, "title": sa.title} for sa in a.sub_areas]}
+            for a in _parse_text(text).wbs_areas]

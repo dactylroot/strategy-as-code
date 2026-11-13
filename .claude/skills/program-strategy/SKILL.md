@@ -94,6 +94,11 @@ $S feature notes  3.1.1 "Does X now"
 $S feature score  3.1.1 8 3             # value [effort]
 $S feature add    3.1 "Feature name" --value 8 --notes "..."   # sub-area prefix; the next WBS code is assigned and printed
 $S feature move   3.1.1 4.2             # new WBS code; initiative bullets and bug WBS refs in this project follow it
+$S structure show                       # areas and sub-areas with feature counts
+$S structure check                      # where Product Scope has drifted from the WBS (exit 1 if it has)
+$S structure area add "Title"           # next free area number; also: area rename N "Title", area remove N
+$S structure sub add 2 "Title"          # next free sub-area code in area 2; also: sub rename 2.1 "Title", sub remove 2.1
+$S structure renumber 6.3 6.1           # close a gap: the sub-area, its features, and this project's initiative and bug refs follow
 $S bug add "Short title" --severity high --notes "..." --wbs 1.2.3
 $S bug status 12 resolved --fix 0.4.2   # open | investigating | resolved
 $S bug close  12 --resolved-in 0.4.2    # only after UAT confirms the fix
@@ -104,7 +109,7 @@ $S bug close  12 --resolved-in 0.4.2    # only after UAT confirms the fix
 - The CLI needs the strategy-as-code requirements installed; if it fails with an import error, point `STRATEGY_PYTHON` at a Python that has them.
 - After a CLI write the working-tree copy of the file is stale (the change lives on the planning branch until it is merged). Do not re-read it as current state or "fix" it by hand; read the planning branch (`git fetch`, then `git show <branch>:PRODUCT.MD`) or the web UI.
 - `feature move` prints notes about references it cannot update (other mentions of the old code in notes or Known Gaps, and initiatives in other projects or the manifest that cite `key:old`). Relay those to the user.
-- The CLI covers program initiatives (`$S initiative ...`, below) but not ABOUT.MD (roadmap and changelog) or the prose sections (summary, users, scope, workflows). Make those edits directly, say that you did, and expect to reconcile them with the planning branch. Never edit the `## Initiatives` section of `PROGRAM.MD` by hand; use `$S initiative`.
+- The CLI covers program initiatives (`$S initiative ...`, below) and the WBS structure (`$S structure ...`) but not ABOUT.MD (roadmap and changelog) or the prose sections (summary, users, scope summary, workflows). Edit the Product Scope text directly (it is prose) but keep it aligned with the WBS as described under PRODUCT.MD. Make those edits directly, say that you did, and expect to reconcile them with the planning branch. Never edit the `## Initiatives` section of `PROGRAM.MD` by hand; use `$S initiative`.
 - User submissions wait as files under `.planning/inbox/` and are triaged with `$S inbox list`, `inbox promote <id> [--prefix 1.2]`, `inbox decline <id> --reason "..."`, `inbox duplicate <id> --of <ref>` and `inbox sweep`. Promote and decline only when the user asks you to triage; never edit those files by hand. An item of type `initiative` is a planning task from the program (see Program initiatives): `inbox promote` refuses it; resolve it with `inbox breakout` or `inbox decline`.
 - Run `$S merge-driver install` once in a clone (and commit the `.gitattributes` lines it adds) so that merging branches combines PRODUCT.MD and BUGS.MD row by row instead of conflicting.
 - Do not regenerate the WBS chart as part of these changes; `--chart` exists, but only use it when the user asks.
@@ -164,12 +169,16 @@ Stakeholder and leadership-facing product overview. The canonical registry for a
 
 1. **Summary** - One paragraph describing what the product is and who it serves.
 2. **Users** - One subsection per user persona. Each persona gets a short paragraph describing their role and what they do with the product.
-3. **Product Scope** - Bulleted list of scope areas and their initiatives. Use strikethrough + 🎆 for completed items. Example:
+3. **Product Scope** - The plain-language summary of the WBS, not a separate list. Each `###` group is a WBS **area** (the same title, in the same order as `## Features`); each bullet summarises one **sub-area** and ends with its code, `(WBS 1.2)`. Strike through + 🎆 an item only when every feature in its sub-area is Live or Released. Groups that are not WBS areas (`Out of Scope`, `Product Boundaries`) may follow the area groups. Example:
    ```
    ### Core Functionality
-   - ~~IBR Ingestion Automation and Data Centralization~~ 🎆
-   - UIUX design to enable the LCR team to manage data mappings themselves
+   - ~~IBR Ingestion Automation and Data Centralization~~ 🎆 (WBS 1.1)
+   - UIUX design to enable the LCR team to manage data mappings themselves (WBS 1.2)
+
+   ### Out of Scope
+   - Owning any product's data
    ```
+   Keep it aligned: whenever you add, rename or remove an area or sub-area, change the matching group or bullet in the same pass, and run `$S structure check` (it lists every place the two have drifted; fix them all).
 4. **WBS Chart** - Embed the chart as a text link to the interactive HTML + a Markdown image for the PNG:
    ```markdown
    [Interactive version](docs/wbs.html)
@@ -178,10 +187,10 @@ Stakeholder and leadership-facing product overview. The canonical registry for a
    ```
    Do NOT use `<iframe>` or `<style>` tags. GitHub strips them and outputs their content as raw text.
 5. **Core Workflows** - Numbered subsection per user persona. Each workflow is a numbered step list showing the end-to-end flow.
-6. **Features** - WBS-coded tables grouped by scope area and sub-area. Columns: `WBS | Feature | Status | Value | Effort | Notes`, plus optional trailing `Flag | Owner | UAT Confirmed` columns. See status values and Feature table format below.
+6. **Features** - WBS-coded tables grouped by area and sub-area. Columns: `WBS | Feature | Status | Value | Effort | Notes`, plus optional trailing `Flag | Owner | UAT Confirmed` columns. See status values and Feature table format below.
 7. **Known Gaps for Team Discussion** - One subsection per gap. Written as a short paragraph explaining the problem, what's missing, and why it matters. `Gap` is a flag/tag, not a stored Status value (see Feature Lifecycle) - a subsection here doesn't require a matching `Gap`-status row, though it commonly pairs with a flagged feature (Flag column set). Reference the relevant WBS code(s) in the heading or body: a specific feature (e.g. `1.2.9`) if one exists, or an entire Level 2 sub-area (e.g. `WBS 1.2`) if the gap doesn't map to a single feature.
 
-**WBS code format:** `{scope}.{area}.{feature}` (e.g. 1.1.3, 2.2.1)
+**WBS code format:** `{area}.{sub-area}.{feature}` (e.g. 1.1.3, 2.2.1). The first two levels are the **structure**: areas (`### 1. Title`) and sub-areas (`#### 1.1 Title`) under `## Features`. Define them in the Structure page's *Work Breakdown Structure* section or with `$S structure ...`, never by inventing a heading while adding a feature: a feature goes into an existing sub-area (`feature add` refuses an unknown one). Number areas 1..n and each area's sub-areas 1..m with no gaps; a code never changes once given, so rename and reorder freely but renumber only to close a gap (`structure renumber`).
 
 **Feature table format:**
 ```markdown
@@ -204,7 +213,7 @@ You only need as many trailing columns as you're using - a row can stop right af
 - **Owner** - free-text name/handle of whoever owns UAT sign-off for this feature. Optional; leave blank if unassigned. Same purpose as BUGS.MD's Owner column.
 - **UAT Confirmed** - `Yes` once a human has verified a `Live` feature in production/staging - the signal that it's ready for a human to advance it to `Released`. Leave blank until then; setting it does not itself change Status. Same semantics as BUGS.MD's UAT Confirmed.
 
-**Strikethrough convention:** Use `~~text~~ 🎆` for completed Product Scope items. Apply at the scope initiative level, not at the individual feature level.
+**Strikethrough convention:** Use `~~text~~ 🎆` on a Product Scope item once every feature in its sub-area is Live or Released. Apply it per sub-area item, never per feature; `structure check` reports an item that is ticked too early or not yet ticked.
 
 **Status values written to the Status column:**
 - `Idea` - captured to a WBS area; not yet fully defined
@@ -329,7 +338,7 @@ Outputs:
 PRODUCT.MD is the single source of truth. The script parses the `## Features` section directly - no separate data structure to maintain. Regenerate only when asked; a stale chart is expected between regenerations, and is not something to flag or offer to fix after ordinary edits.
 
 The parser reads:
-- `### N. Title` → swimlane (Level 1 scope area)
+- `### N. Title` → swimlane (Level 1 area)
 - `#### N.N Title` → section (Level 2 sub-area)
 - `| WBS | Feature | Status |` table rows → features (Level 3)
 
@@ -337,7 +346,7 @@ Status values in PRODUCT.MD: `Idea`, `In-Progress`, `Live`, `Released`, `Planned
 
 ### Chart design notes
 
-- Swimlane layout: one horizontal lane per Level 1 scope area
+- Swimlane layout: one horizontal lane per Level 1 area
 - Level 2 section widths are proportional to feature count, with minimum width enforced so short headers never clip (`distribute_widths()`)
 - Section headers use a red-to-blue heatmap (0% complete = red, 100% = blue) via `LinearSegmentedColormap`
 - Level 3 features are listed as text inside the section body; Live features render with strikethrough and muted color

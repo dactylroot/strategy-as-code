@@ -375,3 +375,9 @@ def test_the_wbs_structure_is_saved_through_the_api_and_a_feature_can_then_be_ad
     assert "Billing" in areas
     bad = client.put("/p/alpha/api/structure/wbs", headers=H, json={"areas": [{"number": 1, "title": " ", "sub_areas": []}]})
     assert bad.status_code == 400
+
+
+def test_the_structure_page_reports_where_the_scope_summary_has_drifted_from_the_wbs(client, prog):
+    page = client.get("/p/alpha/structure").text
+    assert "have drifted apart" in page and "no Product Scope group" in page
+    assert 'class="scope-wbs"' in page and "(WBS ${i.wbs})" in page.replace("(WBS ${i.wbs})", "(WBS ${i.wbs})")

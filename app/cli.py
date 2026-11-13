@@ -197,6 +197,19 @@ def build_parser() -> argparse.ArgumentParser:
     du = ib.add_parser("duplicate"); du.add_argument("id"); du.add_argument("--of", required=True, help="existing bug id or WBS")
     ib.add_parser("sweep", help="archive items untriaged for %d days" % _inbox.ARCHIVE_DAYS)
 
+    st = top.add_parser("structure", help="the first two WBS levels (areas and sub-areas) and the Product Scope summary of them").add_subparsers(dest="action", required=True)
+    st.add_parser("show", help="list the areas and sub-areas with their feature counts")
+    st.add_parser("check", help="report where Product Scope has drifted from the WBS; exit status 1 if it has")
+    sa = st.add_parser("area", help="add, rename or remove a WBS area").add_subparsers(dest="verb", required=True)
+    x = sa.add_parser("add"); x.add_argument("title")
+    x = sa.add_parser("rename"); x.add_argument("number", type=int); x.add_argument("title")
+    x = sa.add_parser("remove"); x.add_argument("number", type=int)
+    ss = st.add_parser("sub", help="add, rename or remove a WBS sub-area").add_subparsers(dest="verb", required=True)
+    x = ss.add_parser("add"); x.add_argument("area", type=int); x.add_argument("title")
+    x = ss.add_parser("rename"); x.add_argument("prefix"); x.add_argument("title")
+    x = ss.add_parser("remove"); x.add_argument("prefix")
+    x = st.add_parser("renumber", help="give a sub-area a new code in its area (6.3 -> 6.1); its features and the references to them follow")
+    x.add_argument("old"); x.add_argument("new")
     top.add_parser("pr", help="open, or refresh, the pull request from the project's planning branch to its default branch")
 
     bo = ib.add_parser("breakout", help="define a program initiative's planning task: add features and list them under the initiative")
@@ -431,6 +444,8 @@ def run(args: argparse.Namespace) -> str:
     actor = resolve_actor()
     if args.resource == "inbox":
         return _run_inbox(reg, key, actor, args)
+    if args.resource == "structure":
+        return _run_structure(reg, key, actor, args)
     msg = args.message
     chart = args.chart
 
@@ -500,6 +515,83 @@ def run(args: argparse.Namespace) -> str:
             summary = f"bug {args.id} closed"
 
     result = _apply(reg, key, edits, msg or label, actor, chart)
+    where = f"{result.branch} @ {result.sha[:7]}" if result.changed else "no change"
+    return "\n".join([f"{key}: {summary} ({where})", *[f"  note: {n}" for n in notes]])
+
+
+def _run_structure(reg: Registry, key: str, actor: Actor, args: argparse.Namespace) -> str:
+    from . import structure_check
+    spec = reg.get(key).spec
+    if args.action in ("show", "check"):
+        reg.refresh(key)
+        doc = product_parser.parse(reg.get(key).path / spec.planning_file("PRODUCT.MD"))
+        if args.action == "show":
+            return "\n".join(f"{a.number}. {a.title}\n" + "\n".join(
+                f"   {sa.wbs_prefix} {sa.title} ({len(sa.features)} feature{'' if len(sa.features) == 1 else 's'})" for sa in a.sub_areas)
+                for a in doc.wbs_areas)
+        found = structure_check.check(doc)
+        if found:
+            raise CliError(f"{key}: Product Scope and the WBS have drifted ({len(found)}):\n  - " + "\n  - ".join(found))
+        return f"{key}: Product Scope lines up with the WBS"
+    notes: list[str] = []
+    edits: list[Edit]
+    if args.action == "renumber":
+        old, new = args.old, args.new
+        changed: list[str] = []
+
+        def renumber(text: str) -> str:
+            new_text, codes = product_parser.transform_renumber_sub_area(text, old, new)
+            changed[:] = codes
+            return new_text
+
+        def refs(rewrite):
+            def fn(text: str) -> str:
+                for code in changed:
+                    text = rewrite(text, code, new + code[len(old):])
+                return text
+            return fn
+
+        edits = [("PRODUCT.MD", renumber, True), ("ABOUT.MD", refs(about_parser.transform_rewrite_wbs_refs), False),
+                 ("BUGS.MD", refs(bugs_parser.transform_rewrite_wbs_refs), False)]
+        summary = f"sub-area {old} renumbered to {new}"
+        notes.append(f"initiatives in other projects or the manifest that cite {key}:{old}.N are not updated; "
+                     "free-text mentions in notes and Known Gaps are left as they are")
+    else:
+        verb = args.verb
+
+        def restructure(text: str) -> str:
+            areas = product_parser.structure_of(text)
+            if args.action == "area":
+                if verb == "add":
+                    areas.append({"number": None, "title": args.title, "sub_areas": []})
+                else:
+                    hit = next((a for a in areas if a["number"] == args.number), None)
+                    if hit is None:
+                        raise CliError(f"no area {args.number}")
+                    if verb == "rename":
+                        hit["title"] = args.title
+                    else:
+                        areas.remove(hit)       # refused below while any of its sub-areas holds features
+            else:
+                if verb == "add":
+                    hit = next((a for a in areas if a["number"] == args.area), None)
+                    if hit is None:
+                        raise CliError(f"no area {args.area}")
+                    hit["sub_areas"].append({"prefix": None, "title": args.title})
+                else:
+                    owner = next((a for a in areas if any(x["prefix"] == args.prefix for x in a["sub_areas"])), None)
+                    if owner is None:
+                        raise CliError(f"no sub-area {args.prefix}")
+                    sub = next(x for x in owner["sub_areas"] if x["prefix"] == args.prefix)
+                    if verb == "rename":
+                        sub["title"] = args.title
+                    else:
+                        owner["sub_areas"].remove(sub)
+            return product_parser.transform_structure(text, areas)
+
+        edits = [("PRODUCT.MD", restructure, True)]
+        summary = f"WBS structure: {args.action} {verb}"
+    result = _apply(reg, key, edits, args.message or (lambda: summary), actor, args.chart)
     where = f"{result.branch} @ {result.sha[:7]}" if result.changed else "no change"
     return "\n".join([f"{key}: {summary} ({where})", *[f"  note: {n}" for n in notes]])
 
