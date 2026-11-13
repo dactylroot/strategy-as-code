@@ -80,6 +80,8 @@ const API = '{{ base_path }}/api/inbox';
 const FEATURES = {{ features | tojson }};
 const TASKS = {{ tasks | tojson }};
 const SUB_AREAS = [{% for sa in sub_areas %}{{ {'wbs': sa.wbs_prefix, 'name': sa.title} | tojson }}{{ ',' if not loop.last }}{% endfor %}];
+// Declared before the rows are wired up below: the editor reads it as soon as it is built.
+const STOP = new Set(['the', 'and', 'for', 'with', 'from', 'into', 'that', 'this', 'new', 'add', 'all']);
 async function send(url, body) {
   const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
   if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail || d; } catch (e) {} throw new Error(d); }
@@ -140,7 +142,6 @@ function featureScore(f, q) {
   return tokens.filter(t => name.includes(t)).length * 10 + tokens.filter(t => notes.includes(t)).length * 5
        + tokens.filter(t => wbs.includes(t)).length * 8;
 }
-const STOP = new Set(['the', 'and', 'for', 'with', 'from', 'into', 'that', 'this', 'new', 'add', 'all']);
 // Suggestions need a word to hang on to: the initiative's name and this project's hint, minus filler words.
 function suggestionQuery(text) {
   return (text || '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w));

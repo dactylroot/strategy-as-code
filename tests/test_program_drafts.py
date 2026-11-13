@@ -346,3 +346,11 @@ def test_the_new_form_warns_about_a_name_that_is_already_in_use(client, prog):
 def test_the_features_and_roadmap_pages_open_at_a_linked_search_or_initiative(client, prog):
     assert "get('q')" in client.get("/p/alpha/features").text
     assert "get('initiative')" in client.get("/p/alpha/roadmap").text
+
+
+def test_the_break_out_editor_constants_are_declared_before_the_rows_are_wired(client, prog):
+    """`const` is not hoisted: the editor runs while the rows are wired up, so what it reads must come first."""
+    page = client.get("/p/alpha/inbox").text
+    wired = page.index("querySelectorAll('.inbox-item').forEach")
+    for name in ("const STOP", "const FEATURES", "const TASKS", "const SUB_AREAS"):
+        assert page.index(name) < wired, name
