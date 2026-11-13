@@ -42,6 +42,7 @@ def refresh_all(registry: Registry) -> dict[str, str | None]:
 def poll_loop(registry: Registry, interval: float, stop: threading.Event) -> None:
     while not stop.wait(max(interval, 5)):
         try:
+            registry.reload_manifest()  # the manifest repository may have gained or lost projects
             registry.expand()          # a nested program's manifest may have gained or lost projects
             refresh_all(registry)
         except Exception:
@@ -98,6 +99,12 @@ def handle_push_event(registry: Registry, payload: dict) -> dict[str, str | None
     """Refresh the projects whose repository the event names."""
     keys = projects_for_repo(registry, payload)
     result = {}
+    manifest = registry.manifest_project
+    if manifest is not None:
+        repo = payload.get("repository") or {}
+        names = {_norm(v) for v in (repo.get("full_name"), repo.get("clone_url"), repo.get("ssh_url")) if v}
+        if _norm(manifest.spec.repo) in names:
+            result["program manifest"] = registry.reload_manifest()
     for key in keys:
         try:
             registry.refresh(key)

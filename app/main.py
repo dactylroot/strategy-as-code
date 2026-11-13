@@ -78,7 +78,11 @@ async def _lifespan(_app: FastAPI):
 app = FastAPI(title=settings.app_title, docs_url=full("/api-docs"), lifespan=_lifespan)
 
 # Program mode: one clone per member project, served under <base>/p/<key>/.
-if settings.program_manifest:
+if settings.program_manifest_repo:
+    scope.set_registry(Registry.from_manifest_repo(
+        settings.program_manifest_repo, settings.program_manifest_path, settings.program_manifest_branch,
+        nested_depth=settings.program_nested_depth))
+elif settings.program_manifest:
     scope.set_registry(Registry.from_manifest(Path(settings.program_manifest).expanduser(),
                                               nested_depth=settings.program_nested_depth))
 
@@ -245,9 +249,11 @@ async def projects_index(request: Request):
     if scope.get_registry() is None:
         raise HTTPException(status_code=404)
     rows = await run_in_threadpool(overview.summarize_all)
-    initiatives, initiatives_error = overview.initiative_views(rows)
+    initiatives, initiatives_error = overview.unified_initiatives(rows)
+    identity = getattr(request.state, "identity", None)
     return templates.TemplateResponse(request, "overview.html", {
-        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "nested_errors": scope.get_registry().nested_errors, "stages": overview.STAGES, "app_title": "Program overview", "host_home_url": settings.host_home_url,
+        "can_manage": identity is None or hub_identity.may_manage(identity),
+        "projects": rows, "initiatives": initiatives, "initiatives_error": initiatives_error, "nested_errors": scope.get_registry().nested_errors, "manifest_error": scope.get_registry().manifest_error, "stages": overview.STAGES, "app_title": "Program overview", "host_home_url": settings.host_home_url,
         "active_page": "overview", "auth_enabled": auth_enabled(), "lock_project": settings.lock_project})
 
 

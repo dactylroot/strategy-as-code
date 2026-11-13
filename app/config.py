@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Screenshots are never committed to a project's branches: standalone ones are uploaded as
     # GitHub Release assets (see github_issues.py), program projects keep theirs on refs/planning/assets (see assets.py).
     program_manifest: str = ""  # path to a PROGRAM.MD; enables /p/<key>/ project-scoped routes
+    program_manifest_repo: str = ""    # or: a git repository holding PROGRAM.MD, cloned and written by the service
+    program_manifest_path: str = "PROGRAM.MD"   # where the manifest is in that repository
+    program_manifest_branch: str = ""  # its branch; empty = the repository's default branch
     hub_auth_url: str = ""           # RevOps hub /internal/auth?app=strategy; enables hub identity and roles
     trusted_origins: str = ""        # comma-separated origins whose browser writes are accepted in hub mode, for a host reached
                                      # over plain http (no Sec-Fetch-Site is sent there), e.g. "http://172.30.0.4"
@@ -213,6 +216,18 @@ class _SettingsProxy:
     @property
     def program_manifest(self) -> str:
         return str(_deploy_value("program_manifest") or _base.program_manifest)
+
+    @property
+    def program_manifest_repo(self) -> str:
+        return _base.program_manifest_repo
+
+    @property
+    def program_manifest_path(self) -> str:
+        return _base.program_manifest_path
+
+    @property
+    def program_manifest_branch(self) -> str:
+        return _base.program_manifest_branch
 
     @property
     def hub_auth_url(self) -> str:

@@ -55,6 +55,26 @@
     .prog .stage-3 { background:var(--color-amber); }
     .prog .stage-4 { background:var(--color-t3-blue); }
     .prog .stage-5 { background:var(--live); }
+    /* Program initiatives: one row per unified initiative, expandable */
+    .prog .inis { border:1px solid var(--line); border-radius:var(--radius); background:var(--color-bg-card); }
+    .prog details.ini { border-bottom:1px solid var(--color-border-subtle); }
+    .prog details.ini:last-child { border-bottom:0; }
+    .prog details.ini > summary { display:grid; grid-template-columns:minmax(11rem, 1.2fr) minmax(8rem, 1fr) 4.5ch minmax(10rem, 2fr); gap:6px 16px; align-items:center; padding:10px 12px; cursor:pointer; list-style:none; }
+    .prog details.ini > summary::-webkit-details-marker { display:none; }
+    .prog details.ini > summary:hover { background:var(--action-hover); }
+    .prog .ini-name { font-weight:600; }
+    .prog .ini-name::before { content:"\25B8"; display:inline-block; margin-right:6px; color:var(--muted); transition:transform .12s; }
+    .prog details.ini[open] .ini-name::before { transform:rotate(90deg); }
+    .prog .ini-count { font-weight:600; font-variant-numeric:tabular-nums; text-align:right; }
+    .prog .ini-sub { grid-column:1 / -1; padding-left:20px; margin-top:-2px; }
+    .prog .ini-body { padding:4px 16px 14px 32px; background:var(--color-bg-surface); }
+    .prog .ini-body .badge { font-size:11px; color:var(--muted); margin-left:6px; }
+    .prog .ini-body pre { background:var(--color-bg-card); border:1px solid var(--line); border-radius:4px; padding:6px 10px; font:12px var(--font-mono); margin:4px 0; white-space:pre-wrap; }
+    .prog .ini-body .copy { font-size:12px; }
+    .prog .ini-body .send { margin:10px 0; display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:13px; }
+    .prog .ini-body .change { margin-top:10px; font-size:13px; }
+    .prog .ini-body .change > summary { cursor:pointer; color:var(--muted); }
+    @media (max-width:40rem) { .prog details.ini > summary { grid-template-columns:1fr 4.5ch; } .prog .ini-bar, .prog .ini-chips { grid-column:1 / -1; } }
     .prog a { color:var(--link); }
 {% endblock %}
 {% block content %}
@@ -63,26 +83,92 @@
   <div class="page-header"><h1>Program overview</h1>
   <p class="subtitle">{{ projects | length }} project{{ '' if projects | length == 1 else 's' }}. Each row links to that project's own board; expand a row for detail. <a href="{{ work_url() }}">Edit features across projects</a>.</p></div>
   {% for key, why in nested_errors.items() %}<p class="bad">{{ "Nested programs" if key == "*" else "Nested program " ~ key }} could not be expanded: {{ why }}</p>{% endfor %}
+  {% if manifest_error %}<p class="bad">The program manifest could not be reloaded; showing the last good list of projects: {{ manifest_error }}</p>{% endif %}
   {% if initiatives_error %}<p class="bad">Program initiatives could not be read: {{ initiatives_error }}</p>{% endif %}
   {% if initiatives %}
+  {% set active = initiatives | rejectattr('status', 'equalto', 'Complete') | list %}
+  {% set drafts = initiatives | selectattr('status', 'equalto', 'Draft') | list %}
+  {% set finished = initiatives | selectattr('status', 'equalto', 'Complete') | list %}
+  {% macro ini_row(i, hide=false) %}
+    <details class="ini"{% if hide %} hidden data-done{% endif %}>
+      <summary>
+        <span class="ini-name">{{ i.name }} <span class="muted">({{ i.kind }}{% if i.status == 'Planned' %} &middot; planned{% elif i.status == 'Draft' %} &middot; draft{% endif %})</span></span>
+        {% if i.status == 'Draft' %}
+        <span class="muted ini-bar">draft &middot; no features yet</span>
+        <b class="ini-count muted">&ndash;</b>
+        <span class="ini-chips">
+          {% for a in i.asks %}<span class="chip {{ 'ok' if a.state == 'Defined' else ('bad' if a.state == 'Declined' else ('warn' if a.state in ('Sent', 'Breaking out') else '')) }}">{{ a.project }} {{ a.state | lower }}</span>{% else %}<span class="muted">no projects asked yet</span>{% endfor %}
+        </span>
+        {% else %}
+        <div class="bar ini-bar" role="img" aria-label="{{ i.done }} of {{ i.total }} features live or released"><span style="width:{{ i.pct }}%"></span></div>
+        <b class="ini-count {{ 'ok' if i.status == 'Complete' else '' }}">{{ i.done }}/{{ i.total }}</b>
+        <span class="ini-chips">
+          {% for pr in i.projects %}<span class="chip {{ 'ok' if pr.done == pr.total else '' }}">{{ pr.project }} {{ pr.done }}/{{ pr.total }}</span>{% endfor %}
+          {% if i.blocked %}<span class="chip warn">{{ i.blocked }} blocked</span>{% endif %}
+          {% if i.awaiting_uat %}<span class="chip warn">{{ i.awaiting_uat }} awaiting UAT</span>{% endif %}
+          {% if i.pending %}<span class="chip warn">requirements pending: {{ i.pending | join(', ') }}</span>{% endif %}
+        </span>
+        {% endif %}
+        {% if i.merged_from | length > 1 or i.separate_of or i.kinds_differ %}
+        <span class="muted ini-sub">
+          {% if i.merged_from | length > 1 %}combined from {{ i.merged_from | length }} projects{% endif %}
+          {% if i.separate_of %}kept separate from the same-named initiative in other projects{% endif %}
+          {% if i.kinds_differ %}{{ ' &middot; ' | safe if i.merged_from | length > 1 or i.separate_of }}Major and Minor differ between sources; showing Major{% endif %}
+        </span>
+        {% endif %}
+      </summary>
+      <div class="ini-body">
+        {% if i.goal or i.success %}<p>{% if i.goal %}<b>Goal:</b> {{ i.goal }}{% endif %}{% if i.success %}<br><b>Success:</b> {{ i.success }}{% endif %}</p>{% endif %}
+        {% if i.asks %}
+        <h3>Asked to plan</h3>
+        <ul>{% for a in i.asks %}
+          <li><a href="#{{ a.project }}">{{ a.project }}</a> <span class="{{ 'ok' if a.state == 'Defined' else ('bad' if a.state == 'Declined' else ('warn' if a.state in ('Sent', 'Breaking out') else 'muted')) }}">{{ a.state }}</span>
+            {% if a.detail %}<span class="muted">{{ a.detail }}</span>{% endif %}
+            {% if a.text %}<span class="muted">&mdash; {{ a.text }}</span>{% endif %}
+            {% if a.waiting_on and a.state == 'Drafted' %}<span class="warn">waits on {{ a.waiting_on | join(', ') }}</span>{% endif %}</li>
+        {% endfor %}</ul>
+        {% set sendable = i.asks | selectattr('state', 'in', ['Drafted', 'Declined']) | list %}
+        {% if i.declared and sendable %}
+          {% if can_manage %}
+          <div class="send" data-name="{{ i.name }}">
+            <button type="button" class="btn send-go">Send to {{ sendable | map(attribute='project') | join(', ') }}</button>
+            <label class="muted"><input type="checkbox" class="send-ordered"{% if i.asks | selectattr('waiting_on') | list %} checked{% endif %}> hold dependent projects until the ones they depend on have defined theirs</label>
+            <span class="send-msg muted" role="status"></span>
+          </div>
+          {% else %}<p class="muted">Only hub admins can send this.</p>{% endif %}
+        {% endif %}
+        {% endif %}
+        {% for project, group in i.members | groupby('project') %}
+        <h3><a href="#{{ project }}">{{ project }}</a></h3>
+        <ul>{% for m in group %}
+          <li><code>{{ m.wbs }}</code>
+            {% if m.name %}{{ m.name }}{% endif %}
+            <span class="{{ 'ok' if m.done else ('bad' if m.missing else 'muted') }}">{{ m.stage }}</span>
+            {% if m.blocked_by %}<span class="warn">blocked by {{ m.blocked_by | join(', ') }}</span>{% endif %}
+            <span class="badge">{{ 'declared in PROGRAM.MD' if m.source == 'declared' else 'matched by name' }}</span></li>
+        {% endfor %}</ul>
+        {% else %}{% if i.status != 'Draft' %}<p class="muted">No features yet.</p>{% endif %}
+        {% endfor %}
+        <details class="change"><summary>Change how this is grouped</summary>
+          <p class="muted">PROGRAM.MD is edited by hand. Add these lines under <code>## Initiatives</code>:</p>
+          {% for k, text in i.snippets.items() %}
+            {% if k == 'alias' %}<p class="muted">Treat another name as this initiative:</p>
+            {% elif k.startswith('split:') %}<p class="muted">Keep {{ k[6:] }}'s initiative of this name separate:</p>
+            {% else %}<p class="muted">{{ text }}</p>{% endif %}
+            {% if k != 'merge' %}<pre>{{ text }}</pre> <button type="button" class="btn btn-ghost copy" data-copy="{{ text }}">Copy</button>{% endif %}
+          {% endfor %}
+        </details>
+      </div>
+    </details>
+  {% endmacro %}
   <h2 class="sec">Program initiatives</h2>
-  <div class="grid inits">
-    {% for i in initiatives %}
-    <section class="card">
-      <h2><span>{{ i.name }} <span class="muted">({{ i.kind }})</span></span>
-        <b class="{{ 'ok' if i.total and i.done == i.total else '' }}">{{ i.done }}/{{ i.total }}</b></h2>
-      <div class="bar" role="img" aria-label="{{ i.done }} of {{ i.total }} features live or released"><span style="width:{{ (100 * i.done / i.total) | round | int if i.total else 0 }}%"></span></div>
-      {% for project, group in i.members | groupby('project') %}
-      <h3><a href="#{{ project }}">{{ project }}</a></h3>
-      <ul>{% for m in group %}
-        <li><code>{{ m.wbs }}</code>
-          {% if m.name %}{{ m.name }}{% endif %}
-          <span class="{{ 'ok' if m.done else ('bad' if m.missing else 'muted') }}">{{ m.stage }}</span>
-          {% if m.blocked_by %}<span class="warn">blocked by {{ m.blocked_by | join(', ') }}</span>{% endif %}</li>
-      {% endfor %}</ul>
-      {% endfor %}
-    </section>
-    {% endfor %}
+  <div class="tools">
+    <span class="muted">{{ (active | length) - (drafts | length) }} in progress or planned{% if drafts %}, {{ drafts | length }} draft{{ '' if drafts | length == 1 else 's' }} below{% endif %}. Initiatives with the same name in several projects are combined.</span>
+    {% if finished %}<button type="button" class="btn btn-ghost" id="toggle-done" aria-expanded="false">Show completed ({{ finished | length }})</button>{% endif %}
+  </div>
+  <div class="inis">
+    {% for i in active %}{{ ini_row(i) }}{% else %}<p class="muted" style="padding:10px 12px;margin:0">No initiatives in progress.</p>{% endfor %}
+    {% for i in finished %}{{ ini_row(i, true) }}{% endfor %}
   </div>
   <h2 class="sec">Projects</h2>
   {% endif %}
@@ -215,6 +301,36 @@
   </div>
   <script>
     (function () {
+      var td = document.getElementById('toggle-done');
+      if (td) td.addEventListener('click', function () {
+        var open = td.getAttribute('aria-expanded') !== 'true';
+        td.setAttribute('aria-expanded', open ? 'true' : 'false');
+        td.textContent = (open ? 'Hide' : 'Show') + ' completed (' + document.querySelectorAll('.prog .inis details.ini[data-done]').length + ')';
+        document.querySelectorAll('.prog .inis details.ini[data-done]').forEach(function (d) { d.hidden = !open; });
+      });
+      document.querySelectorAll('.prog .send').forEach(function (box) {
+        var go = box.querySelector('.send-go'), msg = box.querySelector('.send-msg');
+        go.addEventListener('click', async function () {
+          go.disabled = true; msg.textContent = 'Sending\u2026';
+          try {
+            var r = await fetch('{{ projects_url() }}'.replace(/\/p$/, '') + '/api/program/initiatives/' + encodeURIComponent(box.dataset.name) + '/send', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ordered: box.querySelector('.send-ordered').checked }) });
+            var d = await r.json();
+            if (!r.ok) throw new Error(d.detail || r.status);
+            var bad = (d.results || []).filter(function (x) { return x.error; });
+            if (bad.length) {
+              msg.textContent = bad.map(function (x) { return x.project + ': ' + x.error; }).join('; ');
+              go.disabled = false;
+            } else { msg.textContent = 'Sent. Reloading\u2026'; location.reload(); }
+          } catch (e) { msg.textContent = 'Not sent: ' + e.message; go.disabled = false; }
+        });
+      });
+      document.querySelectorAll('.prog .copy').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).then(function () { b.textContent = 'Copied'; });
+        });
+      });
       var all = document.getElementById('toggle-all');
       function set(btn, open) {
         btn.setAttribute('aria-expanded', open ? 'true' : 'false');

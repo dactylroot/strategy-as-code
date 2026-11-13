@@ -326,6 +326,23 @@ def test_overview_rolls_up_program_initiatives(client, program, tmp_path):
     assert "could not be read" in client.get("/p").text
 
 
+def test_overview_combines_same_named_initiatives_and_hides_completed(client, program, tmp_path):
+    # Both fixture projects have a "Reporting Push" initiative (1.2.2, in progress): one row, two projects.
+    manifest = tmp_path / "PROGRAM.MD"
+    manifest.write_text("""## Projects\n\n| Key | Repo / Path |\n| --- | --- |\n| alpha | x |\n| beta | y |\n
+## Initiatives\n\n### Shipped Already (Minor)\n- alpha:1.1.1\n""", encoding="utf-8")
+    program.manifest_path = manifest
+    page = client.get("/p").text
+    assert page.count("ini-name\">Reporting Push") == 1 and "combined from 2 projects" in page
+    assert "alpha 0/1" in page and "beta 0/1" in page
+    assert "Show completed (1)" in page
+    row = page[page.index("Shipped Already") - 200:page.index("Shipped Already")]
+    assert "hidden data-done" in row                 # present for the toggle, not shown by default
+    manifest.write_text(manifest.read_text() + "\n### Reporting Push\nNot: beta\n", encoding="utf-8")
+    page = client.get("/p").text
+    assert "Reporting Push (beta)" in page and "kept separate" in page
+
+
 # ── inbox ──────────────────────────────────────────────────────────────────
 
 def test_a_bug_lands_on_the_board_open_and_a_feature_waits_for_triage(client, program):

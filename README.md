@@ -39,6 +39,15 @@ The UI defaults to light mode with a theme toggle in the header.
 
 ![Program overview](sample-program/screenshots/overview.png)
 
+The overview lists in-progress and planned initiatives (completed ones sit behind "Show completed"). Initiatives with the same name in several projects' `ABOUT.MD` roadmaps, and in `PROGRAM.MD`, are shown as one. Two optional lines under an initiative in `PROGRAM.MD` change that:
+
+```markdown
+### Faster Checkout (Major)
+Aliases: One-Tap Pay     <!-- another name that means this initiative -->
+Not: storefront          <!-- storefront's own "Faster Checkout" is a different initiative -->
+- platform:1.2.1
+```
+
 ## Ways to deploy
 
 The same app runs four ways. Pick the one that fits how your team works.
@@ -161,6 +170,9 @@ Supports `linux/amd64` and `linux/arm64`.
 | `AUTH_INTROSPECT_URL` | (empty) | Host session-introspection endpoint - see [Embedded](#embedded) below |
 | `HUB_AUTH_URL` | (empty) | RevOps hub `/internal/auth?app=strategy`. Enables hub identity: the visitor's cookie is forwarded, the hub's `X-User-Email` and `X-App-Role` answer is the only identity accepted (`viewer` reads, `editor` and `admin` write, `contributor` and `reporter` are limited roles, see Roles in hub mode; the request names its project with `&project=<key>` and the manifest key must equal the hub's app key), and `X-Host-User` is ignored |
 | `PROGRAM_MANIFEST` | (empty) | Path to a `PROGRAM.MD`. Enables program mode: each project listed in its Projects table is cloned and served under `<base>/p/<key>/`, and the front page becomes the program overview. Can also be set as `program_manifest` in `server.yml` |
+| `PROGRAM_MANIFEST_REPO` | (empty) | Git URL of a repository holding `PROGRAM.MD`, as an alternative to `PROGRAM_MANIFEST`. The service clones it (with `GIT_TOKEN`), reloads the project list from it on every poll and on a push webhook for it, and commits changes to the manifest's `## Initiatives` section to it as the signed-in person. The Projects table is never written by the service. Startup fails if the manifest cannot be fetched |
+| `PROGRAM_MANIFEST_PATH` | `PROGRAM.MD` | Path of the manifest inside `PROGRAM_MANIFEST_REPO` |
+| `PROGRAM_MANIFEST_BRANCH` | (empty) | Branch of `PROGRAM_MANIFEST_REPO` to read and write; empty = its default branch |
 | `PROGRAM_POLL_SECONDS` | `45` | Background refresh of every member project's clone; `0` turns it off |
 | `PROGRAM_NESTED_DEPTH` | `3` | A manifest row with `Kind` = `program` is a nested program: its own `PROGRAM.MD` (in its `Planning Dir`) is read and its projects are listed as `<row key>.<project key>`, with their `Depends On` prefixed the same way. This is how many levels to follow; `0` turns nesting off. A program that would contain itself (same repository and folder further up) is always refused. Re-read on every poll |
 | `PROGRAM_SWEEP_SECONDS` | `86400` | How often every project's inbox is swept: items untriaged for 60 days move to `.planning/inbox/archive/`, one commit per project that had any; `0` turns it off |
@@ -190,6 +202,18 @@ In hub mode the API router refuses a write (any method but GET, HEAD or OPTIONS)
 ### Submissions and their outcomes
 
 A bug does not wait: `POST /api/inbox` with `type: bug` adds the row to BUGS.MD as Open, owned by the submitter, in the same commit, and keeps only the triaged record `.planning/triaged/<id>.md` (`promoted`, `bug N`) so the submitter's app can still find it; the screenshot posted afterwards to `/api/inbox/<id>/screenshot` attaches to that bug. A feature request is one file under `.planning/inbox/`, committed as the submitter. Its id ends with a tag of the submitter's email (`submitter_tag`), so an app can find one person's items by file name. Until it is triaged only its submitter changes it. Promoting, declining or marking a duplicate moves it, without its description or screenshot, to `.planning/triaged/<id>.md` with the outcome (`promoted` with what it became, `declined` with the reason, `duplicate` of what), kept for a year. A screenshot is not committed to the project: files under `.planning/inbox/` and `.planning/screenshots/` are excluded in the clone and kept on `refs/planning/assets`, a single parentless commit holding only the screenshots that exist now. It is outside `refs/heads`, so a default clone does not fetch it, and removing a screenshot (decline, withdraw, bug closed) force-pushes a new commit without it. `GET /api/inbox/mine` returns a person's waiting and triaged items, each promoted one with the current state of the row that carries its `(inbox <id>)` marker.
+
+**Drafting program initiatives.** Creating, changing, removing and sending them is limited to hub admins (editors and viewers can read the list); without hub identity the program endpoints are open as before. An initiative tagged `(Major, Draft)` in `PROGRAM.MD` is being planned. `Goal:` and `Success:` describe it, and one `Ask <project>: hint` line per project names who is asked to plan their part (a hint, not a feature):
+
+```markdown
+### Search Overhaul (Major, Draft)
+Goal: Customers find products in one query across web and app.
+Success: One query returns products and help articles in under 300 ms.
+Ask platform: Search index API
+Ask storefront: Results page
+```
+
+Program-level endpoints (hub administrators; they write the manifest, which needs `PROGRAM_MANIFEST_REPO` to be versioned): `GET /api/program/initiatives?status=draft,planned,in progress,complete` (default: all but Complete), `POST /api/program/initiatives`, `PATCH` and `DELETE /api/program/initiatives/<name>` (`draft: false` publishes a draft; the name cannot change), and `POST /api/program/initiatives/<name>/send` (`projects`, `ordered`). Sending writes one inbox item of type `initiative` into each asked project, a snapshot of the goal, success criteria and what the other projects were asked; `ordered` holds an ask until the projects it depends on have defined theirs. A project resolves its task with `POST /p/<key>/api/inbox/<id>/breakout` (`features: [{prefix, name, value, notes}]`), which adds the features, lists them under an initiative of the same name in its ABOUT.MD (tagged Major or Minor as the program says) and records the task as done, in one commit; or declines it with a reason. Each ask reads as Drafted, Sent, Breaking out, Defined or Declined, derived from the project's inbox and roadmap. An initiative with a task still open is not Complete, and one with no features yet is a Draft rather than in progress.
 
 `GET /api/about/html` is the project's ABOUT.MD rendered, with its newest released version; the apps show it on their About page.
 

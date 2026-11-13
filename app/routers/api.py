@@ -656,6 +656,8 @@ def list_inbox(request: Request):
 @router.post("/inbox", status_code=201, dependencies=[Depends(_rate_limit)])
 @program_write(lambda kw: f"inbox: {kw['req'].type} submitted: {kw['req'].title[:80]}")
 def submit_inbox(request: Request, req: InboxSubmit):
+    if req.type == inbox_lib.TASK:
+        raise HTTPException(status_code=422, detail="Planning tasks are sent from the program's initiatives, not submitted.")
     if _hub.is_reporter(getattr(request.state, "identity", None)) and req.type != "bug":
         raise HTTPException(status_code=403, detail="Your role can report bugs only.")
     actor = request_actor(request)
@@ -758,6 +760,31 @@ def promote_inbox(request: Request, item_id: str, req: InboxPromote):
         raise HTTPException(status_code=422, detail=str(exc))
 
 
+class BreakoutFeature(BaseModel):
+    prefix: str
+    name: str
+    value: int | None = None
+    notes: str = ""
+
+
+class InboxBreakout(BaseModel):
+    features: list[BreakoutFeature]
+
+
+@router.post("/inbox/{item_id}/breakout")
+@program_write("inbox {item_id} broken out into features")
+def breakout_inbox(request: Request, item_id: str, req: InboxBreakout):
+    """Resolve a planning task: add the features, list them under the task's initiative in ABOUT.MD, record the task done."""
+    _require_program()
+    try:
+        feats = [NewFeature(wbs_prefix=f.prefix, name=f.name, value=f.value, notes=f.notes) for f in req.features]
+        if any(not f.name.strip() for f in req.features):
+            raise inbox_lib.InboxError("every feature needs a name")
+        return {"became": inbox_lib.breakout(settings.project_dir, item_id, feats)}
+    except inbox_lib.InboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
 @router.post("/inbox/{item_id}/decline")
 @program_write(lambda kw: (f"inbox: duplicate {kw['item_id']} of {kw['req'].duplicate_of}" if kw["req"].duplicate_of
                            else f"inbox: decline {kw['item_id']}: {kw['req'].reason or 'no reason given'}"))
@@ -793,3 +820,134 @@ async def program_feature_action(body: ProgramFeatureAction, request: Request):
         program_actions.run, registry, [(t.project, t.wbs) for t in body.targets], action, request_actor(request))
     return {"results": [r.as_dict() for r in results],
             "ok": all(r.ok for r in results), "failed": sum(not r.ok for r in results)}
+
+
+# ── Program initiatives: read the rolled-up list; draft, change, send and remove them in the manifest ──
+
+from typing import Literal                                    # noqa: E402
+from functools import partial                                 # noqa: E402
+from .. import manifest as _manifest                          # noqa: E402
+from .. import overview as _overview                          # noqa: E402
+from .. import program_drafts                                 # noqa: E402
+from ..program_manifest import edit_manifest                  # noqa: E402
+
+
+class InitiativeAsk(BaseModel):
+    project: str
+    text: str = ""
+
+
+class InitiativeMember(BaseModel):
+    project: str
+    wbs: str
+
+
+class InitiativeCreate(BaseModel):
+    name: str
+    kind: Literal["major", "minor"] = "minor"
+    draft: bool = True
+    goal: str = ""
+    success: str = ""
+    asks: list[InitiativeAsk] = []
+    members: list[InitiativeMember] = []
+    aliases: list[str] = []
+    excludes: list[str] = []
+
+
+class InitiativePatch(BaseModel):
+    """Only the fields present change; `draft: false` publishes a draft. The name cannot change."""
+    kind: Literal["major", "minor"] | None = None
+    draft: bool | None = None
+    goal: str | None = None
+    success: str | None = None
+    asks: list[InitiativeAsk] | None = None
+    members: list[InitiativeMember] | None = None
+    aliases: list[str] | None = None
+    excludes: list[str] | None = None
+
+
+class InitiativeSend(BaseModel):
+    projects: list[str] | None = None    # default: every ask that is Drafted or Declined
+    ordered: bool = False                # hold an ask until the projects it depends on have defined theirs
+
+
+def _program_registry(request: Request):
+    registry = _scope.get_registry()
+    if registry is None or _scope.scope_key():
+        raise HTTPException(status_code=404, detail="Program initiatives are only available on the program.")
+    identity = getattr(request.state, "identity", None)
+    if identity is not None and not _hub.may_manage(identity):
+        raise HTTPException(status_code=403, detail="Only hub admins can change program initiatives.")
+    return registry
+
+
+def _check_projects(registry, body) -> None:
+    named = {a.project for a in (body.asks or [])} | {m.project for m in (body.members or [])} | set(body.excludes or [])
+    unknown = sorted(named - set(registry.keys()))
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"unknown project(s): {', '.join(unknown)}")
+
+
+def _manifest_write(registry, transform, message: str, request: Request) -> dict:
+    try:
+        written = edit_manifest(registry, transform, message, request_actor(request))
+    except _manifest.ManifestError as exc:
+        raise HTTPException(status_code=409 if "already exists" in str(exc) else 422, detail=str(exc))
+    return {"ok": True, "changed": written.changed, "versioned": written.versioned}
+
+
+@router.get("/program/initiatives")
+async def list_program_initiatives(request: Request, status: str = ""):
+    """Every program initiative with its rolled-up progress. `status` filters (comma separated:
+    Draft, Planned, In progress, Complete); Complete ones are only included when asked for."""
+    registry = _scope.get_registry()
+    if registry is None or _scope.scope_key():
+        raise HTTPException(status_code=404, detail="Program initiatives are only available on the program.")
+    rows = await run_in_threadpool(_overview.summarize_all)
+    views, error = _overview.unified_initiatives(rows)
+    if error:
+        raise HTTPException(status_code=500, detail=f"Program initiatives could not be read: {error}")
+    want = {s.strip().lower() for s in status.split(",") if s.strip()} or {"draft", "planned", "in progress"}
+    return {"initiatives": [v.as_dict() for v in views if v.status.lower() in want]}
+
+
+@router.post("/program/initiatives", status_code=201)
+async def create_program_initiative(body: InitiativeCreate, request: Request):
+    registry = _program_registry(request)
+    _check_projects(registry, body)
+    transform = partial(_manifest.transform_add_initiative, name=body.name, kind=body.kind, draft=body.draft,
+                        goal=body.goal, success=body.success, asks=[(a.project, a.text) for a in body.asks],
+                        members=[(m.project, m.wbs) for m in body.members], aliases=body.aliases, excludes=body.excludes)
+    return await run_in_threadpool(_manifest_write, registry, transform, f"UI: add initiative {body.name}", request)
+
+
+@router.patch("/program/initiatives/{name:path}")
+async def update_program_initiative(name: str, body: InitiativePatch, request: Request):
+    registry = _program_registry(request)
+    _check_projects(registry, body)
+    transform = partial(_manifest.transform_update_initiative, name=name, kind=body.kind, draft=body.draft,
+                        goal=body.goal, success=body.success, aliases=body.aliases, excludes=body.excludes,
+                        asks=None if body.asks is None else [(a.project, a.text) for a in body.asks],
+                        members=None if body.members is None else [(m.project, m.wbs) for m in body.members])
+    return await run_in_threadpool(_manifest_write, registry, transform, f"UI: update initiative {name}", request)
+
+
+@router.delete("/program/initiatives/{name:path}")
+async def delete_program_initiative(name: str, request: Request):
+    """Remove the initiative from the manifest. Planning tasks already sent stay in the projects' inboxes."""
+    registry = _program_registry(request)
+    return await run_in_threadpool(_manifest_write, registry, partial(_manifest.transform_remove_initiative, name=name),
+                                   f"UI: remove initiative {name}", request)
+
+
+@router.post("/program/initiatives/{name:path}/send")
+async def send_program_initiative(name: str, body: InitiativeSend, request: Request):
+    """Send each ask's planning task to its project (one commit per project). The response lists every ask's
+    outcome, so a partial success shows which projects did not receive theirs."""
+    registry = _program_registry(request)
+    try:
+        results = await run_in_threadpool(program_drafts.send, registry, name, body.projects, body.ordered,
+                                          request_actor(request))
+    except program_drafts.DraftError as exc:
+        raise HTTPException(status_code=404 if "no initiative named" in str(exc) else 422, detail=str(exc))
+    return {"results": results, "ok": all(not r["error"] for r in results), "failed": sum(bool(r["error"]) for r in results)}

@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import BugCreate, BugSeverity, NewFeature
+from .parsers import about as about_parser
 from .parsers import bugs as bugs_parser
 from .parsers import product as product_parser
 
@@ -35,6 +36,7 @@ TRIAGED_DAYS = 365
 MAX_TITLE = 200
 MAX_BODY = 5000
 KINDS = ("bug", "feature")
+TASK = "initiative"            # a planning task sent by the program: define an initiative's requirements in this project
 MAX_ATTACHMENT = 5 * 1024 * 1024
 _IMAGE_TYPES = ((b"\x89PNG\r\n\x1a\n", ".png"), (b"\xff\xd8\xff", ".jpg"), (b"GIF87a", ".gif"), (b"GIF89a", ".gif"))
 
@@ -65,6 +67,8 @@ class Item:
     ref: str = ""             # what a promoted item became ("bug 12", "feature 1.2.3") or the item it duplicates
     reason: str = ""
     triaged: str = ""
+    initiative: str = ""      # a planning task's program initiative (also kept on its triaged record)
+    initiative_kind: str = "" # major or minor, so the project can tag its own initiative the same way
 
 
 def _one_line(value: str, limit: int) -> str:
@@ -87,7 +91,7 @@ def _slug(title: str) -> str:
 
 
 def _clean(kind: str, title: str, body: str, severity: str, wbs: str) -> tuple[str, str, str, str]:
-    if kind not in KINDS:
+    if kind not in KINDS + (TASK,):
         raise InboxError(f"type must be one of {KINDS}")
     title = _one_line(title, MAX_TITLE)
     if not title:
@@ -102,8 +106,12 @@ def _clean(kind: str, title: str, body: str, severity: str, wbs: str) -> tuple[s
     return title, body, severity.lower() if severity else "", wbs
 
 
-def _render(kind: str, title: str, body: str, submitter: str, created: str, severity: str, wbs: str) -> str:
+def _render(kind: str, title: str, body: str, submitter: str, created: str, severity: str, wbs: str,
+            initiative: str = "", initiative_kind: str = "") -> str:
     head = [f"type: {kind}", f"title: {title}", f"submitter: {submitter}", f"created: {created}"]
+    if initiative:
+        head.append(f"initiative: {initiative}")
+        head.append(f"initiative_kind: {initiative_kind}")
     if severity:
         head.append(f"severity: {severity}")
     if wbs:
@@ -112,8 +120,14 @@ def _render(kind: str, title: str, body: str, submitter: str, created: str, seve
 
 
 def write_item(root: Path, kind: str, title: str, body: str, submitter: str,
-               severity: str = "", wbs: str = "", now: datetime | None = None) -> Item:
+               severity: str = "", wbs: str = "", now: datetime | None = None,
+               initiative: str = "", initiative_kind: str = "") -> Item:
     title, body, severity, wbs = _clean(kind, title, body, severity, wbs)
+    initiative = _one_line(initiative, MAX_TITLE)
+    if (kind == TASK) != bool(initiative):
+        raise InboxError("a planning task names its initiative, and nothing else does")
+    if initiative_kind not in ("", "major", "minor"):
+        raise InboxError("initiative kind must be major or minor")
     now = now or _now()
     submitter = _one_line(submitter, 120) or "anonymous"
     item_id = f"{now:%Y%m%dT%H%M%SZ}-{_slug(title)}-{secrets.token_hex(2)}"
@@ -122,7 +136,8 @@ def write_item(root: Path, kind: str, title: str, body: str, submitter: str,
     folder = root / INBOX
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{item_id}.md"
-    path.write_text(_render(kind, title, body, submitter, f"{now:%Y-%m-%dT%H:%M:%SZ}", severity, wbs), encoding="utf-8")
+    path.write_text(_render(kind, title, body, submitter, f"{now:%Y-%m-%dT%H:%M:%SZ}", severity, wbs,
+                                    initiative, initiative_kind), encoding="utf-8")
     return read_item(path, now)
 
 
@@ -149,7 +164,8 @@ def read_item(path: Path, now: datetime | None = None) -> Item:
         wbs=meta.get("wbs", ""), body=body, archived=path.parent.name == "archive",
         age_days=age, stale=age >= STALE_DAYS and path.parent.name not in ("archive", TRIAGED.name), attachment=shot,
         outcome=meta.get("outcome", ""), ref=meta.get("ref", ""), reason=meta.get("reason", ""),
-        triaged=meta.get("triaged", ""),
+        triaged=meta.get("triaged", ""), initiative=meta.get("initiative", ""),
+        initiative_kind=meta.get("initiative_kind", ""),
     )
 
 
@@ -160,6 +176,11 @@ def list_items(root: Path, include_archive: bool = False, now: datetime | None =
         if folder.is_dir():
             items += [read_item(p, now) for p in sorted(folder.glob("*.md"))]
     return items
+
+
+def list_triaged(root: Path) -> list[Item]:
+    folder = root / TRIAGED
+    return [read_item(p) for p in sorted(folder.glob("*.md"))] if folder.is_dir() else []
 
 
 def _find(root: Path, item_id: str) -> Path | None:
@@ -260,6 +281,8 @@ def _triage(root: Path, item: Item, outcome: str, ref: str = "", reason: str = "
     """Keep what became of an item, without its description or screenshot, for the submitter to read."""
     head = [f"type: {item.kind}", f"title: {item.title}", f"submitter: {item.submitter}", f"created: {item.created}",
             f"outcome: {outcome}", f"triaged: {(now or _now()):%Y-%m-%dT%H:%M:%SZ}"]
+    if item.initiative:
+        head.append(f"initiative: {item.initiative}")
     if ref:
         head.append(f"ref: {_one_line(ref, 120)}")
     if reason:
@@ -283,6 +306,8 @@ def promote(root: Path, item_id: str, prefix: str = "", value: int | None = None
     if path is None:
         raise InboxError(f"no inbox item {item_id!r}")
     item = read_item(path)
+    if item.kind == TASK:
+        raise InboxError("a planning task is broken out into features, not promoted as one row")
     if item.kind == "bug":
         sev = BugSeverity(next(s.value for s in BugSeverity if s.value.lower() == (item.severity or "medium")))
         text = bugs_file.read_text(encoding="utf-8") if bugs_file.exists() else bugs_parser._EMPTY_BUGS
@@ -303,6 +328,45 @@ def promote(root: Path, item_id: str, prefix: str = "", value: int | None = None
             NewFeature(wbs_prefix=prefix, name=item.title.replace("|", "/"), value=value, notes=_row_notes(item)))
         product_file.write_text(new_text, encoding="utf-8")
         result = f"feature {feat.wbs}"
+    _triage(root, item, "promoted", result)
+    _remove(root, item_id)
+    return result
+
+
+def breakout(root: Path, item_id: str, features: list[NewFeature]) -> str:
+    """Resolve a planning task: add each feature to PRODUCT.MD, list them under the task's initiative in
+    ABOUT.MD (created, with the program's Major/Minor tag, if the project has none), and record the task
+    as done. The caller commits it all at once. A retry that finds the features already there only removes
+    the task file. Returns "<n> features: <codes>"."""
+    path = _find(root, item_id)
+    product_file, about_file = root / "PRODUCT.MD", root / "ABOUT.MD"
+    marker = _marker(item_id)
+    if product_file.exists() and marker in product_file.read_text(encoding="utf-8"):
+        if path is not None:
+            _triage(root, read_item(path), "promoted", "already broken out")
+        _remove(root, item_id)
+        return "already broken out; file removed"
+    if path is None:
+        raise InboxError(f"no inbox item {item_id!r}")
+    item = read_item(path)
+    if item.kind != TASK:
+        raise InboxError("only a planning task is broken out; promote a bug or feature request instead")
+    if not features:
+        raise InboxError("break the task out into at least one feature, or decline it with a reason")
+    if not about_file.exists():
+        raise InboxError("this project has no ABOUT.MD to list the initiative in")
+    text, codes = product_file.read_text(encoding="utf-8"), []
+    for f in features:
+        try:
+            text, feat = product_parser.transform_add_feature(text, f.model_copy(update={
+                "name": f.name.replace("|", "/").strip(), "notes": _one_line(f"{f.notes} {marker}".replace("|", "/"), 700)}))
+        except ValueError as exc:
+            raise InboxError(str(exc)) from exc
+        codes.append(feat.wbs)
+    product_file.write_text(text, encoding="utf-8")
+    about_file.write_text(about_parser.transform_add_to_initiative(
+        about_file.read_text(encoding="utf-8"), item.initiative, item.initiative_kind or "minor", codes), encoding="utf-8")
+    result = f"{len(codes)} feature{'' if len(codes) == 1 else 's'}: {', '.join(codes)}"
     _triage(root, item, "promoted", result)
     _remove(root, item_id)
     return result

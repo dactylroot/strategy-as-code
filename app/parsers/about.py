@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 from ..fileio import _atomic_write, _lock_for
+from ..manifest import normalize_name
 from ..models import (
     AboutDoc, ChangelogEntry, ChangelogGroup,
     RoadmapSection, RoadmapUpdate, Initiative, InitiativeUpdate,
@@ -161,6 +162,18 @@ def transform_update_initiatives(text: str, initiatives: list[InitiativeUpdate])
     return result
 
 
+
+
+def transform_add_to_initiative(text: str, name: str, kind: str, codes: list[str]) -> str:
+    """List `codes` under the initiative called `name` (matched ignoring case and spacing), creating it with
+    `kind` when the roadmap has none. Other initiatives and their members are kept."""
+    updates = [InitiativeUpdate(name=i.name, kind=i.kind, wbs=list(i.items)) for i in _parse_text(text).initiatives]
+    hit = next((u for u in updates if normalize_name(u.name) == normalize_name(name)), None)
+    if hit is None:
+        hit = InitiativeUpdate(name=name, kind="major" if kind == "major" else "minor", wbs=[])
+        updates.append(hit)
+    hit.wbs.extend(c for c in codes if c not in hit.wbs)
+    return transform_update_initiatives(text, updates)
 
 
 def transform_rewrite_wbs_refs(text: str, old: str, new: str) -> str:

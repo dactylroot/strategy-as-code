@@ -187,6 +187,9 @@ class Project:
         return sha
 
 
+MANIFEST_KEY = "_program"   # the manifest repository's own clone; not a valid project key, so never a member
+
+
 class Registry:
     def __init__(self, specs: list[ProjectSpec], cache_dir: Path | None = None,
                  committer: tuple[str, str] = ("strategy-as-code", "noreply@strategy-as-code"),
@@ -198,12 +201,53 @@ class Registry:
         self.manifest_path: Path | None = None
         self.nested_depth = nested_depth       # levels of program-within-program; 0 turns nesting off
         self.nested_errors: dict[str, str] = {}  # nested program key -> why it could not be expanded
+        self.manifest_project: Project | None = None  # set when PROGRAM.MD lives in a repository we clone and may push
+        self._manifest_name = "PROGRAM.MD"
+        self.manifest_error: str | None = None        # why the last reload of that manifest failed (the old list is kept)
 
     @classmethod
     def from_manifest(cls, manifest_path: Path, cache_dir: Path | None = None, nested_depth: int = 3) -> "Registry":
         reg = cls(load_manifest(manifest_path), cache_dir, nested_depth=nested_depth)
         reg.manifest_path = Path(manifest_path)
         return reg
+
+    @classmethod
+    def from_manifest_repo(cls, repo: str, path: str = "PROGRAM.MD", branch: str = "",
+                           cache_dir: Path | None = None, nested_depth: int = 3) -> "Registry":
+        """A registry whose manifest is `path` in repository `repo` (on `branch`, default the repo's
+        default branch). The repository is cloned like a project and written through `writer.edit`,
+        so changes to the manifest are commits by the person who made them, and `reload_manifest`
+        picks up edits made elsewhere. Raises if the manifest cannot be fetched or parsed: without it
+        there is no list of projects to serve."""
+        reg = cls([], cache_dir, nested_depth=nested_depth)
+        spec = ProjectSpec(key=MANIFEST_KEY, repo=repo, mode="direct", branch=branch,
+                           planning_dir=str(Path(path).parent))
+        reg.manifest_project = Project(spec=spec, path=reg.cache_dir / MANIFEST_KEY)
+        reg._manifest_name = Path(path).name
+        reg._refresh(reg.manifest_project)
+        reg.manifest_path = reg.manifest_project.planning_root / reg._manifest_name
+        specs = load_manifest(reg.manifest_path)
+        reg._declared = list(specs)
+        reg._projects = {s.key: Project(spec=s, path=reg.cache_dir / s.key) for s in specs}
+        return reg
+
+    def reload_manifest(self) -> str | None:
+        """Fetch the manifest repository and, when its Projects table changed, adopt the new list
+        (nested programs re-expanded). A manifest that cannot be read keeps the current list and is
+        reported here and in `manifest_error`. Blocking. A no-op for a manifest kept in a plain file."""
+        if self.manifest_project is None:
+            return None
+        try:
+            self._refresh(self.manifest_project)
+            specs = load_manifest(self.manifest_path)
+        except Exception as exc:
+            self.manifest_error = str(exc) or exc.__class__.__name__
+            return self.manifest_error
+        self.manifest_error = None
+        if specs != self._declared:
+            self._declared = list(specs)
+            self.expand()
+        return None
 
     def initiatives(self) -> list[ProgramInitiative]:
         """Program-level initiatives, read from the manifest each call so edits
@@ -276,6 +320,8 @@ class Registry:
         return errors
 
     def get(self, key: str) -> Project:
+        if key == MANIFEST_KEY and self.manifest_project is not None:
+            return self.manifest_project
         try:
             return self._projects[key]
         except KeyError:

@@ -7,7 +7,7 @@ the browser's session cookie forwarded. Headers a client sends for identity
 a proxy stripping them.
 
 Roles: viewer reads; editor reads and writes (edits, submissions, triage);
-admin also manages projects and the manifest (reserved, nothing needs it yet);
+admin also manages the program manifest: creating, changing, removing and sending program initiatives;
 contributor is a Power User of one project's app: it opens that project's Features and Bugs pages,
 submits to the inbox, and changes only its own untriaged submissions (see CONTRIBUTOR_ROUTES);
 reporter is anyone else with a grant in that app: it reports bugs and reads its own submissions, from the
@@ -78,6 +78,10 @@ def enabled() -> bool:
 
 def may_write(identity: Identity) -> bool:
     return identity.role in ("editor", "admin")
+
+
+def may_manage(identity: Identity) -> bool:
+    return identity.role == "admin"
 
 
 def is_contributor(identity: Identity | None) -> bool:
