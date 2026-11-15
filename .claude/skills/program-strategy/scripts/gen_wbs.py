@@ -170,20 +170,32 @@ def min_sec_width(label):
     wider than naive estimates) and accounts for the left/right text margins.
     """
     char_w   = HDR_LBL_FONT * DPI / 72 * 0.72
-    label_px = len(label) * char_w
+    label_px = min(len(label), 18) * char_w          # a longer label wraps onto a second line
     pct_px   = 4 * HDR_PCT_FONT * DPI / 72 * 0.72   # worst-case '100%'
     margin_px = 2 * HDR_MARGIN * FIG_W * DPI         # left + right insets
-    return (label_px + pct_px + HDR_PAD_PX + margin_px) / (FIG_W * DPI)
+    return (label_px + pct_px + HDR_PAD_PX / 2 + margin_px) / (FIG_W * DPI)
+
+def wrap_to(text, width_data, font_pt, reserve_data=0.0, ratio=0.62):
+    """Wrap `text` to fit `width_data` (figure fraction) at `font_pt`, leaving `reserve_data` free."""
+    import textwrap
+    char_w = font_pt * DPI / 72 * ratio / (FIG_W * DPI)
+    n = max(8, int((width_data - reserve_data - 2 * HDR_MARGIN) / char_w))
+    return textwrap.wrap(text, n, break_long_words=False) or [text]
 
 def distribute_widths(sections, avail_w):
     """
     Start with feature-count-proportional widths, then enforce per-section
     minimums by taking the deficit from wider sections proportionally.
     """
-    counts = [len(s['features']) for s in sections]
-    total  = sum(counts)
+    # weight by how much text a section holds, not only how many features, so long names get room
+    counts = [sum(len(f['label']) + 14 for f in s['features']) for s in sections]
+    total  = sum(counts) or 1
     widths = [avail_w * c / total for c in counts]
     mins   = [min_sec_width(s['label']) for s in sections]
+    # A crowded lane cannot honour every minimum: shrink them together so they fit; the header
+    # label and the feature text wrap to whatever width each section ends up with.
+    if sum(mins) > avail_w * 0.98:
+        mins = [m * avail_w * 0.98 / sum(mins) for m in mins]
 
     # Iterate until all minimums are satisfied (converges in one pass for
     # well-behaved inputs, but loop handles cascading constraints).
@@ -203,6 +215,41 @@ def distribute_widths(sections, avail_w):
 
     return widths
 
+# ── LAYOUT ────────────────────────────────────────────────────────────────────
+# Lane heights follow the text: a lane with a crowded section grows taller instead of overflowing.
+LINE_IN      = FEAT_FONT / 72 * LINE_SPACING          # one text line, inches
+HDR_IN       = 0.95                                   # header band: room for a two-line label
+MIN_LANE_IN  = 3.4
+MIN_COL_W    = 0.17                                   # narrowest a feature column may get (figure fraction)
+TITLE_IN     = 0.9
+GAP_IN       = 0.15
+
+def section_blocks(sec, sec_w):
+    """Feature names wrapped to the section, dealt into columns: (columns, lines in the longest one)."""
+    n_cols = max(1, min(4, int(sec_w / MIN_COL_W)))
+    blocks = []
+    for item in sec['features']:
+        live = item['status'] in DONE_STATUSES
+        lines = wrap_to('• ' + item['label'], sec_w / n_cols, FEAT_FONT)
+        blocks.append([(strike(l) if live else l, live) for l in lines])
+    per = ceil(sum(len(b) for b in blocks) / n_cols) if blocks else 0
+    cols, ci = [[] for _ in range(n_cols)], 0
+    for b in blocks:
+        if ci < n_cols - 1 and cols[ci] and sum(len(x) for x in cols[ci]) + len(b) > per:
+            ci += 1
+        cols[ci].append(b)
+    return cols, max((sum(len(x) for x in c) for c in cols), default=0)
+
+lane_layout = []
+for lane in SWIMLANES:
+    avail = CONTENT_W - SEC_GAP * (len(lane['sections']) - 1)
+    widths = distribute_widths(lane['sections'], avail)
+    laid = [section_blocks(sec, w) for sec, w in zip(lane['sections'], widths)]
+    rows = max((r for _, r in laid), default=0)
+    lane_layout.append((widths, [c for c, _ in laid], max(MIN_LANE_IN, HDR_IN + rows * LINE_IN / 0.84 + 0.1)))
+
+FIG_H = TITLE_IN + sum(l[2] for l in lane_layout) + GAP_IN * (len(lane_layout) - 1) + 0.1
+
 # ── DRAW ──────────────────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
 ax.set_xlim(0, 1)
@@ -211,18 +258,20 @@ ax.axis('off')
 fig.patch.set_facecolor(BG)
 ax.set_facecolor(BG)
 
-ax.text(0.5, TITLE_TOP,
+ax.text(0.5, 1 - 0.1 / FIG_H,
         f'{PRODUCT_TITLE} - Work Breakdown Structure',
         ha='center', va='top', fontsize=TITLE_FONT,
         fontweight='bold', color='#0f172a')
 
+y_top = 1 - TITLE_IN / FIG_H
 for lane_i, lane in enumerate(SWIMLANES):
-    y0, y1   = lane_bounds(lane_i)
-    header_h = LANE_H * HEADER_FRAC
+    widths, columns, lane_in = lane_layout[lane_i]
+    LANE_H   = lane_in / FIG_H
+    y1       = y_top
+    y0       = y1 - LANE_H
+    y_top    = y0 - GAP_IN / FIG_H
+    header_h = HDR_IN / FIG_H
     body_h   = LANE_H - header_h
-
-    avail_w  = CONTENT_W - SEC_GAP * (len(lane['sections']) - 1)
-    widths   = distribute_widths(lane['sections'], avail_w)
 
     # Lane label strip
     ax.add_patch(mpatches.FancyBboxPatch(
@@ -235,28 +284,25 @@ for lane_i, lane in enumerate(SWIMLANES):
             multialignment='center', linespacing=1.45, zorder=3)
 
     x_cursor = CONTENT_X0
-    for sec, sec_w in zip(lane['sections'], widths):
-        n     = len(sec['features'])
+    for sec, sec_w, cols in zip(lane['sections'], widths, columns):
         ratio = completion(sec)
         sx0   = x_cursor
 
-        # Body background
         ax.add_patch(mpatches.Rectangle(
             (sx0, y0), sec_w, LANE_H,
             facecolor=body_tint(ratio), edgecolor=EDGE_COLOR,
             linewidth=0.8, zorder=2))
-
-        # Header band
         ax.add_patch(mpatches.Rectangle(
             (sx0, y1 - header_h), sec_w, header_h,
             facecolor=CMAP(ratio), edgecolor='none', zorder=3))
-
         ax.plot([sx0, sx0 + sec_w], [y1 - header_h, y1 - header_h],
                 color='white', lw=0.6, zorder=4)
 
-        # Header: label left, % right - always inline now
+        # Header: label left (wrapped), % right
+        pct_w = 4 * HDR_PCT_FONT * DPI / 72 * 0.72 / (FIG_W * DPI)
+        hdr_lines = wrap_to(sec['label'], sec_w, HDR_LBL_FONT, reserve_data=pct_w, ratio=0.8)
         ax.text(sx0 + HDR_MARGIN, y1 - header_h / 2,
-                sec['label'], ha='left', va='center',
+                '\n'.join(hdr_lines), ha='left', va='center', linespacing=1.25,
                 fontsize=HDR_LBL_FONT, fontweight='bold',
                 color='white', zorder=5)
         ax.text(sx0 + sec_w - HDR_MARGIN, y1 - header_h / 2,
@@ -264,27 +310,16 @@ for lane_i, lane in enumerate(SWIMLANES):
                 fontsize=HDR_PCT_FONT, fontweight='bold',
                 color='white', zorder=5)
 
-        # Feature text list - auto-column to fill body height
-        line_h_data  = (FEAT_FONT / 72) / FIG_H * LINE_SPACING
-        max_rows     = max(1, int(body_h * 0.84 / line_h_data))
-        n_cols       = max(1, ceil(n / max_rows))
-        rows_per_col = ceil(n / n_cols)
-        col_w        = sec_w / n_cols
-        body_cy      = y0 + body_h / 2
-
-        for col_i in range(n_cols):
-            start     = col_i * rows_per_col
-            col_items = sec['features'][start : start + rows_per_col]
-            n_rows    = len(col_items)
-            col_cx    = sx0 + (col_i + 0.5) * col_w
-            for row_i, item in enumerate(col_items):
-                y     = body_cy + ((n_rows - 1) / 2 - row_i) * line_h_data
-                live  = item['status'] in DONE_STATUSES
-                label = strike(item['label']) if live else item['label']
-                color = '#94a3b8' if live else '#1e293b'
-                ax.text(col_cx, y, '• ' + label,
-                        ha='center', va='center',
-                        fontsize=FEAT_FONT, color=color, zorder=5)
+        # Feature text: columns of wrapped lines, centred in the body
+        line_h_data = LINE_IN / FIG_H
+        col_w, body_cy = sec_w / len(cols), y0 + body_h / 2
+        for col_i, col in enumerate(cols):
+            lines  = [ln for blk in col for ln in blk]
+            col_cx = sx0 + (col_i + 0.5) * col_w
+            for row_i, (txt, live) in enumerate(lines):
+                y = body_cy + ((len(lines) - 1) / 2 - row_i) * line_h_data
+                ax.text(col_cx, y, txt, ha='center', va='center',
+                        fontsize=FEAT_FONT, color='#94a3b8' if live else '#1e293b', zorder=5)
 
         x_cursor += sec_w + SEC_GAP
 
