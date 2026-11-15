@@ -684,6 +684,10 @@ def transform_renumber_sub_area(text: str, old: str, new: str) -> tuple[str, lis
     changed = re.findall(rf"^\| {re.escape(old)}\.(\d+) \|", text, re.MULTILINE)
     text = re.sub(rf"^(#### ){re.escape(old)}( )", rf"\g<1>{new}\g<2>", text, flags=re.MULTILINE)
     text = re.sub(rf"^(\| ){re.escape(old)}(\.\d+ \|)", rf"\g<1>{new}\g<2>", text, flags=re.MULTILINE)
+    sm = re.search(r"(^## Product Scope\n)(.*?)(?=\n## |\Z)", text, re.DOTALL | re.MULTILINE)
+    if sm:      # the sub-area's Product Scope item is tagged with its code
+        body = sm.group(2).replace(f"(WBS {old})", f"(WBS {new})")
+        text = text[:sm.start(2)] + body + text[sm.end(2):]
     return text, [f"{old}.{n}" for n in changed]
 
 
@@ -721,6 +725,35 @@ def transform_move_features(text: str, wbs_list: list[str], target: str) -> tupl
 
 def _scope_line(section: str, prefix: str) -> re.Match | None:
     return re.search(rf"^[ \t]*-[^\n]*\(WBS {re.escape(prefix)}\)[~ \t🎆]*$\n?", section, re.MULTILINE)
+
+
+def scope_item_complete(text: str, prefix: str) -> bool | None:
+    """Whether the Product Scope item tagged `(WBS prefix)` is ticked; None if there is no such item."""
+    for g in _parse_text(text).scope_groups:
+        for it in g.items:
+            if it.wbs == prefix:
+                return it.complete
+    return None
+
+
+def transform_sync_scope_item(text: str, prefix: str) -> str:
+    """Tick the sub-area's Product Scope item when every feature in it has shipped, untick it when not.
+    A sub-area's item is ticked only once all of it is Live or Released (see `structure_check`)."""
+    sub = next((sa for a in _parse_text(text).wbs_areas for sa in a.sub_areas if sa.wbs_prefix == prefix), None)
+    if sub is None:
+        return text
+    shipped = bool(sub.features) and all(f.status in (FeatureStatus.live, FeatureStatus.released) for f in sub.features)
+    sm = re.search(r"(^## Product Scope\n)(.*?)(?=\n## |\Z)", text, re.DOTALL | re.MULTILINE)
+    line = _scope_line(sm.group(2), prefix) if sm else None
+    if not line or scope_item_complete(text, prefix) == shipped:
+        return text
+    raw = line.group(0)
+    bare = raw.replace("~~", "").replace("🎆", "")
+    tag = re.search(rf"\s*\(WBS {re.escape(prefix)}\)\s*$", bare)
+    item = bare[:tag.start()].lstrip(" \t-").strip()
+    new = (f"- ~~{item}~~ 🎆 (WBS {prefix})" if shipped else f"- {item} (WBS {prefix})") + ("\n" if raw.endswith("\n") else "")
+    body = sm.group(2)[:line.start()] + new + sm.group(2)[line.end():]
+    return text[:sm.start(2)] + body + text[sm.end(2):]
 
 
 def transform_merge_sub_area(text: str, source: str, target: str, *, fold_scope: bool = False

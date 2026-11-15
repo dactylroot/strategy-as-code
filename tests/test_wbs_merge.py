@@ -80,9 +80,10 @@ def shape(text):
 
 def test_merge_into_a_sibling_renumbers_and_removes_the_heading():
     r = wbs_merge.merge_sub_area(DOC, ABOUT, BUGS, "1.1", "1.2")
-    assert r.mapping == {"1.1.1": "1.2.2", "1.1.2": "1.2.3"}
-    assert shape(r.product) == [("1.2", ["1.2.1", "1.2.2", "1.2.3"]), ("2.1", ["2.1.1"])]
-    assert "#### 1.1 " not in r.product
+    # 1.1 goes into 1.2 and the survivor closes the gap by becoming 1.1
+    assert r.mapping == {"1.1.1": "1.1.2", "1.1.2": "1.1.3", "1.2.1": "1.1.1"}
+    assert shape(r.product) == [("1.1", ["1.1.1", "1.1.2", "1.1.3"]), ("2.1", ["2.1.1"])]
+    assert "#### 1.2 " not in r.product and "- 1.1.2\n- 1.1.1\n- other:1.2.1" in r.about   # no rewrite lands on another's output
 
 
 def test_merge_into_another_area():
@@ -165,3 +166,41 @@ def test_the_input_text_is_not_mutated_and_dry_run_is_just_the_result():
     before = (DOC, ABOUT, BUGS)
     wbs_merge.merge_sub_area(DOC, ABOUT, BUGS, "1.1", "2.1")
     assert (DOC, ABOUT, BUGS) == before
+
+
+THREE = DOC.replace("### 2. Ops", """#### 1.3 Reports
+
+| WBS | Feature | Status | Value | Effort | Notes |
+| --- | ------- | ------ | ----- | ------ | ----- |
+| 1.3.1 | Export | Live | | | |
+
+### 2. Ops""").replace("- ~~See the numbers (WBS 1.2)~~", "- ~~See the numbers (WBS 1.2)~~ 🎆\n- Export it (WBS 1.3)").replace(
+    "| 1.2.1 | Overview | Idea |", "| 1.2.1 | Overview | Live |")
+
+
+def test_removing_a_middle_sub_area_closes_the_gap_and_the_check_stays_clean():
+    about = ABOUT.replace("- 1.2.1\n", "- 1.3.1\n")
+    r = wbs_merge.merge_sub_area(THREE, about, BUGS, "1.2", "1.1")
+    assert [s for s, _ in shape(r.product)[:2]] == ["1.1", "1.2"]               # 1.3 became 1.2
+    assert "(WBS 1.2)" in r.product and "(WBS 1.3)" not in r.product              # its scope tag followed
+    assert r.mapping["1.3.1"] == "1.2.1" and "- 1.2.1" in r.about                 # and so did references
+    assert any("renumbered to 1.2" in n for n in r.notes)
+    assert not any("but no" in m for m in structure_check.check(P._parse_text(r.product)))
+
+
+def test_merging_unfinished_features_into_a_shipped_sub_area_unticks_its_scope_item():
+    r = wbs_merge.merge_sub_area(THREE, ABOUT, BUGS, "1.1", "1.2", close_gap=False)   # 1.1 holds a Planned feature
+    assert "- ~~See the numbers" not in r.product and "- See the numbers (WBS 1.2)" in r.product
+    assert any("unticked" in n for n in r.notes)
+    assert not any("ticked as shipped" in m for m in structure_check.check(P._parse_text(r.product)))
+
+
+def test_moving_the_last_unfinished_feature_out_ticks_the_source_item():
+    r = wbs_merge.move_features(DOC, ABOUT, BUGS, ["1.1.2"], "2.1")       # Logout is the only unfinished one in 1.1
+    assert "- ~~Sign in and out~~ 🎆 (WBS 1.1)" in r.product
+
+
+def test_renumber_carries_the_scope_tag_with_it():
+    text, _ = P.transform_renumber_sub_area(THREE, "1.3", "1.2") if False else P.transform_renumber_sub_area(
+        THREE.replace("#### 1.2 Dashboard", "#### 1.4 Dashboard").replace("| 1.2.1 |", "| 1.4.1 |").replace("(WBS 1.2)", "(WBS 1.4)"), "1.4", "1.2")
+    assert "(WBS 1.2)" in text and "(WBS 1.4)" not in text

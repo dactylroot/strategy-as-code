@@ -36,8 +36,22 @@ def _mentions(text: str, code: str) -> int:
     return len(re.findall(rf"(?<![\w.]){re.escape(code)}(?![\w.])", text))
 
 
+def _rewrite_order(mapping: dict[str, str]) -> list[tuple[str, str]]:
+    """Order the rewrites so none is applied on top of another's output. A new code can equal another
+    feature's old code (1.1.1 -> 1.1.2 while 1.1.2 -> 1.1.3), so the entry that vacates a code goes
+    before the one that takes it."""
+    pending, out = dict(mapping), []
+    while pending:
+        ready = next((o for o, n in pending.items() if n not in pending), None)
+        if ready is None:                       # a cycle cannot arise from a move or a renumber; keep the rest as given
+            out.extend(pending.items())
+            break
+        out.append((ready, pending.pop(ready)))
+    return out
+
+
 def _follow(result: MoveResult, about: str, bugs: str) -> None:
-    for old, new in result.mapping.items():
+    for old, new in _rewrite_order(result.mapping):
         a2 = about_parser.transform_rewrite_wbs_refs(about, old, new)
         result.initiatives_updated += a2 != about
         about = a2
@@ -51,20 +65,54 @@ def _follow(result: MoveResult, about: str, bugs: str) -> None:
     result.notes.append("initiatives in other projects or the manifest that cite the old codes are not updated")
 
 
+def _sync_scope(result: MoveResult, prefixes: list[str]) -> None:
+    """A sub-area that gained unfinished features is no longer shipped, and one left with only shipped
+    features now is: keep the Product Scope tick in step so `structure check` stays clean."""
+    for prefix in prefixes:
+        before = product_parser.scope_item_complete(result.product, prefix)
+        result.product = product_parser.transform_sync_scope_item(result.product, prefix)
+        after = product_parser.scope_item_complete(result.product, prefix)
+        if before is not None and before != after:
+            result.notes.append(f"Product Scope item for {prefix} {'ticked: all of it has shipped' if after else 'unticked: it now holds unfinished features'}")
+
+
+def _close_gap(result: MoveResult, area: int) -> None:
+    """After a sub-area is removed, renumber the ones after it down so the area stays 1..n (the check
+    insists on it). Their features, scope tags and references follow."""
+    subs = [s["prefix"] for a in product_parser.structure_of(result.product) if a["number"] == area for s in a["sub_areas"]]
+    for want, prefix in enumerate(sorted(subs, key=lambda p: int(p.split(".")[1])), 1):
+        new = f"{area}.{want}"
+        if prefix == new:
+            continue
+        result.product, codes = product_parser.transform_renumber_sub_area(result.product, prefix, new)
+        for code in codes:
+            fresh = new + code[len(prefix):]
+            hit = [k for k, v in result.mapping.items() if v == code]     # a feature merged in earlier, now renumbered
+            if hit:
+                result.mapping[hit[0]] = fresh
+            else:
+                result.mapping[code] = fresh
+        result.notes.append(f"sub-area {prefix} renumbered to {new} to close the gap")
+
+
 def move_features(product: str, about: str, bugs: str, wbs_list: list[str], target: str) -> MoveResult:
     new_product, mapping = product_parser.transform_move_features(product, wbs_list, target)
     result = MoveResult(new_product, about, bugs, mapping)
+    _sync_scope(result, sorted({c.rsplit(".", 1)[0] for c in list(mapping) + list(mapping.values())}))
     _follow(result, about, bugs)
     return result
 
 
 def merge_sub_area(product: str, about: str, bugs: str, source: str, target: str, *,
-                   fold_scope: bool = False) -> MoveResult:
+                   fold_scope: bool = False, close_gap: bool = True) -> MoveResult:
     had_item = bool(re.search(rf"\(WBS {re.escape(source)}\)", product))
     new_product, mapping = product_parser.transform_merge_sub_area(product, source, target, fold_scope=fold_scope)
     result = MoveResult(new_product, about, bugs, mapping, removed_sub_area=source)
     if had_item:
         result.scope_item = "folded" if fold_scope else "dropped"
+    _sync_scope(result, [target])
+    if close_gap:
+        _close_gap(result, int(source.split(".")[0]))
     _follow(result, about, bugs)
     return result
 
@@ -81,7 +129,7 @@ def merge_area(product: str, about: str, bugs: str, number: int, target: str, *,
         raise ValueError(f"Target {target} is inside area {number}; pick a sub-area in another area.")
     total = MoveResult(product, about, bugs, {})
     for prefix in subs:
-        step = merge_sub_area(total.product, total.about, total.bugs, prefix, target, fold_scope=fold_scope)
+        step = merge_sub_area(total.product, total.about, total.bugs, prefix, target, fold_scope=fold_scope, close_gap=False)
         total.product, total.about, total.bugs = step.product, step.about, step.bugs
         total.mapping.update(step.mapping)
         total.initiatives_updated += step.initiatives_updated
