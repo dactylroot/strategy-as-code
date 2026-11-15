@@ -178,7 +178,7 @@
     <div class="str-modal-footer">
       <span class="modal-hint" style="margin:0">Applied at once as its own change; codes of moved features change.</span>
       <span><button class="btn btn-ghost btn-sm" onclick="closeWbsMove()">Cancel</button>
-      <button id="wbs-move-go" class="btn btn-primary btn-sm" disabled onclick="confirmWbsMove()">Confirm</button></span>
+      <button id="wbs-move-go" class="btn btn-primary btn-sm" disabled onclick="confirmWbsMove()">Move and remove</button></span>
     </div>
   </div>
 </div>
@@ -459,11 +459,10 @@ function renderWbs() {
     const rows = a.sub_areas.map((s, si) => {
       const c = s.prefix == null ? '<span class="wbs-code new" title="Assigned when saved">new</span>' : `<span class="wbs-code">${esc(s.prefix)}</span>`;
       const n = s.count ? `${s.done || 0}/${s.count} shipped` : 'no features';
-      const lock = s.count ? `Holds ${s.count} feature(s): move or delete them first` : 'Remove this sub-area';
+      const lock = s.count ? `Remove: choose a sub-area to move its ${s.count} feature(s) into first` : 'Remove this sub-area';
       const saved = s.prefix != null;
       const open = saved && _wbsOpen.has(s.prefix);
       const toggle = saved && s.count ? `<button class="wbs-btn" title="${open?'Hide':'Show'} its features" onclick="wbsToggle('${s.prefix}')">${open?'▾':'▸'}</button>` : '';
-      const mv = saved ? `<button class="wbs-btn move" title="Move all of this sub-area's features into another sub-area and remove it" onclick="openWbsMove({kind:'sub',source:'${s.prefix}'})">⇄ Merge into…</button>` : '';
       const feats = open ? `<div class="wbs-feats" ondragover="event.stopPropagation()">
           <div class="wbs-feats-bar"><span>Tick features to move them, or drag one onto another sub-area.</span>
             <button class="wbs-btn move" onclick="wbsMovePicked('${s.prefix}')">Move ticked…</button></div>
@@ -474,22 +473,20 @@ function renderWbs() {
         <input class="wbs-title" type="text" value="${esc(s.title)}" maxlength="120" placeholder="Sub-area name…" aria-label="Sub-area name"
                oninput="_wbs[${ai}].sub_areas[${si}].title=this.value;_wbsDirtyNow()">
         <span class="wbs-count">${n}</span>
-        ${s.count ? mv : ''}
         <button class="wbs-btn" title="Move up" ${si===0?'disabled':''} onclick="wbsMoveSub(${ai},${si},-1)">↑</button>
         <button class="wbs-btn" title="Move down" ${si===subs-1?'disabled':''} onclick="wbsMoveSub(${ai},${si},1)">↓</button>
-        <button class="wbs-btn" title="${lock}" ${s.count?'disabled':''} onclick="wbsRemoveSub(${ai},${si})">✕</button></div>${feats}`;
+        <button class="wbs-btn" title="${lock}" onclick="wbsRemoveSub(${ai},${si})">✕</button></div>${feats}`;
     }).join('');
-    const lockA = held ? `Holds ${held} feature(s): move or delete them first` : 'Remove this area';
+    const lockA = held ? `Remove: choose a sub-area to move its ${held} feature(s) into first` : 'Remove this area';
     const box = document.createElement('div');
     box.className = 'wbs-area';
     box.innerHTML = `<div class="wbs-row">${code}
         <input class="wbs-title" type="text" value="${esc(a.title)}" maxlength="120" placeholder="Area name…" aria-label="Area name"
                oninput="_wbs[${ai}].title=this.value;_wbsDirtyNow()">
         <span class="wbs-count">${subs} sub-area${subs===1?'':'s'}</span>
-        ${held && a.number != null ? `<button class="wbs-btn move" title="Move every feature in this area into one sub-area elsewhere and remove the area" onclick="openWbsMove({kind:'area',area:${a.number}})">⇄ Merge into…</button>` : ''}
         <button class="wbs-btn" title="Move up" ${ai===0?'disabled':''} onclick="wbsMoveArea(${ai},-1)">↑</button>
         <button class="wbs-btn" title="Move down" ${ai===_wbs.length-1?'disabled':''} onclick="wbsMoveArea(${ai},1)">↓</button>
-        <button class="wbs-btn" title="${lockA}" ${held?'disabled':''} onclick="wbsRemoveArea(${ai})">✕</button></div>
+        <button class="wbs-btn" title="${lockA}" onclick="wbsRemoveArea(${ai})">✕</button></div>
       ${rows}
       <button class="btn-add-row wbs-add" onclick="addWbsSub(${ai})">+ Add sub-area</button>`;
     list.appendChild(box);
@@ -523,8 +520,8 @@ function openWbsMove(m) {
   if (_wbsDirty) { alert('Save your structure edits first (Save, top right); then move features.'); return; }
   _move = {target: '', ...m};
   const t = document.getElementById('wbs-move-title');
-  if (m.kind === 'sub') { const x = _subOf(m.source); t.textContent = `Merge ${m.source} ${x.s.title}`; }
-  else if (m.kind === 'area') { t.textContent = `Merge area ${m.area} ${_wbs.find(a => a.number === m.area).title}`; }
+  if (m.kind === 'sub') { const x = _subOf(m.source); t.textContent = `Remove ${m.source} ${x.s.title}`; }
+  else if (m.kind === 'area') { t.textContent = `Remove area ${m.area} ${_wbs.find(a => a.number === m.area).title}`; }
   else t.textContent = `Move ${m.wbs.length} feature${m.wbs.length === 1 ? '' : 's'} from ${m.source}`;
   _renderMoveBody();
   document.getElementById('wbs-move-modal').style.display = 'flex';
@@ -543,14 +540,15 @@ function _renderMoveBody() {
   const what = _move.kind === 'features'
     ? `<p class="modal-hint">${_move.wbs.map(w => '<code>' + esc(w) + '</code>').join(', ')} will move; the sub-area they leave stays.</p>`
     : _move.kind === 'sub'
-      ? '<p class="modal-hint">Every feature moves; then this sub-area is removed. Its Product Scope item is dropped unless you fold it in.</p>'
-      : '<p class="modal-hint">Every feature in every sub-area of this area moves into one sub-area; then the area is removed.</p>';
+      ? '<p class="modal-hint">Choose where its features go; then this sub-area is removed. Its Product Scope item is dropped unless you fold it in.</p>'
+      : '<p class="modal-hint">Choose one sub-area for every feature in this area; then the area and its sub-areas are removed.</p>';
   document.getElementById('wbs-move-body').innerHTML = what + `
     <div class="modal-field"><label>Into sub-area</label>
       <select class="modal-input" onchange="_move.target=this.value;_previewMove()"><option value="">Choose a sub-area…</option>${_moveOptions()}</select></div>
     ${_move.kind === 'features' ? '' : `<label style="font-size:0.8rem;display:block;margin-bottom:0.7rem"><input type="checkbox" onchange="_move.fold=this.checked;_previewMove()" ${_move.fold ? 'checked' : ''}> Fold the Product Scope item into the target's instead of dropping it</label>`}
     <div id="wbs-move-preview" class="move-preview" style="display:none"></div>`;
-  document.getElementById('wbs-move-go').disabled = true;
+  const go = document.getElementById('wbs-move-go');
+  go.disabled = true; go.textContent = _move.kind === 'features' ? 'Move' : 'Move and remove';
 }
 function _moveBody() {
   const b = {target: _move.target};
@@ -584,12 +582,12 @@ async function _previewMove() {
 }
 async function confirmWbsMove() {
   const go = document.getElementById('wbs-move-go'), box = document.getElementById('wbs-move-preview');
-  go.disabled = true; go.textContent = 'Moving…';
+  go.disabled = true; go.textContent = 'Working…';
   try {
     const d = await _post(_api + '/move', _moveBody());
     try { sessionStorage.setItem('wbsMoved', JSON.stringify({mapping: d.mapping, removed: d.removed_sub_area, notes: d.notes, target: _move.target})); } catch (e) {}
     location.reload();
-  } catch (e) { box.style.display = 'block'; box.innerHTML = `<span class="err">${esc(e.message)}</span>`; go.textContent = 'Confirm'; go.disabled = false; }
+  } catch (e) { box.style.display = 'block'; box.innerHTML = `<span class="err">${esc(e.message)}</span>`; go.textContent = _move.kind === 'features' ? 'Move' : 'Move and remove'; go.disabled = false; }
 }
 function _showMovedNote() {
   let d = null;
@@ -606,9 +604,13 @@ function wbsMoveArea(ai, d) { _wbsSwap(_wbs, ai, d); _wbsDirtyNow(); renderWbs()
 function wbsMoveSub(ai, si, d) { _wbsSwap(_wbs[ai].sub_areas, si, d); _wbsDirtyNow(); renderWbs(); }
 function addWbsArea() { _wbs.push({number:null, title:'', sub_areas:[]}); _wbsDirtyNow(); renderWbs(); const t = document.querySelectorAll('#wbs-list .wbs-area > .wbs-row .wbs-title'); t[t.length-1].focus(); }
 function addWbsSub(ai) { _wbs[ai].sub_areas.push({prefix:null, title:'', count:0, done:0}); _wbsDirtyNow(); renderWbs(); const t = document.querySelectorAll('#wbs-list .wbs-area')[ai].querySelectorAll('.wbs-sub .wbs-title'); t[t.length-1].focus(); }
-function wbsRemoveSub(ai, si) { _wbs[ai].sub_areas.splice(si, 1); _wbsDirtyNow(); renderWbs(); }
+function wbsRemoveSub(ai, si) {
+  const s = _wbs[ai].sub_areas[si];
+  if (s.count && s.prefix) { openWbsMove({kind:'sub', source:s.prefix}); return; }   // it holds features: they move first
+  _wbs[ai].sub_areas.splice(si, 1); _wbsDirtyNow(); renderWbs(); }
 function wbsRemoveArea(ai) {
   const a = _wbs[ai];
+  if (a.number != null && a.sub_areas.some(s => s.count)) { openWbsMove({kind:'area', area:a.number}); return; }   // it holds features: they move first
   if (a.sub_areas.length && !confirm(`Remove "${a.title}" and its ${a.sub_areas.length} empty sub-area(s)?`)) return;
   _wbs.splice(ai, 1); _wbsDirtyNow(); renderWbs();
 }
