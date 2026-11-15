@@ -100,6 +100,7 @@ $S structure area add "Title"           # next free area number; also: area rena
 $S structure sub add 2 "Title"          # next free sub-area code in area 2; also: sub rename 2.1 "Title", sub remove 2.1
 $S structure renumber 6.3 6.1           # close a gap: the sub-area, its features, and this project's initiative and bug refs follow
 $S structure sub merge 1.2 --into 2.1   # retire a sub-area: all its features move to 2.1 (any area), heading removed; add --dry-run to preview, --fold-scope to keep its Product Scope text
+$S structure sub move 1.6 --to-area 2     # move a sub-area, its features and its scope item under another area (new code there, e.g. 2.3; --dry-run to preview)
 $S structure area merge 3 --into 1.1    # retire a whole area into one sub-area of another area
 $S structure move 1.2.1 1.2.3 --into 2.1  # move chosen features to a sub-area (several at once; new codes there)
 $S bug add "Short title" --severity high --notes "..." --wbs 1.2.3

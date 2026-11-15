@@ -204,3 +204,41 @@ def test_renumber_carries_the_scope_tag_with_it():
     text, _ = P.transform_renumber_sub_area(THREE, "1.3", "1.2") if False else P.transform_renumber_sub_area(
         THREE.replace("#### 1.2 Dashboard", "#### 1.4 Dashboard").replace("| 1.2.1 |", "| 1.4.1 |").replace("(WBS 1.2)", "(WBS 1.4)"), "1.4", "1.2")
     assert "(WBS 1.2)" in text and "(WBS 1.4)" not in text
+
+
+def test_move_a_sub_area_to_another_area_takes_its_features_scope_item_and_references():
+    about = ABOUT.replace("- 1.1.1\n", "- 1.1.2\n")
+    r = wbs_merge.move_sub_area(DOC, about, BUGS, "1.1", 2)
+    assert r.new_sub_area == "2.2" and r.removed_sub_area == "1.1" and r.scope_item == "moved"
+    assert shape(r.product) == [("1.1", ["1.1.1"]), ("2.1", ["2.1.1"]), ("2.2", ["2.2.1", "2.2.2"])]   # old 1.2 closed the gap
+    assert r.mapping == {"1.1.1": "2.2.1", "1.1.2": "2.2.2", "1.2.1": "1.1.1"}
+    assert "#### 2.2 Auth" in r.product and "#### 1.1 Dashboard" in r.product
+    assert "- Sign in and out (WBS 2.2)" in r.product
+    core, ops = r.product.split("## Features")[0].split("### Ops")[0], r.product.split("## Features")[0].split("### Ops")[1]
+    assert "Sign in and out" not in core and "Sign in and out (WBS 2.2)" in ops      # the item changed groups, retagged
+    assert "- 2.2.2" in r.about and "- other:1.2.1" in r.about                        # a bullet followed; another project's did not
+    assert any("is now 2.2 in area 2" in n for n in r.notes)
+    assert not any(m for m in structure_check.check(P._parse_text(r.product)) if "but no" in m or "points at" in m or "belongs under" in m)
+
+
+def test_move_a_sub_area_refusals():
+    with pytest.raises(ValueError, match="already in area"):
+        wbs_merge.move_sub_area(DOC, ABOUT, BUGS, "1.1", 1)
+    with pytest.raises(ValueError, match="Area 9 not found"):
+        wbs_merge.move_sub_area(DOC, ABOUT, BUGS, "1.1", 9)
+    with pytest.raises(ValueError, match="not found"):
+        wbs_merge.move_sub_area(DOC, ABOUT, BUGS, "7.7", 2)
+
+
+def test_move_a_sub_area_into_an_area_with_no_scope_group_says_so():
+    doc = DOC.replace("### Ops\n- Ship it (WBS 2.1)\n\n", "")
+    r = wbs_merge.move_sub_area(doc, ABOUT, BUGS, "1.2", 2)
+    assert r.scope_item == "dropped" and any("no Product Scope group" in n for n in r.notes)
+    assert "(WBS 1.2)" not in r.product.split("## Features")[0]
+
+
+def test_move_an_empty_sub_area_moves_just_the_heading():
+    doc = DOC.replace("| 2.1.1 | Pipeline | Live | | | |\n", "")
+    r = wbs_merge.move_sub_area(doc, ABOUT, BUGS, "2.1", 1)
+    assert r.mapping == {} and r.new_sub_area == "1.3"
+    assert [s for s, _ in shape(r.product)] == ["1.1", "1.2", "1.3"] and "#### 1.3 Deploy" in r.product

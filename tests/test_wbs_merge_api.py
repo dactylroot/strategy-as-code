@@ -39,3 +39,34 @@ def test_structure_page_offers_merge_and_move(client):
     page = client.get("/structure").text
     assert "openWbsMove" in page and "wbs-move-modal" in page and "/api/structure/wbs" in page
     assert '"features": [{"wbs": "1.1.1"' in page
+
+
+def test_structure_page_script_parses(client, tmp_path):
+    """The Structure page's own script (the one holding renderWbs), not the base template's, must be valid JS."""
+    import re, shutil, subprocess
+    node = shutil.which("node")
+    if not node:
+        import pytest
+        pytest.skip("node is not installed")
+    scripts = [s for s in re.findall(r"<script>(.*?)</script>", client.get("/structure").text, re.S) if "function renderWbs" in s]
+    assert len(scripts) == 1
+    f = tmp_path / "structure.js"
+    f.write_text(scripts[0], encoding="utf-8")
+    r = subprocess.run([node, "--check", str(f)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+
+
+def test_move_a_sub_area_under_another_area(client, tmp_project):
+    from app.parsers import product as P
+    r = client.post("/api/structure/wbs/preview", json={"source": "1.2", "to_area": 2})
+    assert r.status_code == 400 and "Area 2 not found" in r.json()["detail"]      # the fixture has one area
+    client.put("/api/structure/wbs", json={"areas": [
+        {"number": 1, "title": "Core", "sub_areas": [{"prefix": "1.1", "title": "Auth"}, {"prefix": "1.2", "title": "Dashboard"}]},
+        {"number": None, "title": "Ops", "sub_areas": []}]})
+    prev = client.post("/api/structure/wbs/preview", json={"source": "1.2", "to_area": 2}).json()
+    assert prev["new_sub_area"] == "2.1" and prev["mapping"]["1.2.2"] == "2.1.2" and prev["initiatives_updated"] == 1
+    r = client.post("/api/structure/wbs/move", json={"source": "1.2", "to_area": 2})
+    assert r.status_code == 200 and r.json()["new_sub_area"] == "2.1"
+    doc = P._parse_text((tmp_project / "PRODUCT.MD").read_text())
+    assert [(s.wbs_prefix, s.title, len(s.features)) for a in doc.wbs_areas for s in a.sub_areas] == [("1.1", "Auth", 3), ("2.1", "Dashboard", 3)]
+    assert "- 2.1.2" in (tmp_project / "ABOUT.MD").read_text()

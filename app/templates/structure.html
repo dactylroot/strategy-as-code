@@ -79,12 +79,37 @@
 .scope-wbs { flex:0 0 11rem; max-width:11rem; padding:0.3rem 0.35rem; border:1px solid var(--color-border-subtle); border-radius:4px; font-size:0.78rem; font-family:inherit; color:var(--color-text-primary); background:var(--color-bg-card); }
 .wbs-btn.move { border-color:var(--color-border-subtle); font-size:0.74rem; padding:0.15rem 0.5rem; white-space:nowrap; }
 .wbs-grip { cursor:grab; color:var(--color-text-muted); font-size:0.8rem; padding:0 0.15rem; user-select:none; }
-.wbs-sub.drop-ok { outline:2px dashed var(--color-t3-blue); outline-offset:-2px; background:var(--color-t3-blue-dim); }
+.wbs-subbox { border-radius:6px; position:relative; }
+.wbs-area > .wbs-row[data-area] { position:relative; }
+.drop-ok[data-hint]::after { content:attr(data-hint); position:absolute; right:0.6rem; top:0.3rem; padding:0.15rem 0.55rem; border-radius:999px; background:var(--color-t3-blue); color:#fff; font-size:0.72rem; font-weight:600; pointer-events:none; z-index:2; }
+.wbs-area > .wbs-row.drop-ok { outline:2px dashed var(--color-t3-blue); outline-offset:-2px; background:var(--color-t3-blue-dim); }
+/* while something is being dragged, show every place it can land */
+.wbs-dragging .wbs-subbox[data-prefix]:not(.drop-ok) { outline:1px dashed var(--color-border-muted); outline-offset:-1px; }
+.wbs-dragging-s .wbs-area > .wbs-row[data-area]:not(.drop-ok) { outline:1px dashed var(--color-border-muted); outline-offset:-1px; }
+.is-dragging { opacity:0.4; }
+/* what follows the pointer while dragging (off-screen element, handed to setDragImage) */
+.wbs-dragimg { position:fixed; top:-1000px; left:-1000px; max-width:320px; padding:0.55rem 0.8rem; border:2px solid var(--color-t3-blue); border-radius:10px; background:var(--color-bg-card); color:var(--color-text-primary); box-shadow:0 10px 28px rgba(0,0,0,0.3); font-size:0.85rem; line-height:1.4; z-index:9999; }
+.wbs-dragimg .t { font-weight:700; }
+.wbs-dragimg .t code { font-family:var(--font-mono); color:var(--color-t3-blue); }
+.wbs-dragimg .s { margin-top:0.15rem; font-size:0.74rem; color:var(--color-text-secondary); }
+.wbs-dragimg .more { display:inline-block; margin-top:0.2rem; padding:0 0.45rem; border-radius:999px; background:var(--color-t3-blue); color:#fff; font-size:0.72rem; font-weight:700; }
+.wbs-subbox.drop-ok { outline:2px dashed var(--color-t3-blue); outline-offset:-2px; background:var(--color-t3-blue-dim); }
+.wbs-feat { user-select:none; border-radius:4px; padding-left:0.3rem; padding-right:0.3rem; }
+.wbs-feat:hover { background:var(--color-bg-card-hover); }
+.wbs-feat:focus-visible { outline:2px solid var(--color-t3-blue); }
+.wbs-feat.sel { background:var(--color-t3-blue-dim); box-shadow:inset 3px 0 0 var(--color-t3-blue); }
+.wbs-feat.moved { animation:wbs-moved 2.4s ease-out; }
+@keyframes wbs-moved { 0%,40% { background:var(--live-bg, #dcfce7); box-shadow:inset 3px 0 0 var(--live); } 100% { background:transparent; box-shadow:none; } }
+.wbs-selbar { display:flex; align-items:center; gap:0.6rem; padding:0.3rem 0.5rem; margin-bottom:0.3rem; border-radius:5px; background:var(--color-t3-blue-dim); font-size:0.78rem; }
+.wbs-selbar select { padding:0.2rem 0.4rem; font-size:0.78rem; border:1px solid var(--color-border-muted); border-radius:4px; background:var(--color-bg-card); color:var(--color-text-primary); font-family:inherit; }
+.wbs-inline { position:fixed; left:50%; bottom:1.2rem; transform:translateX(-50%); z-index:950; display:none; align-items:center; gap:0.7rem; flex-wrap:wrap; max-width:calc(100% - 2rem); padding:0.65rem 0.9rem; border-radius:10px; background:var(--color-bg-card); border:1px solid var(--color-t3-blue); box-shadow:0 12px 36px rgba(0,0,0,0.25); font-size:0.84rem; }
+.wbs-inline code { font-family:var(--font-mono); font-size:0.78rem; }
+.wbs-inline .err { color:var(--gap); }
 .wbs-feats { margin:0 0.6rem 0.5rem 2.8rem; padding:0.3rem 0.6rem; border:1px solid var(--color-border-subtle); border-radius:6px; background:var(--color-bg-card); }
 .wbs-feat { display:flex; align-items:center; gap:0.5rem; padding:0.18rem 0; font-size:0.8rem; cursor:grab; }
 .wbs-feat code { font-size:0.72rem; color:var(--color-t3-blue); }
 .wbs-feat .st { margin-left:auto; font-size:0.68rem; color:var(--color-text-muted); text-transform:uppercase; }
-.wbs-feats-bar { display:flex; align-items:center; gap:0.6rem; padding-bottom:0.25rem; font-size:0.74rem; color:var(--color-text-muted); }
+.wbs-feats-bar { padding-bottom:0.25rem; font-size:0.74rem; color:var(--color-text-muted); }
 .move-preview { font-size:0.8rem; border:1px solid var(--color-border-subtle); border-radius:6px; padding:0.6rem 0.8rem; background:var(--color-bg-card-hover); }
 .move-preview table { border-collapse:collapse; margin:0.3rem 0; } .move-preview td { padding:0.1rem 0.8rem 0.1rem 0; font-family:var(--font-mono); font-size:0.76rem; }
 .move-preview .err { color:var(--gap); }
@@ -169,6 +194,8 @@
   </div>
   <div class="str-body"><div id="scope-list" class="item-grid"></div></div>
 </div>
+
+<div id="wbs-inline" class="wbs-inline" role="alertdialog" aria-live="polite"></div>
 
 <!-- Move / merge modal (WBS) -->
 <div id="wbs-move-modal" class="str-modal-overlay" onclick="if(event.target===this)closeWbsMove()">
@@ -463,24 +490,20 @@ function renderWbs() {
       const saved = s.prefix != null;
       const open = saved && _wbsOpen.has(s.prefix);
       const toggle = saved && s.count ? `<button class="wbs-btn" title="${open?'Hide':'Show'} its features" onclick="wbsToggle('${s.prefix}')">${open?'▾':'▸'}</button>` : '';
-      const feats = open ? `<div class="wbs-feats" ondragover="event.stopPropagation()">
-          <div class="wbs-feats-bar"><span>Tick features to move them, or drag one onto another sub-area.</span>
-            <button class="wbs-btn move" onclick="wbsMovePicked('${s.prefix}')">Move ticked…</button></div>
-          ${(s.features||[]).map(f => `<label class="wbs-feat" draggable="true" ondragstart="wbsDrag(event,'f:${f.wbs}')">
-            <input type="checkbox" ${_wbsPick.has(f.wbs)?'checked':''} onchange="wbsPick('${f.wbs}',this.checked)">
-            <code>${esc(f.wbs)}</code><span>${esc(f.name)}</span><span class="st">${esc(f.status)}</span></label>`).join('')}</div>` : '';
-      return `<div class="wbs-row wbs-sub" ${saved?`data-prefix="${s.prefix}" ondragover="wbsDragOver(event,this)" ondragleave="this.classList.remove('drop-ok')" ondrop="wbsDrop(event,this)"`:''}>${saved && s.count ? `<span class="wbs-grip" title="Drag onto another sub-area to merge into it" draggable="true" ondragstart="wbsDrag(event,'s:${s.prefix}')">⠿</span>` : ''}${toggle}${c}
+      const feats = open ? _featsHtml(s) : '';
+      return `<div class="wbs-subbox" ${saved?`data-prefix="${s.prefix}" ondragover="wbsDragOver(event,this)" ondragleave="wbsDragLeave(event,this)" ondrop="wbsDrop(event,this)"`:''}><div class="wbs-row wbs-sub">${saved && s.count ? `<span class="wbs-grip" title="Drag onto another sub-area to merge into it" draggable="true" ondragstart="wbsDrag(event,'s:${s.prefix}')" ondragend="wbsDragEnd()">⠿</span>` : ''}${toggle}${c}
         <input class="wbs-title" type="text" value="${esc(s.title)}" maxlength="120" placeholder="Sub-area name…" aria-label="Sub-area name"
                oninput="_wbs[${ai}].sub_areas[${si}].title=this.value;_wbsDirtyNow()">
         <span class="wbs-count">${n}</span>
+        ${saved ? `<button class="wbs-btn move" title="Move this sub-area, with its features, under another area" onclick="openWbsMove({kind:'toarea',source:'${s.prefix}'})">⇄ Area</button>` : ''}
         <button class="wbs-btn" title="Move up" ${si===0?'disabled':''} onclick="wbsMoveSub(${ai},${si},-1)">↑</button>
         <button class="wbs-btn" title="Move down" ${si===subs-1?'disabled':''} onclick="wbsMoveSub(${ai},${si},1)">↓</button>
-        <button class="wbs-btn" title="${lock}" onclick="wbsRemoveSub(${ai},${si})">✕</button></div>${feats}`;
+        <button class="wbs-btn" title="${lock}" onclick="wbsRemoveSub(${ai},${si})">✕</button></div>${feats}</div>`;
     }).join('');
     const lockA = held ? `Remove: choose a sub-area to move its ${held} feature(s) into first` : 'Remove this area';
     const box = document.createElement('div');
     box.className = 'wbs-area';
-    box.innerHTML = `<div class="wbs-row">${code}
+    box.innerHTML = `<div class="wbs-row" ${a.number != null ? `data-area="${a.number}" ondragover="wbsAreaDragOver(event,this)" ondragleave="wbsAreaDragLeave(event,this)" ondrop="wbsAreaDrop(event,this)"` : ''}>${code}
         <input class="wbs-title" type="text" value="${esc(a.title)}" maxlength="120" placeholder="Area name…" aria-label="Area name"
                oninput="_wbs[${ai}].title=this.value;_wbsDirtyNow()">
         <span class="wbs-count">${subs} sub-area${subs===1?'':'s'}</span>
@@ -494,49 +517,197 @@ function renderWbs() {
 }
 // ── Move / merge: features and sub-areas go to an existing sub-area, in any area ──
 
-const _wbsOpen = new Set(), _wbsPick = new Set();
+const _wbsOpen = new Set(), _wbsPick = new Set(), _wbsHighlight = new Set();
+let _wbsAnchor = null, _wbsDragging = null, _wbsHoverTimer = null;
 let _move = null;   // {kind:'sub'|'area'|'features', source, area, wbs:[], target}
 const _api = '{{ base_path }}/api/structure/wbs';
 
-function wbsToggle(p) { _wbsOpen.has(p) ? _wbsOpen.delete(p) : _wbsOpen.add(p); renderWbs(); }
-function wbsPick(w, on) { on ? _wbsPick.add(w) : _wbsPick.delete(w); }
 function _subOf(prefix) { for (const a of _wbs) for (const s of a.sub_areas) if (s.prefix === prefix) return {a, s}; return null; }
-function wbsMovePicked(prefix) {
-  const mine = (_subOf(prefix).s.features || []).map(f => f.wbs).filter(w => _wbsPick.has(w));
-  if (!mine.length) { alert('Tick at least one feature first.'); return; }
-  openWbsMove({kind:'features', source:prefix, wbs:mine});
-}
-function wbsDrag(e, payload) { e.dataTransfer.setData('text/plain', payload); e.dataTransfer.effectAllowed = 'move'; }
-function wbsDragOver(e, el) { e.preventDefault(); el.classList.add('drop-ok'); }
-function wbsDrop(e, el) {
-  e.preventDefault(); el.classList.remove('drop-ok');
-  const [kind, code] = (e.dataTransfer.getData('text/plain') || ':').split(':');
-  const target = el.dataset.prefix;
-  if (kind === 's' && code && code !== target) openWbsMove({kind:'sub', source:code, target});
-  else if (kind === 'f' && code && code.split('.').slice(0,2).join('.') !== target) openWbsMove({kind:'features', source:code.split('.').slice(0,2).join('.'), wbs:[code], target});
+function _prefixOf(code) { return code.split('.').slice(0, 2).join('.'); }
+function wbsToggle(p) { _wbsOpen.has(p) ? _wbsOpen.delete(p) : _wbsOpen.add(p); renderWbs(); }
+
+// A target list for any move: every other sub-area, the source's own area first.
+function _targetOptions(excludePrefix, ownArea, selected, excludeArea) {
+  const areas = _wbs.filter(a => a.number != null && a.number !== excludeArea)
+    .sort((x, y) => (y.number === ownArea) - (x.number === ownArea));
+  return areas.map(a => `<optgroup label="${a.number}. ${esc(a.title)}">${a.sub_areas.filter(s => s.prefix && s.prefix !== excludePrefix).map(s =>
+    `<option value="${s.prefix}" ${selected === s.prefix ? 'selected' : ''}>${s.prefix} ${esc(s.title)}</option>`).join('')}</optgroup>`).join('');
 }
 
+// Features: click selects (Shift extends, Ctrl/Cmd adds), drag moves them, and the bar above them has a "Move to…" picker.
+function _featsHtml(s) {
+  const mine = [...(s.features || [])];
+  const picked = mine.filter(f => _wbsPick.has(f.wbs)).map(f => f.wbs);
+  const bar = picked.length ? `<div class="wbs-selbar"><b>${picked.length} selected</b>
+      <select aria-label="Move the selected features to" onchange="if(this.value)wbsMoveSelected('${s.prefix}',this.value)"><option value="">Move to…</option>${_targetOptions(s.prefix, Number(s.prefix.split('.')[0]), '')}</select>
+      <button class="wbs-btn" onclick="wbsClearPick()">Clear</button></div>` : '';
+  return `<div class="wbs-feats">
+    <div class="wbs-feats-bar">Click to select (Shift for a range, Ctrl/Cmd to add), then drag onto another sub-area or use Move to…</div>${bar}
+    ${mine.map(f => `<div class="wbs-feat ${_wbsPick.has(f.wbs) ? 'sel' : ''} ${_wbsHighlight.has(f.wbs) ? 'moved' : ''}" data-wbs="${esc(f.wbs)}" tabindex="0" role="option" aria-selected="${_wbsPick.has(f.wbs)}" draggable="true"
+        onclick="wbsRowClick(event,'${f.wbs}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();wbsRowClick(event,'${f.wbs}')}"
+        ondragstart="wbsDragFeature(event,'${f.wbs}')" ondragend="wbsDragEnd()">
+        <code>${esc(f.wbs)}</code><span>${esc(f.name)}</span><span class="st">${esc(f.status)}</span></div>`).join('')}</div>`;
+}
+function wbsClearPick() { _wbsPick.clear(); _wbsAnchor = null; renderWbs(); }
+function wbsRowClick(e, code) {
+  const prefix = _prefixOf(code), feats = _subOf(prefix).s.features.map(f => f.wbs);
+  if ([..._wbsPick].some(c => _prefixOf(c) !== prefix)) _wbsPick.clear();      // a selection lives in one sub-area
+  if (e.shiftKey && _wbsAnchor && _prefixOf(_wbsAnchor) === prefix) {
+    const [i, j] = [feats.indexOf(_wbsAnchor), feats.indexOf(code)].sort((x, y) => x - y);
+    feats.slice(i, j + 1).forEach(c => _wbsPick.add(c));
+  } else if (e.ctrlKey || e.metaKey) {
+    _wbsPick.has(code) ? _wbsPick.delete(code) : _wbsPick.add(code); _wbsAnchor = code;
+  } else {
+    const only = _wbsPick.size === 1 && _wbsPick.has(code);
+    _wbsPick.clear(); if (!only) _wbsPick.add(code); _wbsAnchor = code;
+  }
+  renderWbs();
+  document.querySelector(`.wbs-feat[data-wbs="${code}"]`)?.focus();
+}
+function wbsMoveSelected(prefix, target) {
+  const codes = _subOf(prefix).s.features.map(f => f.wbs).filter(c => _wbsPick.has(c));
+  if (codes.length) startFeatureMove(codes, prefix, target);
+}
+
+// Dragging: a selected row drags the whole selection; an unselected one drags just itself.
+// What follows the pointer: a labelled card, not just the grip glyph. It must be in the DOM when
+// setDragImage runs; the browser snapshots it then, so it can go straight away.
+function _dragImage(e, titleHtml, subText, moreText) {
+  const el = document.createElement('div');
+  el.className = 'wbs-dragimg';
+  el.innerHTML = `<div class="t">${titleHtml}</div>${subText ? `<div class="s">${esc(subText)}</div>` : ''}${moreText ? `<span class="more">${esc(moreText)}</span>` : ''}`;
+  document.body.appendChild(el);
+  try { e.dataTransfer.setDragImage(el, 18, 18); } catch (x) {}
+  setTimeout(() => el.remove(), 0);
+}
+function _dragStyle(kind, elements) {                 // dim what is being dragged and outline where it can land
+  document.body.classList.add('wbs-dragging', 'wbs-dragging-' + kind);
+  setTimeout(() => elements.forEach(x => x && x.classList && x.classList.add('is-dragging')), 0);   // after the browser took its snapshot
+}
+function wbsDragFeature(e, code) {
+  const codes = _wbsPick.has(code) ? [..._wbsPick] : [code];
+  _wbsDragging = {kind: 'f', codes, source: _prefixOf(code)};
+  e.dataTransfer.setData('text/plain', 'f:' + codes.join(',')); e.dataTransfer.effectAllowed = 'move';
+  const feats = _subOf(_prefixOf(code)).s.features, name = c => (feats.find(f => f.wbs === c) || {}).name || '';
+  const shown = codes.slice(0, 3).map(c => `<code>${esc(c)}</code> ${esc(name(c))}`).join('<br>');
+  _dragImage(e, shown, codes.length > 1 ? 'Drop on a sub-area to move them there' : 'Drop on a sub-area to move it there', codes.length > 3 ? `+${codes.length - 3} more` : '');
+  _dragStyle('f', codes.map(c => document.querySelector(`.wbs-feat[data-wbs="${c}"]`)));
+}
+function wbsDrag(e, payload) {                       // a sub-area's grip: onto a sub-area merges into it, onto an area moves it there
+  const source = payload.slice(2), x = _subOf(source);
+  _wbsDragging = {kind: 's', source, area: Number(source.split('.')[0])};
+  e.dataTransfer.setData('text/plain', payload); e.dataTransfer.effectAllowed = 'move';
+  _dragImage(e, `⠿ <code>${esc(source)}</code> ${esc(x.s.title)}`, `${x.s.count} feature${x.s.count === 1 ? '' : 's'}. Drop on a sub-area to merge into it, or on an area to move it there.`);
+  _dragStyle('s', [document.querySelector(`.wbs-subbox[data-prefix="${source}"]`)]);
+}
+function wbsDragEnd() {
+  _wbsDragging = null; clearTimeout(_wbsHoverTimer); _wbsHoverTimer = null;
+  document.body.classList.remove('wbs-dragging', 'wbs-dragging-s', 'wbs-dragging-f');
+  document.querySelectorAll('.drop-ok, .is-dragging').forEach(x => x.classList.remove('drop-ok', 'is-dragging'));
+}
+function _dropOk(prefix) { return _wbsDragging && _wbsDragging.source !== prefix; }
+function wbsDragOver(e, box) {
+  const prefix = box.dataset.prefix;
+  if (!_dropOk(prefix)) return;
+  e.preventDefault(); box.classList.add('drop-ok');
+  box.dataset.hint = _wbsDragging.kind === 's' ? `Merge ${_wbsDragging.source} into ${prefix}`
+    : `Move ${_wbsDragging.codes.length} feature${_wbsDragging.codes.length === 1 ? '' : 's'} here`;
+  // A collapsed sub-area opens while you hover over it, so you can drop between its features.
+  // It is inserted without a re-render: re-rendering would remove the row being dragged.
+  const s = _subOf(prefix).s;
+  if (s.count && !_wbsOpen.has(prefix) && !_wbsHoverTimer) _wbsHoverTimer = setTimeout(() => {
+    _wbsHoverTimer = null;
+    if (!_wbsDragging || _wbsOpen.has(prefix)) return;
+    _wbsOpen.add(prefix);
+    box.insertAdjacentHTML('beforeend', _featsHtml(s));
+    const tg = box.querySelector('.wbs-row > .wbs-btn[title$="features"]'); if (tg) tg.textContent = '▾';
+  }, 600);
+}
+function wbsDragLeave(e, box) {
+  if (box.contains(e.relatedTarget)) return;
+  box.classList.remove('drop-ok'); clearTimeout(_wbsHoverTimer); _wbsHoverTimer = null;
+}
+function _areaDropOk(n) { return _wbsDragging && _wbsDragging.kind === 's' && _wbsDragging.area !== n; }
+function wbsAreaDragOver(e, row) {
+  const n = Number(row.dataset.area);
+  if (!_areaDropOk(n)) return;
+  e.preventDefault(); row.classList.add('drop-ok'); row.dataset.hint = `Move ${_wbsDragging.source} to area ${n}`;
+}
+function wbsAreaDragLeave(e, row) { if (!row.contains(e.relatedTarget)) row.classList.remove('drop-ok'); }
+function wbsAreaDrop(e, row) {
+  e.preventDefault(); row.classList.remove('drop-ok');
+  const drag = _wbsDragging, n = Number(row.dataset.area);
+  wbsDragEnd();
+  if (drag && drag.kind === 's' && drag.area !== n) openWbsMove({kind:'toarea', source:drag.source, toArea:n});
+}
+function wbsDrop(e, box) {
+  e.preventDefault(); box.classList.remove('drop-ok');
+  const drag = _wbsDragging, target = box.dataset.prefix;
+  wbsDragEnd();
+  if (!drag || drag.source === target) return;
+  if (drag.kind === 's') openWbsMove({kind:'sub', source:drag.source, target});
+  else startFeatureMove(drag.codes, drag.source, target);
+}
+
+// One feature gets a one-line confirmation with its new code; several (or a whole sub-area) get the full dialog.
+function _wbsGuard() {
+  if (_wbsDirty) { alert('Save your structure edits first (Save, top right); then move features.'); return false; }
+  return true;
+}
+async function startFeatureMove(codes, source, target) {
+  if (!_wbsGuard()) return;
+  if (codes.length > 1) { openWbsMove({kind:'features', source, wbs:codes, target}); return; }
+  const code = codes[0], bar = document.getElementById('wbs-inline'), dest = _subOf(target);
+  const f = _subOf(source).s.features.find(x => x.wbs === code);
+  bar.style.display = 'flex';
+  bar.innerHTML = `<span>Moving <code>${esc(code)}</code> ${esc(f.name)} to <b>${esc(target)} ${esc(dest.s.title)}</b>…</span>`;
+  const body = {wbs: [code], target};
+  try {
+    const d = await _post(_api + '/preview', body);
+    const fresh = d.mapping[code], refs = d.initiatives_updated + d.bugs_updated;
+    bar.innerHTML = `<span><code>${esc(code)}</code> ${esc(f.name)} → <b>${esc(target)} ${esc(dest.s.title)}</b> as <code>${esc(fresh)}</code>${refs ? ` <span class="modal-hint">(${refs} reference${refs === 1 ? ' follows' : 's follow'})</span>` : ''}</span>
+      <button class="btn btn-primary btn-sm" id="wbs-inline-go">Move</button><button class="btn btn-ghost btn-sm" onclick="closeInlineMove()">Cancel</button>`;
+    document.getElementById('wbs-inline-go').onclick = async () => {
+      bar.querySelectorAll('button').forEach(b => b.disabled = true);
+      try { _afterMove(await _post(_api + '/move', body), {kind:'features', target}); }
+      catch (e) { bar.innerHTML = `<span class="err">${esc(e.message)}</span><button class="btn btn-ghost btn-sm" onclick="closeInlineMove()">Close</button>`; }
+    };
+  } catch (e) { bar.innerHTML = `<span class="err">${esc(e.message)}</span><button class="btn btn-ghost btn-sm" onclick="closeInlineMove()">Close</button>`; }
+}
+function closeInlineMove() { const b = document.getElementById('wbs-inline'); b.style.display = 'none'; b.innerHTML = ''; }
+
+function _chosen() { return _move.kind === 'toarea' ? _move.toArea : _move.target; }
+function _moveLabel() { return _move.kind === 'features' || _move.kind === 'toarea' ? 'Move' : 'Move and remove'; }
 function openWbsMove(m) {
-  if (_wbsDirty) { alert('Save your structure edits first (Save, top right); then move features.'); return; }
+  if (!_wbsGuard()) return;
   _move = {target: '', ...m};
   const t = document.getElementById('wbs-move-title');
   if (m.kind === 'sub') { const x = _subOf(m.source); t.textContent = `Remove ${m.source} ${x.s.title}`; }
   else if (m.kind === 'area') { t.textContent = `Remove area ${m.area} ${_wbs.find(a => a.number === m.area).title}`; }
+  else if (m.kind === 'toarea') { const x = _subOf(m.source); t.textContent = `Move ${m.source} ${x.s.title} to another area`; }
   else t.textContent = `Move ${m.wbs.length} feature${m.wbs.length === 1 ? '' : 's'} from ${m.source}`;
   _renderMoveBody();
   document.getElementById('wbs-move-modal').style.display = 'flex';
-  if (_move.target) _previewMove();
+  if (_chosen()) _previewMove();
 }
 function closeWbsMove() { document.getElementById('wbs-move-modal').style.display = 'none'; _move = null; }
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && _move) closeWbsMove(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (_move) closeWbsMove(); closeInlineMove(); } });
 
 function _moveOptions() {
-  const own = _move.kind === 'area' ? String(_move.area) : (_move.source || '').split('.')[0];
-  return _wbs.filter(a => a.number != null && !(_move.kind === 'area' && a.number === _move.area))
-    .map(a => `<optgroup label="${a.number}. ${esc(a.title)}">${a.sub_areas.filter(s => s.prefix && s.prefix !== _move.source).map(s =>
-      `<option value="${s.prefix}" ${_move.target === s.prefix ? 'selected' : ''}>${s.prefix} ${esc(s.title)}</option>`).join('')}</optgroup>`).join('');
+  const own = _move.kind === 'area' ? _move.area : Number((_move.source || '').split('.')[0]);
+  return _targetOptions(_move.source, own, _move.target, _move.kind === 'area' ? _move.area : null);
 }
 function _renderMoveBody() {
+  const own = Number((_move.source || '').split('.')[0]);
+  if (_move.kind === 'toarea') {
+    document.getElementById('wbs-move-body').innerHTML = `<p class="modal-hint">The sub-area, its features and its scope item move under the area you choose. An area's number is part of every feature code, so the features get new codes there, and the sub-areas after it in this area close up the gap.</p>
+      <div class="modal-field"><label>Under area</label>
+        <select class="modal-input" onchange="_move.toArea=Number(this.value)||null;_previewMove()"><option value="">Choose an area…</option>${_wbs.filter(a => a.number != null && a.number !== own).map(a =>
+          `<option value="${a.number}" ${_move.toArea === a.number ? 'selected' : ''}>${a.number}. ${esc(a.title)}</option>`).join('')}</select></div>
+      <div id="wbs-move-preview" class="move-preview" style="display:none"></div>`;
+    const go = document.getElementById('wbs-move-go'); go.disabled = true; go.textContent = _moveLabel();
+    return;
+  }
   const what = _move.kind === 'features'
     ? `<p class="modal-hint">${_move.wbs.map(w => '<code>' + esc(w) + '</code>').join(', ')} will move; the sub-area they leave stays.</p>`
     : _move.kind === 'sub'
@@ -548,9 +719,10 @@ function _renderMoveBody() {
     ${_move.kind === 'features' ? '' : `<label style="font-size:0.8rem;display:block;margin-bottom:0.7rem"><input type="checkbox" onchange="_move.fold=this.checked;_previewMove()" ${_move.fold ? 'checked' : ''}> Fold the Product Scope item into the target's instead of dropping it</label>`}
     <div id="wbs-move-preview" class="move-preview" style="display:none"></div>`;
   const go = document.getElementById('wbs-move-go');
-  go.disabled = true; go.textContent = _move.kind === 'features' ? 'Move' : 'Move and remove';
+  go.disabled = true; go.textContent = _moveLabel();
 }
 function _moveBody() {
+  if (_move.kind === 'toarea') return {source: _move.source, to_area: _move.toArea};
   const b = {target: _move.target};
   if (_move.kind === 'sub') b.source = _move.source; else if (_move.kind === 'area') b.area = _move.area; else b.wbs = _move.wbs;
   if (_move.fold) b.fold_scope = true;
@@ -565,16 +737,16 @@ async function _post(url, body) {
 async function _previewMove() {
   const box = document.getElementById('wbs-move-preview'), go = document.getElementById('wbs-move-go');
   go.disabled = true;
-  if (!_move.target) { box.style.display = 'none'; return; }
+  if (!_chosen()) { box.style.display = 'none'; return; }
   box.style.display = 'block'; box.textContent = 'Checking…';
-  const target = _move.target;
+  const target = _chosen();
   try {
     const d = await _post(_api + '/preview', _moveBody());
-    if (!_move || _move.target !== target) return;
+    if (!_move || _chosen() !== target) return;
     const rows = Object.entries(d.mapping).map(([o, n]) => `<tr><td>${esc(o)}</td><td>→</td><td>${esc(n)}</td></tr>`).join('');
     box.innerHTML = `${rows ? `<table>${rows}</table>` : 'No features to move.'}
-      ${d.removed_sub_area ? `<div><b>${esc(d.removed_sub_area)}</b> will be removed.</div>` : ''}
-      ${d.scope_item !== 'none' ? `<div>Product Scope item: ${d.scope_item}.</div>` : ''}
+      ${d.new_sub_area ? `<div><b>${esc(d.removed_sub_area)}</b> becomes <b>${esc(d.new_sub_area)}</b>.</div>` : d.removed_sub_area ? `<div><b>${esc(d.removed_sub_area)}</b> will be removed.</div>` : ''}
+      ${d.scope_item !== 'none' ? `<div>Product Scope item: ${d.scope_item === 'moved' ? "moved to the area's group" : d.scope_item}.</div>` : ''}
       <div>${d.initiatives_updated} initiative and ${d.bugs_updated} bug reference(s) will follow.</div>
       ${d.notes.map(n => `<div class="modal-hint">${esc(n)}</div>`).join('')}`;
     go.disabled = false;
@@ -584,17 +756,33 @@ async function confirmWbsMove() {
   const go = document.getElementById('wbs-move-go'), box = document.getElementById('wbs-move-preview');
   go.disabled = true; go.textContent = 'Working…';
   try {
-    const d = await _post(_api + '/move', _moveBody());
-    try { sessionStorage.setItem('wbsMoved', JSON.stringify({mapping: d.mapping, removed: d.removed_sub_area, notes: d.notes, target: _move.target})); } catch (e) {}
-    location.reload();
-  } catch (e) { box.style.display = 'block'; box.innerHTML = `<span class="err">${esc(e.message)}</span>`; go.textContent = _move.kind === 'features' ? 'Move' : 'Move and remove'; go.disabled = false; }
+    _afterMove(await _post(_api + '/move', _moveBody()), {kind: _move.kind, target: _chosen()});
+  } catch (e) { box.style.display = 'block'; box.innerHTML = `<span class="err">${esc(e.message)}</span>`; go.textContent = _moveLabel(); go.disabled = false; }
+}
+// Reload to show the new codes, but keep the sub-areas you had open and highlight what moved.
+function _afterMove(d, ctx) {
+  const landed = Object.values(d.mapping || {});
+  // A merge can renumber sub-areas, so only a plain feature move keeps the previous open set.
+  const open = new Set(ctx.kind === 'features' ? _wbsOpen : []);
+  landed.forEach(c => open.add(_prefixOf(c)));
+  try {
+    sessionStorage.setItem('wbsMoved', JSON.stringify({mapping: d.mapping, removed: d.removed_sub_area, notes: d.notes, target: d.new_sub_area || ctx.target, relocated: !!d.new_sub_area}));
+    sessionStorage.setItem('wbsView', JSON.stringify({open: [...open], highlight: landed}));
+  } catch (e) {}
+  location.reload();
+}
+function _restoreView() {
+  try {
+    const v = JSON.parse(sessionStorage.getItem('wbsView') || 'null'); sessionStorage.removeItem('wbsView');
+    if (v) { (v.open || []).forEach(p => _wbsOpen.add(p)); (v.highlight || []).forEach(c => _wbsHighlight.add(c)); }
+  } catch (e) {}
 }
 function _showMovedNote() {
   let d = null;
   try { d = JSON.parse(sessionStorage.getItem('wbsMoved') || 'null'); sessionStorage.removeItem('wbsMoved'); } catch (e) {}
   if (!d) return;
   const rows = Object.entries(d.mapping || {}).map(([o, n]) => `${esc(o)} → ${esc(n)}`).join(', ');
-  document.getElementById('wbs-moved-note').innerHTML = `<div class="moved-note"><div>Moved into <b>${esc(d.target)}</b>${d.removed ? `; ${esc(d.removed)} removed` : ''}.
+  document.getElementById('wbs-moved-note').innerHTML = `<div class="moved-note"><div>${d.relocated ? `Sub-area <b>${esc(d.removed)}</b> moved to <b>${esc(d.target)}</b>.` : `Moved into <b>${esc(d.target)}</b>${d.removed ? `; ${esc(d.removed)} removed` : ''}.`}
     ${rows ? `<div><code>${rows}</code></div>` : ''}${(d.notes || []).map(n => `<div class="modal-hint">${esc(n)}</div>`).join('')}</div>
     <button class="btn btn-ghost btn-sm" onclick="this.closest('.moved-note').remove()">Dismiss</button></div>`;
 }
@@ -702,8 +890,11 @@ function saveScope()     { _save('{{ base_path }}/api/structure/scope',     seri
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderUsers();
 renderWorkflows();
+_restoreView();
 renderWbs();
 _showMovedNote();
+document.querySelector('.wbs-feat.moved')?.scrollIntoView({block:'center'});
+setTimeout(() => _wbsHighlight.clear(), 2500);
 renderScope();
 </script>
 {% endblock %}

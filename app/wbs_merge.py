@@ -21,13 +21,14 @@ class MoveResult:
     bugs: str
     mapping: dict[str, str]                      # old feature code -> new feature code
     removed_sub_area: str | None = None
-    scope_item: str = "none"                     # none | dropped | folded
+    scope_item: str = "none"                     # none | dropped | folded | moved
+    new_sub_area: str | None = None              # where a moved sub-area now lives
     initiatives_updated: int = 0
     bugs_updated: int = 0
     notes: list[str] = field(default_factory=list)
 
     def report(self) -> dict:
-        return {"mapping": self.mapping, "removed_sub_area": self.removed_sub_area, "scope_item": self.scope_item,
+        return {"mapping": self.mapping, "removed_sub_area": self.removed_sub_area, "new_sub_area": self.new_sub_area, "scope_item": self.scope_item,
                 "initiatives_updated": self.initiatives_updated, "bugs_updated": self.bugs_updated,
                 "notes": self.notes}
 
@@ -114,6 +115,39 @@ def merge_sub_area(product: str, about: str, bugs: str, source: str, target: str
     if close_gap:
         _close_gap(result, int(source.split(".")[0]))
     _follow(result, about, bugs)
+    return result
+
+
+def move_sub_area(product: str, about: str, bugs: str, source: str, area: int) -> MoveResult:
+    """Move sub-area `source` (title, features and scope item) under area `area`. An area's number is part of
+    its features' codes, so the sub-area is recreated at the next free code there and its features move into
+    it; the old heading goes, the old area's later sub-areas close the gap, and the scope item moves to the
+    destination area's scope group. Returns the usual code map plus `new_sub_area`."""
+    areas = product_parser.structure_of(product)
+    here = next((a for a in areas if any(s["prefix"] == source for s in a["sub_areas"])), None)
+    if here is None:
+        raise ValueError(f"Sub-area {source!r} not found")
+    dest = next((a for a in areas if a["number"] == area), None)
+    if dest is None:
+        raise ValueError(f"Area {area} not found")
+    if here["number"] == area:
+        raise ValueError(f"Sub-area {source} is already in area {area}.")
+    title = next(s["title"] for s in here["sub_areas"] if s["prefix"] == source)
+    dest["sub_areas"].append({"prefix": None, "title": title})
+    grown = product_parser.transform_structure(product, areas)
+    known = {s["prefix"] for a in areas for s in a["sub_areas"] if s["prefix"]}
+    new = next(s["prefix"] for a in product_parser.structure_of(grown) if a["number"] == area
+               for s in a["sub_areas"] if s["prefix"] not in known)
+    grown, status = product_parser.transform_move_scope_item(grown, source, new, dest["title"])
+    result = merge_sub_area(grown, about, bugs, source, new)
+    result.removed_sub_area, result.new_sub_area = source, new
+    if status == "moved":
+        result.scope_item = "moved"
+    elif status == "no_group":
+        result.scope_item = "dropped"
+        result.notes.append(f"area {area} has no Product Scope group named {dest['title']!r}: add an item for {new} by hand")
+    # the product in the result already includes the new heading and the scope move
+    result.notes.insert(0, f"sub-area {source} {title!r} is now {new} in area {area}")
     return result
 
 

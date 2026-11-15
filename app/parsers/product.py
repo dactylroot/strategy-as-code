@@ -756,6 +756,37 @@ def transform_sync_scope_item(text: str, prefix: str) -> str:
     return text[:sm.start(2)] + body + text[sm.end(2):]
 
 
+def transform_move_scope_item(text: str, old: str, new: str, dest_area_title: str) -> tuple[str, str]:
+    """Take the Product Scope item tagged `(WBS old)` out of its group, retag it `(WBS new)` and append it to
+    the scope group named `dest_area_title`. Returns the text and `moved`, `no_item` (nothing was tagged
+    `old`) or `no_group` (the destination area has no scope group; the item is left where it was)."""
+    from ..manifest import normalize_name
+    sm = re.search(r"(^## Product Scope\n)(.*?)(?=\n## |\Z)", text, re.DOTALL | re.MULTILINE)
+    if not sm:
+        return text, "no_item"
+    body = sm.group(2)
+    line = _scope_line(body, old)
+    if not line:
+        return text, "no_item"
+    group = next((g for g in re.finditer(r"^### ([^\n]+?)[ \t]*\n(.*?)(?=^### |\Z)", body, re.DOTALL | re.MULTILINE)
+                  if normalize_name(g.group(1)) == normalize_name(dest_area_title)), None)
+    if group is None:
+        return text, "no_group"
+    raw = line.group(0)
+    complete = "~~" in raw or "🎆" in raw
+    bare = raw.replace("~~", "").replace("🎆", "")
+    item = re.sub(rf"\s*\(WBS {re.escape(old)}\)\s*$", "", bare).lstrip(" \t-").strip()
+    new_line = f"- ~~{item}~~ 🎆 (WBS {new})" if complete else f"- {item} (WBS {new})"
+    body = body[:line.start()] + body[line.end():]            # take it out first; then find the group again
+    group = next(g for g in re.finditer(r"^### ([^\n]+?)[ \t]*\n(.*?)(?=^### |\Z)", body, re.DOTALL | re.MULTILINE)
+                 if normalize_name(g.group(1)) == normalize_name(dest_area_title))
+    content = group.group(2)
+    trail = len(content) - len(content.rstrip("\n"))
+    content = content.rstrip("\n") + "\n" + new_line + "\n" * max(trail, 1)
+    body = body[:group.start(2)] + content + body[group.end(2):]
+    return text[:sm.start(2)] + body + text[sm.end(2):], "moved"
+
+
 def transform_merge_sub_area(text: str, source: str, target: str, *, fold_scope: bool = False
                              ) -> tuple[str, dict[str, str]]:
     """Retire sub-area `source`: every feature in it moves to the existing sub-area `target` (in this or

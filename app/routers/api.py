@@ -463,10 +463,11 @@ def put_wbs_structure(body: StructureUpdate, request: Request):
 
 class WbsMoveBody(BaseModel):
     """Merge sub-area `source` into `target`, or (with `wbs`) move just those features to `target`.
-    `area` retires a whole area into `target` instead."""
-    target: str
+    `area` retires a whole area into `target` instead; `source` with `to_area` moves the sub-area under that area."""
+    target: str = ""
     source: str | None = None
     area: int | None = None
+    to_area: int | None = None      # with `source`: move the sub-area itself under this area
     wbs: list[str] = []
     fold_scope: bool = False
 
@@ -477,6 +478,8 @@ def _wbs_move(body: WbsMoveBody, product: str, about: str, bugs: str) -> wbs_mer
             return wbs_merge.move_features(product, about, bugs, body.wbs, body.target)
         if body.area is not None:
             return wbs_merge.merge_area(product, about, bugs, body.area, body.target, fold_scope=body.fold_scope)
+        if body.source and body.to_area is not None:
+            return wbs_merge.move_sub_area(product, about, bugs, body.source, body.to_area)
         if body.source:
             return wbs_merge.merge_sub_area(product, about, bugs, body.source, body.target, fold_scope=body.fold_scope)
     except ValueError as e:

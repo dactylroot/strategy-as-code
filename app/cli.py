@@ -217,6 +217,9 @@ def build_parser() -> argparse.ArgumentParser:
     x = ss.add_parser("add"); x.add_argument("area", type=int); x.add_argument("title")
     x = ss.add_parser("rename"); x.add_argument("prefix"); x.add_argument("title")
     x = ss.add_parser("remove"); x.add_argument("prefix")
+    x = ss.add_parser("move", help="move a sub-area, with its features and scope item, under another area (it gets a new code there)")
+    x.add_argument("prefix"); x.add_argument("--to-area", type=int, required=True, metavar="N", help="the area to move it under")
+    x.add_argument("--dry-run", action="store_true", help="show what would change; write nothing")
     x = ss.add_parser("merge", help="retire a sub-area: move all its features into another sub-area (any area), then remove it")
     x.add_argument("prefix"); _merge_options(x)
     x = st.add_parser("move", help="move chosen features into a sub-area (any area); they get new codes there")
@@ -547,7 +550,7 @@ def _run_structure(reg: Registry, key: str, actor: Actor, args: argparse.Namespa
         if found:
             raise CliError(f"{key}: Product Scope and the WBS have drifted ({len(found)}):\n  - " + "\n  - ".join(found))
         return f"{key}: Product Scope lines up with the WBS"
-    if args.action == "move" or (args.action in ("sub", "area") and args.verb == "merge"):
+    if args.action == "move" or (args.action in ("sub", "area") and args.verb in ("merge", "move")):
         return _run_wbs_move(reg, key, actor, args)
     notes: list[str] = []
     edits: list[Edit]
@@ -622,6 +625,8 @@ def _run_wbs_move(reg: Registry, key: str, actor: Actor, args: argparse.Namespac
         try:
             if args.action == "move":
                 return wbs_merge.move_features(*texts, args.wbs, args.into)
+            if args.action == "sub" and args.verb == "move":
+                return wbs_merge.move_sub_area(*texts, args.prefix, args.to_area)
             if args.action == "area":
                 return wbs_merge.merge_area(*texts, args.number, args.into, fold_scope=args.fold_scope)
             return wbs_merge.merge_sub_area(*texts, args.prefix, args.into, fold_scope=args.fold_scope)
@@ -630,6 +635,8 @@ def _run_wbs_move(reg: Registry, key: str, actor: Actor, args: argparse.Namespac
 
     def describe(r: "wbs_merge.MoveResult") -> str:
         lines = [f"{old} -> {new}" for old, new in r.mapping.items()] or ["no features to move"]
+        if r.new_sub_area:
+            lines.insert(0, f"{args.prefix} is now {r.new_sub_area}")
         if r.removed_sub_area:
             lines.append(f"{r.removed_sub_area} removed")
         if r.scope_item != "none":
@@ -661,10 +668,11 @@ def _run_wbs_move(reg: Registry, key: str, actor: Actor, args: argparse.Namespac
 
     what = (f"features {', '.join(args.wbs)}" if args.action == "move"
             else f"area {args.number}" if args.action == "area" else f"sub-area {args.prefix}")
-    result = edit(reg, key, fn, args.message or f"WBS: {what} moved into {args.into}", actor)
+    dest = f"area {args.to_area}" if getattr(args, "verb", None) == "move" else args.into
+    result = edit(reg, key, fn, args.message or f"WBS: {what} moved into {dest}", actor)
     r = done["r"]
     where = f"{result.branch} @ {result.sha[:7]}" if result.changed else "no change"
-    return "\n".join([f"{key}: {what} moved into {args.into} ({where})", describe(r), *[f"  note: {n}" for n in r.notes]])
+    return "\n".join([f"{key}: {what} moved into {dest} ({where})", describe(r), *[f"  note: {n}" for n in r.notes]])
 
 
 def _run_inbox(reg: Registry, key: str, actor: Actor, args: argparse.Namespace) -> str:

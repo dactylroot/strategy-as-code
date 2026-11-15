@@ -343,3 +343,15 @@ def test_structure_merge_and_move_carry_features_and_references_in_one_commit(ma
     product = remote(origin, "PRODUCT.MD")
     assert "#### 1.2 " not in product and "| 1.2.1 |" not in product
     assert run_git(origin, ["log", "-1", "--format=%s", "main"]).startswith("WBS: sub-area 1.2 moved into 2.1")
+
+
+def test_structure_sub_move_puts_a_sub_area_under_another_area(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["structure", "area", "add", "Ops"]) == 0
+    assert main(base + ["structure", "sub", "move", "1.2", "--to-area", "2", "--dry-run"]) == 0
+    assert "1.2 is now 2.1" in capsys.readouterr().out and "#### 1.2 " in remote(origin, "PRODUCT.MD")
+    assert main(base + ["structure", "sub", "move", "1.2", "--to-area", "1"]) == 1
+    assert "already in area" in capsys.readouterr().err
+    assert main(base + ["structure", "sub", "move", "1.2", "--to-area", "2"]) == 0
+    product = remote(origin, "PRODUCT.MD")
+    assert "#### 2.1 Reporting" in product and "#### 1.2 " not in product and "| 2.1.1 | Export |" in product
