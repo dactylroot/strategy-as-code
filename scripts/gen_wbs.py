@@ -1,10 +1,18 @@
 """
-gen_wbs.py - WBS swimlane chart generator for strategy-as-code.
+gen_wbs.py - WBS swimlane chart generator.
 
-Reads PROJECT_DIR env var to locate PRODUCT.MD and write output.
 Outputs:
-  $PROJECT_DIR/docs/wbs.png   - static PNG
-  $PROJECT_DIR/docs/wbs.html  - self-contained interactive HTML
+  docs/wbs.png   - static PNG for embedding and sharing
+  docs/wbs.html  - self-contained interactive HTML (hover effects, responsive)
+
+Re-run any time PRODUCT.MD feature status changes.
+
+Layout: one horizontal swimlane per Level 1 scope area.
+        Level 2 sub-sections fill each lane proportional to feature count,
+        with a minimum width per section so every header always fits inline.
+        Narrow sections borrow space from wider neighbours proportionally.
+        Level 2 headers are heatmap-colored (red→blue) by completion ratio.
+        Level 3 features are listed as text within their parent section.
 """
 
 import html as html_mod
@@ -18,15 +26,14 @@ from matplotlib.colors import LinearSegmentedColormap
 from math import ceil
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-_BASE    = os.environ.get('PROJECT_DIR', '/project')
-OUT      = os.path.join(_BASE, 'docs', 'wbs.png')
-OUT_HTML = os.path.join(_BASE, 'docs', 'wbs.html')
-PRODUCT_MD = os.path.join(_BASE, 'PRODUCT.MD')
-
-os.makedirs(os.path.dirname(OUT), exist_ok=True)
-
+# Resolved relative to the project root, i.e. the directory this script is run
+# from (SKILL.md instructs running it from the project root). Override with
+# PROJECT_DIR for callers that invoke it from elsewhere (e.g. run-ui.sh).
 FIG_W, FIG_H = 22, 12
 DPI          = 150
+PROJECT_DIR  = os.environ.get('PROJECT_DIR', os.getcwd())
+OUT          = os.path.join(PROJECT_DIR, 'docs', 'wbs.png')
+OUT_HTML     = os.path.join(PROJECT_DIR, 'docs', 'wbs.html')
 BG           = '#f8fafc'
 
 LABEL_X0, LABEL_X1     = 0.008, 0.098
@@ -37,10 +44,13 @@ TITLE_TOP    = 0.985
 LANES_TOP    = 0.930
 LANES_BOTTOM = 0.020
 LANE_GAP     = 0.012
+LANE_COUNT   = 3
+LANE_H       = (LANES_TOP - LANES_BOTTOM - LANE_GAP * (LANE_COUNT - 1)) / LANE_COUNT
 
 SEC_GAP      = 0.004
 HEADER_FRAC  = 0.24
 
+# Fonts
 TITLE_FONT   = 20
 LANE_FONT    = 13
 HDR_LBL_FONT = 11
@@ -48,17 +58,35 @@ HDR_PCT_FONT = 13
 FEAT_FONT    = 10.5
 LINE_SPACING = 1.55
 
-HDR_PAD_PX   = 100
-HDR_MARGIN   = 0.007
+HDR_PAD_PX   = 100  # minimum pixel gap between label and % in header
+HDR_MARGIN   = 0.007  # left/right inset of header text (data coords)
 
 LANE_LABEL_BG = '#1e293b'
 EDGE_COLOR    = '#e2e8f0'
 
 CMAP = LinearSegmentedColormap.from_list('RdBl', ['#b91c1c', '#1e40af'])
 
-# ── DATA ──────────────────────────────────────────────────────────────────────
+# ── DATA (parsed from PRODUCT.MD) ────────────────────────────────────────────
+PRODUCT_MD = os.path.join(PROJECT_DIR, 'PRODUCT.MD')
+
+def get_product_title(path):
+    """Derive the project title the same way the UI does (app/config.py
+    _title_from_product_md): PRODUCT.MD's H1, minus a trailing "Overview"
+    suffix, falling back to the project directory name."""
+    try:
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+        m = re.match(r'^# (.+)', text)
+        raw = m.group(1).strip() if m else ''
+        title = re.sub(r'\s*[-–]\s*(Product\s+)?Overview\s*$', '', raw, flags=re.IGNORECASE).strip()
+        return title or None
+    except OSError:
+        return None
+
+PRODUCT_TITLE = get_product_title(PRODUCT_MD) or os.path.basename(os.path.abspath(PROJECT_DIR))
 
 def make_lane_label(num, title):
+    """Wrap title into short lines prefixed by the scope number."""
     words = title.split()
     lines = [num]
     current = ''
@@ -74,7 +102,9 @@ def make_lane_label(num, title):
 
 # Scoped/Scored are display-derived (see Feature.stage in app/models.py),
 # never stored - normalize any legacy literal text from older files to Idea.
-_LEGACY_STATUS = {'scoped': 'idea', 'scored': 'idea'}
+# Gap is likewise no longer a stored per-feature status (it's a Known Gaps
+# discussion tag) - normalize legacy literal Gap text to Idea too.
+_LEGACY_STATUS = {'scoped': 'idea', 'scored': 'idea', 'gap': 'idea'}
 
 
 def parse_product_md(path):
@@ -112,22 +142,10 @@ def parse_product_md(path):
         swimlanes.append(lane)
     return swimlanes
 
-def get_product_title(path):
-    with open(path, encoding='utf-8') as fh:
-        for line in fh:
-            m = re.match(r'^# (.+)', line)
-            if m:
-                return m.group(1).strip()
-    return 'Work Breakdown Structure'
-
 SWIMLANES = parse_product_md(PRODUCT_MD)
-PRODUCT_TITLE = get_product_title(PRODUCT_MD)
-LANE_COUNT = len(SWIMLANES)
-LANE_H = (LANES_TOP - LANES_BOTTOM - LANE_GAP * max(LANE_COUNT - 1, 0)) / max(LANE_COUNT, 1)
 
 # ── HELPERS ──────────────────────────────────────────────────────────────────
 DONE_STATUSES = ('live', 'released')
-
 
 def completion(section):
     feats = section['features']
@@ -140,6 +158,7 @@ def body_tint(ratio):
     return (r * 0.15 + 0.85, g * 0.15 + 0.85, b * 0.15 + 0.85, 1.0)
 
 def strike(text):
+    """Apply Unicode combining strikethrough to every character."""
     return ''.join(c + '̶' for c in text)
 
 def lane_bounds(i):
@@ -147,18 +166,41 @@ def lane_bounds(i):
     return y_top - LANE_H, y_top
 
 def min_sec_width(label):
+    """Minimum data-coord width so the header label and % sit inline.
+
+    Uses 0.72 char-width ratio (conservative - matplotlib renders slightly
+    wider than naive estimates) and accounts for the left/right text margins.
+    """
     char_w   = HDR_LBL_FONT * DPI / 72 * 0.72
-    label_px = len(label) * char_w
-    pct_px   = 4 * HDR_PCT_FONT * DPI / 72 * 0.72
-    margin_px = 2 * HDR_MARGIN * FIG_W * DPI
-    return (label_px + pct_px + HDR_PAD_PX + margin_px) / (FIG_W * DPI)
+    label_px = min(len(label), 18) * char_w          # a longer label wraps onto a second line
+    pct_px   = 4 * HDR_PCT_FONT * DPI / 72 * 0.72   # worst-case '100%'
+    margin_px = 2 * HDR_MARGIN * FIG_W * DPI         # left + right insets
+    return (label_px + pct_px + HDR_PAD_PX / 2 + margin_px) / (FIG_W * DPI)
+
+def wrap_to(text, width_data, font_pt, reserve_data=0.0, ratio=0.62):
+    """Wrap `text` to fit `width_data` (figure fraction) at `font_pt`, leaving `reserve_data` free."""
+    import textwrap
+    char_w = font_pt * DPI / 72 * ratio / (FIG_W * DPI)
+    n = max(8, int((width_data - reserve_data - 2 * HDR_MARGIN) / char_w))
+    return textwrap.wrap(text, n, break_long_words=False) or [text]
 
 def distribute_widths(sections, avail_w):
-    counts = [max(len(s['features']), 1) for s in sections]
-    total  = sum(counts)
+    """
+    Start with feature-count-proportional widths, then enforce per-section
+    minimums by taking the deficit from wider sections proportionally.
+    """
+    # weight by how much text a section holds, not only how many features, so long names get room
+    counts = [sum(len(f['label']) + 14 for f in s['features']) for s in sections]
+    total  = sum(counts) or 1
     widths = [avail_w * c / total for c in counts]
     mins   = [min_sec_width(s['label']) for s in sections]
+    # A crowded lane cannot honour every minimum: shrink them together so they fit; the header
+    # label and the feature text wrap to whatever width each section ends up with.
+    if sum(mins) > avail_w * 0.98:
+        mins = [m * avail_w * 0.98 / sum(mins) for m in mins]
 
+    # Iterate until all minimums are satisfied (converges in one pass for
+    # well-behaved inputs, but loop handles cascading constraints).
     for _ in range(len(sections)):
         below = [i for i, (w, m) in enumerate(zip(widths, mins)) if w < m - 1e-9]
         if not below:
@@ -175,6 +217,41 @@ def distribute_widths(sections, avail_w):
 
     return widths
 
+# ── LAYOUT ────────────────────────────────────────────────────────────────────
+# Lane heights follow the text: a lane with a crowded section grows taller instead of overflowing.
+LINE_IN      = FEAT_FONT / 72 * LINE_SPACING          # one text line, inches
+HDR_IN       = 0.95                                   # header band: room for a two-line label
+MIN_LANE_IN  = 3.4
+MIN_COL_W    = 0.17                                   # narrowest a feature column may get (figure fraction)
+TITLE_IN     = 0.9
+GAP_IN       = 0.15
+
+def section_blocks(sec, sec_w):
+    """Feature names wrapped to the section, dealt into columns: (columns, lines in the longest one)."""
+    n_cols = max(1, min(4, int(sec_w / MIN_COL_W)))
+    blocks = []
+    for item in sec['features']:
+        live = item['status'] in DONE_STATUSES
+        lines = wrap_to('• ' + item['label'], sec_w / n_cols, FEAT_FONT)
+        blocks.append([(strike(l) if live else l, live) for l in lines])
+    per = ceil(sum(len(b) for b in blocks) / n_cols) if blocks else 0
+    cols, ci = [[] for _ in range(n_cols)], 0
+    for b in blocks:
+        if ci < n_cols - 1 and cols[ci] and sum(len(x) for x in cols[ci]) + len(b) > per:
+            ci += 1
+        cols[ci].append(b)
+    return cols, max((sum(len(x) for x in c) for c in cols), default=0)
+
+lane_layout = []
+for lane in SWIMLANES:
+    avail = CONTENT_W - SEC_GAP * (len(lane['sections']) - 1)
+    widths = distribute_widths(lane['sections'], avail)
+    laid = [section_blocks(sec, w) for sec, w in zip(lane['sections'], widths)]
+    rows = max((r for _, r in laid), default=0)
+    lane_layout.append((widths, [c for c, _ in laid], max(MIN_LANE_IN, HDR_IN + rows * LINE_IN / 0.84 + 0.1)))
+
+FIG_H = TITLE_IN + sum(l[2] for l in lane_layout) + GAP_IN * (len(lane_layout) - 1) + 0.1
+
 # ── DRAW ──────────────────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
 ax.set_xlim(0, 1)
@@ -183,19 +260,22 @@ ax.axis('off')
 fig.patch.set_facecolor(BG)
 ax.set_facecolor(BG)
 
-ax.text(0.5, TITLE_TOP,
+ax.text(0.5, 1 - 0.1 / FIG_H,
         f'{PRODUCT_TITLE} - Work Breakdown Structure',
         ha='center', va='top', fontsize=TITLE_FONT,
         fontweight='bold', color='#0f172a')
 
+y_top = 1 - TITLE_IN / FIG_H
 for lane_i, lane in enumerate(SWIMLANES):
-    y0, y1   = lane_bounds(lane_i)
-    header_h = LANE_H * HEADER_FRAC
+    widths, columns, lane_in = lane_layout[lane_i]
+    LANE_H   = lane_in / FIG_H
+    y1       = y_top
+    y0       = y1 - LANE_H
+    y_top    = y0 - GAP_IN / FIG_H
+    header_h = HDR_IN / FIG_H
     body_h   = LANE_H - header_h
 
-    avail_w  = CONTENT_W - SEC_GAP * (len(lane['sections']) - 1)
-    widths   = distribute_widths(lane['sections'], avail_w)
-
+    # Lane label strip
     ax.add_patch(mpatches.FancyBboxPatch(
         (LABEL_X0, y0), LABEL_X1 - LABEL_X0, LANE_H,
         boxstyle='round,pad=0.004',
@@ -206,8 +286,7 @@ for lane_i, lane in enumerate(SWIMLANES):
             multialignment='center', linespacing=1.45, zorder=3)
 
     x_cursor = CONTENT_X0
-    for sec, sec_w in zip(lane['sections'], widths):
-        n     = len(sec['features'])
+    for sec, sec_w, cols in zip(lane['sections'], widths, columns):
         ratio = completion(sec)
         sx0   = x_cursor
 
@@ -215,16 +294,17 @@ for lane_i, lane in enumerate(SWIMLANES):
             (sx0, y0), sec_w, LANE_H,
             facecolor=body_tint(ratio), edgecolor=EDGE_COLOR,
             linewidth=0.8, zorder=2))
-
         ax.add_patch(mpatches.Rectangle(
             (sx0, y1 - header_h), sec_w, header_h,
             facecolor=CMAP(ratio), edgecolor='none', zorder=3))
-
         ax.plot([sx0, sx0 + sec_w], [y1 - header_h, y1 - header_h],
                 color='white', lw=0.6, zorder=4)
 
+        # Header: label left (wrapped), % right
+        pct_w = 4 * HDR_PCT_FONT * DPI / 72 * 0.72 / (FIG_W * DPI)
+        hdr_lines = wrap_to(sec['label'], sec_w, HDR_LBL_FONT, reserve_data=pct_w, ratio=0.8)
         ax.text(sx0 + HDR_MARGIN, y1 - header_h / 2,
-                sec['label'], ha='left', va='center',
+                '\n'.join(hdr_lines), ha='left', va='center', linespacing=1.25,
                 fontsize=HDR_LBL_FONT, fontweight='bold',
                 color='white', zorder=5)
         ax.text(sx0 + sec_w - HDR_MARGIN, y1 - header_h / 2,
@@ -232,26 +312,16 @@ for lane_i, lane in enumerate(SWIMLANES):
                 fontsize=HDR_PCT_FONT, fontweight='bold',
                 color='white', zorder=5)
 
-        line_h_data  = (FEAT_FONT / 72) / FIG_H * LINE_SPACING
-        max_rows     = max(1, int(body_h * 0.84 / line_h_data))
-        n_cols       = max(1, ceil(n / max_rows))
-        rows_per_col = ceil(n / n_cols) if n > 0 else 1
-        col_w        = sec_w / n_cols
-        body_cy      = y0 + body_h / 2
-
-        for col_i in range(n_cols):
-            start     = col_i * rows_per_col
-            col_items = sec['features'][start : start + rows_per_col]
-            n_rows    = len(col_items)
-            col_cx    = sx0 + (col_i + 0.5) * col_w
-            for row_i, item in enumerate(col_items):
-                y     = body_cy + ((n_rows - 1) / 2 - row_i) * line_h_data
-                live  = item['status'] in DONE_STATUSES
-                label = strike(item['label']) if live else item['label']
-                color = '#94a3b8' if live else '#1e293b'
-                ax.text(col_cx, y, '• ' + label,
-                        ha='center', va='center',
-                        fontsize=FEAT_FONT, color=color, zorder=5)
+        # Feature text: columns of wrapped lines, centred in the body
+        line_h_data = LINE_IN / FIG_H
+        col_w, body_cy = sec_w / len(cols), y0 + body_h / 2
+        for col_i, col in enumerate(cols):
+            lines  = [ln for blk in col for ln in blk]
+            col_cx = sx0 + (col_i + 0.5) * col_w
+            for row_i, (txt, live) in enumerate(lines):
+                y = body_cy + ((len(lines) - 1) / 2 - row_i) * line_h_data
+                ax.text(col_cx, y, txt, ha='center', va='center',
+                        fontsize=FEAT_FONT, color='#94a3b8' if live else '#1e293b', zorder=5)
 
         x_cursor += sec_w + SEC_GAP
 
@@ -259,7 +329,10 @@ plt.savefig(OUT, dpi=DPI, bbox_inches='tight', facecolor=BG)
 print(f'Saved: {OUT}')
 
 # ── HTML OUTPUT ───────────────────────────────────────────────────────────────
+
 def gen_html(out_path):
+    """Generate a self-contained interactive HTML version of the WBS chart."""
+
     def css_rgb(ratio):
         r, g, b, _ = CMAP(ratio)
         return f'rgb({int(r*255)},{int(g*255)},{int(b*255)})'
@@ -270,26 +343,70 @@ def gen_html(out_path):
 
     CSS = """
 * { box-sizing: border-box; margin: 0; padding: 0 }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; padding: 16px; min-width: 680px; max-width: 960px; margin: 0 auto; }
-.wbs-title { text-align: center; font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: 14px; }
-.lane { display: flex; margin-bottom: 6px; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-.lane-lbl { width: 86px; min-width: 86px; background: #1e293b; color: #fff; display: flex; align-items: center; justify-content: center; text-align: center; font-size: .78rem; font-weight: 700; padding: 8px; line-height: 1.45; }
-.secs { display: flex; flex: 1; gap: 3px; background: #e2e8f0; padding: 3px; }
-.sec { display: flex; flex-direction: column; border-radius: 4px; overflow: hidden; min-width: 0; transition: filter .15s, box-shadow .15s; cursor: default; }
-.sec:hover { filter: brightness(.93); box-shadow: 0 0 0 2px rgba(255,255,255,.55) inset; }
-.sec-hdr { display: flex; justify-content: space-between; align-items: flex-start; padding: 7px 9px; min-height: 44px; gap: 8px; }
-.sec-lbl { font-size: .82rem; font-weight: 700; color: #fff; line-height: 1.35; flex: 1; }
-.sec-pct { font-size: 1.0rem; font-weight: 700; color: #fff; white-space: nowrap; flex-shrink: 0; padding-top: 1px; }
-.sec-body { flex: 1; padding: 8px 10px 10px; font-size: .82rem; color: #1e293b; line-height: 1.75; column-gap: 10px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f8fafc; padding: 16px; min-width: 680px;
+  max-width: 960px; margin: 0 auto;
+}
+.wbs-title {
+  text-align: center; font-size: 1.25rem; font-weight: 700;
+  color: #0f172a; margin-bottom: 14px; letter-spacing: -.01em;
+}
+.lane {
+  display: flex; margin-bottom: 6px; border-radius: 6px;
+  overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+}
+.lane-lbl {
+  width: 86px; min-width: 86px; background: #1e293b; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; font-size: .78rem; font-weight: 700;
+  padding: 8px; line-height: 1.45;
+}
+.secs {
+  display: flex; flex: 1; gap: 3px;
+  background: #e2e8f0; padding: 3px;
+}
+.sec {
+  display: flex; flex-direction: column;
+  border-radius: 4px; overflow: hidden; min-width: 0;
+  transition: filter .15s, box-shadow .15s; cursor: default;
+}
+.sec:hover {
+  filter: brightness(.93);
+  box-shadow: 0 0 0 2px rgba(255,255,255,.55) inset;
+}
+.sec-hdr {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 7px 9px; min-height: 44px; gap: 8px;
+}
+.sec-lbl {
+  font-size: .82rem; font-weight: 700; color: #fff;
+  line-height: 1.35; flex: 1;
+}
+.sec-pct {
+  font-size: 1.0rem; font-weight: 700; color: #fff;
+  white-space: nowrap; flex-shrink: 0; padding-top: 1px;
+}
+.sec-body {
+  flex: 1; padding: 8px 10px 10px; font-size: .82rem;
+  color: #1e293b; line-height: 1.75; column-gap: 10px;
+}
 .sec-body ul { list-style: none }
 .sec-body li::before { content: "• "; color: #64748b }
-.legend { display: flex; gap: 14px; margin-top: 10px; font-size: .78rem; color: #374151; flex-wrap: wrap; align-items: center; }
+.legend {
+  display: flex; gap: 14px; margin-top: 10px;
+  font-size: .78rem; color: #374151; flex-wrap: wrap; align-items: center;
+}
 .ld { display: inline-flex; align-items: center; gap: 5px }
-.ld-swatch { width: 28px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.ld-swatch {
+  width: 28px; height: 10px; border-radius: 2px; flex-shrink: 0;
+}
 """
 
+    # Build lane HTML
     lane_blocks = []
     for lane in SWIMLANES:
+        total = sum(len(s['features']) for s in lane['sections'])
         sec_parts = []
         for sec in lane['sections']:
             n      = len(sec['features'])
@@ -320,6 +437,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             f'</div>'
         )
 
+    # Gradient swatch for legend
     grad_start = css_rgb(0.0)
     grad_end   = css_rgb(1.0)
 
@@ -336,7 +454,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 {"".join(lane_blocks)}
 <div class="legend">
   <span class="ld">
-    <span class="ld-swatch" style="background:linear-gradient(to right,{grad_start},{grad_end})"></span>
+    <span class="ld-swatch"
+      style="background:linear-gradient(to right,{grad_start},{grad_end})"></span>
     Section header: red = 0% complete &rarr; blue = 100% complete
   </span>
 </div>

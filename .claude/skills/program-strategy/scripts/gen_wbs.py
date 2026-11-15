@@ -149,6 +149,8 @@ DONE_STATUSES = ('live', 'released')
 
 def completion(section):
     feats = section['features']
+    if not feats:
+        return 0.0
     return sum(1 for item in feats if item['status'] in DONE_STATUSES) / len(feats)
 
 def body_tint(ratio):
@@ -417,7 +419,7 @@ body {
                 for feat in sec['features']
             )
             sec_parts.append(
-                f'<div class="sec" style="flex:{n};background:{css_tint(ratio)}">'
+                f'<div class="sec" style="flex:{max(n,1)};background:{css_tint(ratio)}">'
                 f'<div class="sec-hdr" style="background:{css_rgb(ratio)}">'
                 f'<span class="sec-lbl">{html_mod.escape(sec["label"])}</span>'
                 f'<span class="sec-pct">{ratio*100:.0f}%</span>'
