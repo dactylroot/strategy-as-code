@@ -687,6 +687,79 @@ def transform_renumber_sub_area(text: str, old: str, new: str) -> tuple[str, lis
     return text, [f"{old}.{n}" for n in changed]
 
 
+def _feature_codes_in(text: str, prefix: str) -> list[str]:
+    """The feature codes directly under sub-area `prefix`, in numeric order."""
+    nums = re.findall(rf"^\| {re.escape(prefix)}\.(\d+) \|", text, re.MULTILINE)
+    return [f"{prefix}.{n}" for n in sorted(int(x) for x in nums)]
+
+
+def _require_sub_area(text: str, prefix: str) -> None:
+    if not re.fullmatch(r"\d+\.\d+", prefix or ""):
+        raise ValueError(f"A sub-area code looks like 6.1, not {prefix!r}")
+    if not re.search(rf"^#### {re.escape(prefix)} ", text, re.MULTILINE):
+        raise ValueError(f"Sub-area {prefix!r} not found")
+
+
+def transform_move_features(text: str, wbs_list: list[str], target: str) -> tuple[str, dict[str, str]]:
+    """Move several features into sub-area `target` (any area). Each gets the next free code there, in
+    the order given. Returns the new text and `{old code: new code}`."""
+    _require_sub_area(text, target)
+    codes = list(dict.fromkeys(wbs_list))
+    if not codes:
+        raise ValueError("No features to move.")
+    for code in codes:
+        if not re.search(rf"^\| {re.escape(code)} \|", text, re.MULTILINE):
+            raise ValueError(f"Feature {code!r} not found")
+        if code.rsplit(".", 1)[0] == target:
+            raise ValueError(f"Feature {code} is already in sub-area {target}.")
+    mapping: dict[str, str] = {}
+    for code in codes:
+        text, moved = transform_move_feature(text, code, target)
+        mapping[code] = moved.wbs
+    return text, mapping
+
+
+def _scope_line(section: str, prefix: str) -> re.Match | None:
+    return re.search(rf"^[ \t]*-[^\n]*\(WBS {re.escape(prefix)}\)[~ \t🎆]*$\n?", section, re.MULTILINE)
+
+
+def transform_merge_sub_area(text: str, source: str, target: str, *, fold_scope: bool = False
+                             ) -> tuple[str, dict[str, str]]:
+    """Retire sub-area `source`: every feature in it moves to the existing sub-area `target` (in this or
+    another area) and the empty heading is removed. The Product Scope item tagged `(WBS source)` is
+    dropped, or with `fold_scope` its text is appended to the item for `target`. Returns the new text and
+    `{old code: new code}` so references elsewhere can follow."""
+    _require_sub_area(text, source)
+    _require_sub_area(text, target)
+    if source == target:
+        raise ValueError("A sub-area cannot be merged into itself.")
+    codes = _feature_codes_in(text, source)
+    mapping: dict[str, str] = {}
+    if codes:
+        text, mapping = transform_move_features(text, codes, target)
+    areas = structure_of(text)
+    for a in areas:
+        a["sub_areas"] = [s for s in a["sub_areas"] if s["prefix"] != source]
+    text = transform_structure(text, areas)
+
+    sm = re.search(r"(^## Product Scope\n)(.*?)(?=\n## |\Z)", text, re.DOTALL | re.MULTILINE)
+    if sm:
+        body = sm.group(2)
+        line = _scope_line(body, source)
+        if line:
+            if fold_scope:
+                src_text = line.group(0).replace("~~", "").replace("🎆", "")
+                src_text = re.sub(r"\s*\(WBS [\d.]+\)\s*$", "", src_text).lstrip(" \t-").strip()
+            body = body[:line.start()] + body[line.end():]
+            tl = _scope_line(body, target)
+            if fold_scope and tl and src_text:
+                raw = tl.group(0)
+                tag = re.search(rf"\s*\(WBS {re.escape(target)}\)", raw)
+                body = body[:tl.start()] + raw[:tag.start()].rstrip() + f"; {src_text}" + raw[tag.start():] + body[tl.end():]
+            text = text[:sm.start(2)] + body + text[sm.end(2):]
+    return text, mapping
+
+
 def structure_of(text: str) -> list[dict]:
     """The WBS skeleton in the shape `transform_structure` takes: every area and sub-area, in file order."""
     return [{"number": a.number, "title": a.title,

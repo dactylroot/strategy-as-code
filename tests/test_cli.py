@@ -324,3 +324,22 @@ def test_structure_commands_define_the_wbs_check_the_scope_summary_and_renumber(
     assert "#### 1.4 Reporting" in product and "| 1.4.1 | Export |" in product and "| 1.2.1 |" not in product
     assert main(base + ["structure", "check"]) == 1
     assert "no 1.2" in capsys.readouterr().err
+
+
+def test_structure_merge_and_move_carry_features_and_references_in_one_commit(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["structure", "area", "add", "Ops"]) == 0
+    assert main(base + ["structure", "sub", "add", "2", "Deploy"]) == 0
+    before = run_git(origin, ["rev-parse", "main"])
+    assert main(base + ["structure", "sub", "merge", "1.2", "--into", "2.1", "--dry-run"]) == 0
+    assert "dry run" in capsys.readouterr().out and run_git(origin, ["rev-parse", "main"]) == before
+    assert main(base + ["structure", "sub", "merge", "1.2", "--into", "1.2"]) == 1       # into itself
+    assert "itself" in capsys.readouterr().err
+    assert main(base + ["structure", "move", "1.1.1", "--into", "2.1"]) == 0
+    assert "1.1.1 -> 2.1.1" in capsys.readouterr().out
+    assert main(base + ["structure", "sub", "merge", "1.2", "--into", "2.1"]) == 0
+    out = capsys.readouterr().out
+    assert "1.2 removed" in out and "-> 2.1." in out
+    product = remote(origin, "PRODUCT.MD")
+    assert "#### 1.2 " not in product and "| 1.2.1 |" not in product
+    assert run_git(origin, ["log", "-1", "--format=%s", "main"]).startswith("WBS: sub-area 1.2 moved into 2.1")

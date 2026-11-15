@@ -127,6 +127,13 @@ def _pick_project(reg: Registry, key: str | None) -> str:
     raise CliError(f"several projects in the manifest; pass --project ({', '.join(reg.keys())})")
 
 
+def _merge_options(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--into", required=True, metavar="PREFIX", help="the sub-area that receives the features, e.g. 2.1")
+    p.add_argument("--fold-scope", action="store_true",
+                   help="append the retired sub-area's Product Scope item to the target's (default: drop it)")
+    p.add_argument("--dry-run", action="store_true", help="show what would change; write nothing")
+
+
 Edit = tuple[str, Callable[[str], str], bool]   # (planning file, text transform, must exist)
 
 
@@ -200,14 +207,21 @@ def build_parser() -> argparse.ArgumentParser:
     st = top.add_parser("structure", help="the first two WBS levels (areas and sub-areas) and the Product Scope summary of them").add_subparsers(dest="action", required=True)
     st.add_parser("show", help="list the areas and sub-areas with their feature counts")
     st.add_parser("check", help="report where Product Scope has drifted from the WBS; exit status 1 if it has")
-    sa = st.add_parser("area", help="add, rename or remove a WBS area").add_subparsers(dest="verb", required=True)
+    sa = st.add_parser("area", help="add, rename, remove or merge a WBS area").add_subparsers(dest="verb", required=True)
     x = sa.add_parser("add"); x.add_argument("title")
     x = sa.add_parser("rename"); x.add_argument("number", type=int); x.add_argument("title")
     x = sa.add_parser("remove"); x.add_argument("number", type=int)
-    ss = st.add_parser("sub", help="add, rename or remove a WBS sub-area").add_subparsers(dest="verb", required=True)
+    x = sa.add_parser("merge", help="retire an area: move all its features into one sub-area of another area, then remove it")
+    x.add_argument("number", type=int); _merge_options(x)
+    ss = st.add_parser("sub", help="add, rename, remove or merge a WBS sub-area").add_subparsers(dest="verb", required=True)
     x = ss.add_parser("add"); x.add_argument("area", type=int); x.add_argument("title")
     x = ss.add_parser("rename"); x.add_argument("prefix"); x.add_argument("title")
     x = ss.add_parser("remove"); x.add_argument("prefix")
+    x = ss.add_parser("merge", help="retire a sub-area: move all its features into another sub-area (any area), then remove it")
+    x.add_argument("prefix"); _merge_options(x)
+    x = st.add_parser("move", help="move chosen features into a sub-area (any area); they get new codes there")
+    x.add_argument("wbs", nargs="+"); x.add_argument("--into", required=True, metavar="PREFIX", help="the target sub-area, e.g. 2.1")
+    x.add_argument("--dry-run", action="store_true", help="show what would change; write nothing")
     x = st.add_parser("renumber", help="give a sub-area a new code in its area (6.3 -> 6.1); its features and the references to them follow")
     x.add_argument("old"); x.add_argument("new")
     top.add_parser("pr", help="open, or refresh, the pull request from the project's planning branch to its default branch")
@@ -533,6 +547,8 @@ def _run_structure(reg: Registry, key: str, actor: Actor, args: argparse.Namespa
         if found:
             raise CliError(f"{key}: Product Scope and the WBS have drifted ({len(found)}):\n  - " + "\n  - ".join(found))
         return f"{key}: Product Scope lines up with the WBS"
+    if args.action == "move" or (args.action in ("sub", "area") and args.verb == "merge"):
+        return _run_wbs_move(reg, key, actor, args)
     notes: list[str] = []
     edits: list[Edit]
     if args.action == "renumber":
@@ -594,6 +610,61 @@ def _run_structure(reg: Registry, key: str, actor: Actor, args: argparse.Namespa
     result = _apply(reg, key, edits, args.message or (lambda: summary), actor, args.chart)
     where = f"{result.branch} @ {result.sha[:7]}" if result.changed else "no change"
     return "\n".join([f"{key}: {summary} ({where})", *[f"  note: {n}" for n in notes]])
+
+
+def _run_wbs_move(reg: Registry, key: str, actor: Actor, args: argparse.Namespace) -> str:
+    """`structure sub merge`, `structure area merge`, `structure move`: one commit across PRODUCT, ABOUT and BUGS."""
+    from . import wbs_merge
+    spec = reg.get(key).spec
+    names = ("PRODUCT.MD", "ABOUT.MD", "BUGS.MD")
+
+    def compute(texts: list[str]) -> "wbs_merge.MoveResult":
+        try:
+            if args.action == "move":
+                return wbs_merge.move_features(*texts, args.wbs, args.into)
+            if args.action == "area":
+                return wbs_merge.merge_area(*texts, args.number, args.into, fold_scope=args.fold_scope)
+            return wbs_merge.merge_sub_area(*texts, args.prefix, args.into, fold_scope=args.fold_scope)
+        except ValueError as exc:
+            raise CliError(f"{key}: {exc}") from exc
+
+    def describe(r: "wbs_merge.MoveResult") -> str:
+        lines = [f"{old} -> {new}" for old, new in r.mapping.items()] or ["no features to move"]
+        if r.removed_sub_area:
+            lines.append(f"{r.removed_sub_area} removed")
+        if r.scope_item != "none":
+            lines.append(f"Product Scope item {r.scope_item}")
+        lines.append(f"{r.initiatives_updated} initiative reference(s) and {r.bugs_updated} bug(s) rewritten")
+        return "\n".join(f"  {x}" for x in lines)
+
+    if args.dry_run:
+        reg.refresh(key)
+        root = reg.get(key).path
+        texts = [(p.read_text(encoding="utf-8") if (p := root / spec.planning_file(n)).is_file() else "") for n in names]
+        r = compute(texts)
+        return "\n".join([f"{key}: dry run, nothing written", describe(r), *[f"  note: {n}" for n in r.notes]])
+
+    done: dict[str, "wbs_merge.MoveResult"] = {}
+
+    def fn(checkout: Path) -> None:
+        paths = [checkout / spec.planning_file(n) for n in names]
+        if not paths[0].is_file():
+            raise CliError(f"{key}: {spec.planning_file(names[0])} does not exist")
+        texts = [p.read_text(encoding="utf-8") if p.is_file() else "" for p in paths]
+        r = compute(texts)
+        for p, old, new in zip(paths, texts, (r.product, r.about, r.bugs)):
+            if p.is_file() and new != old:
+                p.write_text(new, encoding="utf-8")
+        if args.chart:
+            _run_chart(checkout / spec.planning_dir)
+        done["r"] = r
+
+    what = (f"features {', '.join(args.wbs)}" if args.action == "move"
+            else f"area {args.number}" if args.action == "area" else f"sub-area {args.prefix}")
+    result = edit(reg, key, fn, args.message or f"WBS: {what} moved into {args.into}", actor)
+    r = done["r"]
+    where = f"{result.branch} @ {result.sha[:7]}" if result.changed else "no change"
+    return "\n".join([f"{key}: {what} moved into {args.into} ({where})", describe(r), *[f"  note: {n}" for n in r.notes]])
 
 
 def _run_inbox(reg: Registry, key: str, actor: Actor, args: argparse.Namespace) -> str:

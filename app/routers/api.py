@@ -21,6 +21,7 @@ from ..parsers import product as product_parser
 from ..parsers import about as about_parser
 from ..parsers import bugs as bugs_parser
 from .. import wbs as wbs_module
+from .. import wbs_merge
 from .. import git_sync
 from ..program_write import program_write, refuse_when_scoped, request_email
 from ..template_env import templates
@@ -458,6 +459,69 @@ def put_wbs_structure(body: StructureUpdate, request: Request):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"ok": True}
+
+
+class WbsMoveBody(BaseModel):
+    """Merge sub-area `source` into `target`, or (with `wbs`) move just those features to `target`.
+    `area` retires a whole area into `target` instead."""
+    target: str
+    source: str | None = None
+    area: int | None = None
+    wbs: list[str] = []
+    fold_scope: bool = False
+
+
+def _wbs_move(body: WbsMoveBody, product: str, about: str, bugs: str) -> wbs_merge.MoveResult:
+    try:
+        if body.wbs:
+            return wbs_merge.move_features(product, about, bugs, body.wbs, body.target)
+        if body.area is not None:
+            return wbs_merge.merge_area(product, about, bugs, body.area, body.target, fold_scope=body.fold_scope)
+        if body.source:
+            return wbs_merge.merge_sub_area(product, about, bugs, body.source, body.target, fold_scope=body.fold_scope)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    raise HTTPException(status_code=400, detail="Say what to move: `source`, `area` or `wbs`.")
+
+
+def _read_optional(path: Path) -> str:
+    return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+@router.post("/structure/wbs/preview")
+def preview_wbs_move(body: WbsMoveBody, request: Request):
+    """What a merge or move would do (new codes, references rewritten, scope item), writing nothing."""
+    s = _session(request)
+    if s:
+        files = (s.get_file("PRODUCT.MD"), s.get_file("ABOUT.MD"), s.get_file("BUGS.MD"))
+    else:
+        files = (settings.product_md.read_text(encoding="utf-8"), _read_optional(settings.about_md),
+                 _read_optional(settings.bugs_md))
+    return _wbs_move(body, *files).report()
+
+
+@router.post("/structure/wbs/move")
+@program_write("WBS restructured: features moved")
+def move_wbs(body: WbsMoveBody, request: Request):
+    """Merge a sub-area (or area) into another sub-area, or move chosen features there. The features get
+    new codes in the target, and initiatives and bugs that cite them follow."""
+    s = _session(request)
+    if s:
+        result = _wbs_move(body, s.get_file("PRODUCT.MD"), s.get_file("ABOUT.MD"), s.get_file("BUGS.MD"))
+        s.set_file("PRODUCT.MD", result.product)
+        if result.about:
+            s.set_file("ABOUT.MD", result.about)
+        if result.bugs:
+            s.set_file("BUGS.MD", result.bugs)
+        return {"ok": True, **result.report(), "updated": {"product_md": result.product}}
+    paths = [settings.product_md, settings.about_md, settings.bugs_md]
+    locks = [product_parser._lock_for(pth) for pth in paths]
+    with locks[0], locks[1], locks[2]:
+        result = _wbs_move(body, *(_read_optional(pth) for pth in paths))
+        for pth, new in zip(paths, (result.product, result.about, result.bugs)):
+            if pth.exists() and new != pth.read_text(encoding="utf-8"):
+                product_parser._atomic_write(pth, new)
+    return {"ok": True, **result.report()}
 
 
 @router.put("/structure/scope")

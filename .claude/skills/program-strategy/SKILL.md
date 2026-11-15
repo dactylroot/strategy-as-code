@@ -99,6 +99,9 @@ $S structure check                      # where Product Scope has drifted from t
 $S structure area add "Title"           # next free area number; also: area rename N "Title", area remove N
 $S structure sub add 2 "Title"          # next free sub-area code in area 2; also: sub rename 2.1 "Title", sub remove 2.1
 $S structure renumber 6.3 6.1           # close a gap: the sub-area, its features, and this project's initiative and bug refs follow
+$S structure sub merge 1.2 --into 2.1   # retire a sub-area: all its features move to 2.1 (any area), heading removed; add --dry-run to preview, --fold-scope to keep its Product Scope text
+$S structure area merge 3 --into 1.1    # retire a whole area into one sub-area of another area
+$S structure move 1.2.1 1.2.3 --into 2.1  # move chosen features to a sub-area (several at once; new codes there)
 $S bug add "Short title" --severity high --notes "..." --wbs 1.2.3
 $S bug status 12 resolved --fix 0.4.2   # open | investigating | resolved
 $S bug close  12 --resolved-in 0.4.2    # only after UAT confirms the fix
@@ -108,6 +111,7 @@ $S bug close  12 --resolved-in 0.4.2    # only after UAT confirms the fix
 - The commit author is read from `$STRATEGY_ACTOR` (`Name <email>`) or git `user.name`/`user.email`.
 - The CLI needs the strategy-as-code requirements installed; if it fails with an import error, point `STRATEGY_PYTHON` at a Python that has them.
 - After a CLI write the working-tree copy of the file is stale (the change lives on the planning branch until it is merged). Do not re-read it as current state or "fix" it by hand; read the planning branch (`git fetch`, then `git show <branch>:PRODUCT.MD`) or the web UI.
+- To remove a sub-area or area that still holds features, use `structure sub merge` / `structure area merge` (not hand-moving features one by one): features, this project's initiative bullets and bug refs, and the Product Scope item all follow in one commit. The Structure page does the same (*Merge into…*, tick-and-move, or drag onto another sub-area) and previews the new codes first. Run `--dry-run` first and relay its notes.
 - `feature move` prints notes about references it cannot update (other mentions of the old code in notes or Known Gaps, and initiatives in other projects or the manifest that cite `key:old`). Relay those to the user.
 - The CLI covers program initiatives (`$S initiative ...`, below) and the WBS structure (`$S structure ...`) but not ABOUT.MD (roadmap and changelog) or the prose sections (summary, users, scope summary, workflows). Edit the Product Scope text directly (it is prose) but keep it aligned with the WBS as described under PRODUCT.MD. Make those edits directly, say that you did, and expect to reconcile them with the planning branch. Never edit the `## Initiatives` section of `PROGRAM.MD` by hand; use `$S initiative`.
 - User submissions wait as files under `.planning/inbox/` and are triaged with `$S inbox list`, `inbox promote <id> [--prefix 1.2]`, `inbox decline <id> --reason "..."`, `inbox duplicate <id> --of <ref>` and `inbox sweep`. Promote and decline only when the user asks you to triage; never edit those files by hand. An item of type `initiative` is a planning task from the program (see Program initiatives): `inbox promote` refuses it; resolve it with `inbox breakout` or `inbox decline`.
