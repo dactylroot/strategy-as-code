@@ -203,9 +203,9 @@
     <div class="str-modal-header"><h3 id="wbs-move-title"></h3><button class="str-modal-close" onclick="closeWbsMove()">✕</button></div>
     <div id="wbs-move-body" class="str-modal-body"></div>
     <div class="str-modal-footer">
-      <span class="modal-hint" style="margin:0">Applied at once as its own change; codes of moved features change.</span>
-      <span><button class="btn btn-ghost btn-sm" onclick="closeWbsMove()">Cancel</button>
-      <button id="wbs-move-go" class="btn btn-primary btn-sm" disabled onclick="confirmWbsMove()">Move and remove</button></span>
+      <span class="modal-hint" style="margin:0;flex:1;min-width:0">Applied at once as its own change; codes of moved features change.</span>
+      <span style="display:flex;gap:0.5rem;flex-shrink:0;margin-left:1rem"><button class="btn btn-ghost btn-sm" onclick="closeWbsMove()">Cancel</button>
+      <button id="wbs-move-go" style="min-width:9.5rem;white-space:nowrap" class="btn btn-primary btn-sm" disabled onclick="confirmWbsMove()">Move and remove</button></span>
     </div>
   </div>
 </div>
@@ -495,7 +495,6 @@ function renderWbs() {
         <input class="wbs-title" type="text" value="${esc(s.title)}" maxlength="120" placeholder="Sub-area name…" aria-label="Sub-area name"
                oninput="_wbs[${ai}].sub_areas[${si}].title=this.value;_wbsDirtyNow()">
         <span class="wbs-count">${n}</span>
-        ${saved ? `<button class="wbs-btn move" title="Move this sub-area, with its features, under another area" onclick="openWbsMove({kind:'toarea',source:'${s.prefix}'})">⇄ Area</button>` : ''}
         <button class="wbs-btn" title="Move up" ${si===0?'disabled':''} onclick="wbsMoveSub(${ai},${si},-1)">↑</button>
         <button class="wbs-btn" title="Move down" ${si===subs-1?'disabled':''} onclick="wbsMoveSub(${ai},${si},1)">↓</button>
         <button class="wbs-btn" title="${lock}" onclick="wbsRemoveSub(${ai},${si})">✕</button></div>${feats}</div>`;
