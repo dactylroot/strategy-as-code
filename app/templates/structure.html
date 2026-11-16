@@ -491,7 +491,7 @@ function renderWbs() {
       const open = saved && _wbsOpen.has(s.prefix);
       const toggle = saved && s.count ? `<button class="wbs-btn" title="${open?'Hide':'Show'} its features" onclick="wbsToggle('${s.prefix}')">${open?'▾':'▸'}</button>` : '';
       const feats = open ? _featsHtml(s) : '';
-      return `<div class="wbs-subbox" ${saved?`data-prefix="${s.prefix}" ondragover="wbsDragOver(event,this)" ondragleave="wbsDragLeave(event,this)" ondrop="wbsDrop(event,this)"`:''}><div class="wbs-row wbs-sub">${saved && s.count ? `<span class="wbs-grip" title="Drag onto another sub-area to merge into it" draggable="true" ondragstart="wbsDrag(event,'s:${s.prefix}')" ondragend="wbsDragEnd()">⠿</span>` : ''}${toggle}${c}
+      return `<div class="wbs-subbox" ${saved?`data-prefix="${s.prefix}" ondragover="wbsDragOver(event,this)" ondragleave="wbsDragLeave(event,this)" ondrop="wbsDrop(event,this)"`:''}><div class="wbs-row wbs-sub">${saved ? `<span class="wbs-grip" title="Drag onto another sub-area to merge into it" draggable="true" ondragstart="wbsDrag(event,'s:${s.prefix}')" ondragend="wbsDragEnd()">⠿</span>` : ''}${toggle}${c}
         <input class="wbs-title" type="text" value="${esc(s.title)}" maxlength="120" placeholder="Sub-area name…" aria-label="Sub-area name"
                oninput="_wbs[${ai}].sub_areas[${si}].title=this.value;_wbsDirtyNow()">
         <span class="wbs-count">${n}</span>
