@@ -1,7 +1,8 @@
 import json
 import re
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from ..config import settings, full
 from ..manifest import normalize_name
@@ -147,6 +148,32 @@ def registry_redirect(request: Request):
     # Registry page was folded into the Feature Registry section at the
     # bottom of the Summary/Dashboard page - keep old links working.
     return RedirectResponse(url=full("/dashboard"))
+
+
+def _wbs_chart(request: Request) -> dict[str, bytes]:
+    """The WBS chart drawn from the current PRODUCT.MD (the session's copy in session mode)."""
+    from .. import wbs as wbs_module
+    s = _get_session(request)
+    if s is not None:
+        text = s.files.get("PRODUCT.MD", "")
+    elif settings.product_md.exists():
+        text = settings.product_md.read_text(encoding="utf-8")
+    else:
+        raise HTTPException(status_code=404, detail="No PRODUCT.MD")
+    try:
+        return wbs_module.render(text, settings.project_dir.name)
+    except (FileNotFoundError, RuntimeError) as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/wbs.png", include_in_schema=False)
+def wbs_chart_png(request: Request):
+    return Response(_wbs_chart(request)["png"], media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+@router.get("/wbs.html", include_in_schema=False, response_class=HTMLResponse)
+def wbs_chart_html(request: Request):
+    return HTMLResponse(_wbs_chart(request)["html"].decode("utf-8"), headers={"Cache-Control": "no-cache"})
 
 
 @router.get("/product", response_class=HTMLResponse)

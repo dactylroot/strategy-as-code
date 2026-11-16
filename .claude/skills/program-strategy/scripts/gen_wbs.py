@@ -68,6 +68,7 @@ CMAP = LinearSegmentedColormap.from_list('RdBl', ['#b91c1c', '#1e40af'])
 
 # ── DATA (parsed from PRODUCT.MD) ────────────────────────────────────────────
 PRODUCT_MD = os.path.join(PROJECT_DIR, 'PRODUCT.MD')
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 def get_product_title(path):
     """Derive the project title the same way the UI does (app/config.py
