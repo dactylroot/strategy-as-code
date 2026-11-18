@@ -176,6 +176,18 @@ def transform_add_to_initiative(text: str, name: str, kind: str, codes: list[str
     return transform_update_initiatives(text, updates)
 
 
+def transform_remove_from_initiative(text: str, name: str, code: str) -> str:
+    """Take `code` out of the initiative called `name`. The initiative stays, even if it ends up empty."""
+    updates = [InitiativeUpdate(name=i.name, kind=i.kind, wbs=list(i.items)) for i in _parse_text(text).initiatives]
+    hit = next((u for u in updates if normalize_name(u.name) == normalize_name(name)), None)
+    if hit is None:
+        raise ValueError(f"No initiative called {name!r}")
+    if code not in hit.wbs:
+        raise ValueError(f"{code} is not in initiative {hit.name!r}")
+    hit.wbs.remove(code)
+    return transform_update_initiatives(text, updates)
+
+
 def transform_rewrite_wbs_refs(text: str, old: str, new: str) -> str:
     """Point initiative members at a feature's new WBS code after a move.
 

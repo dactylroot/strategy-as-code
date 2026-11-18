@@ -397,3 +397,44 @@ def test_reinstate_undoes_a_decline(manifest, origin, capsys):
     cells = [c.strip() for c in row.split("|")]
     assert cells[3] == "Idea" and cells[6].startswith("Reinstated (") and "Covered by 1.1.1" in cells[6]
     assert main(base + ["feature", "reinstate", "1.1.2"]) == 1
+
+
+def test_feature_rename_keeps_code_and_other_cells(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["feature", "rename", "1.1.1", "Single Sign-On"]) == 0
+    assert "feature 1.1.1 renamed: Single Sign-On" in capsys.readouterr().out
+    row = next(l for l in remote(origin, "PRODUCT.MD").splitlines() if l.startswith("| 1.1.1 |"))
+    cells = [c.strip() for c in row.split("|")]
+    assert cells[2] == "Single Sign-On" and cells[3] == "Live" and cells[4] == "8" and "Ada" in row
+
+
+def test_feature_rename_rejects_pipe_and_unknown(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    before = run_git(origin, ["rev-parse", "main"])
+    assert main(base + ["feature", "rename", "1.1.1", "A | B"]) == 1
+    assert main(base + ["feature", "rename", "9.9.9", "Nope"]) == 1
+    assert run_git(origin, ["rev-parse", "main"]) == before
+
+
+def test_feature_initiative_add_create_and_remove(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["feature", "initiative", "1.2.1", "auth push"]) == 0   # existing, matched ignoring case
+    about = remote(origin, "ABOUT.MD")
+    assert "### Auth Push (Major)" in about and "- 1.2.1" in about and "- other:1.1.1" in about
+    assert main(base + ["feature", "initiative", "1.2.1", "Reporting Pack", "--major"]) == 0
+    out = capsys.readouterr().out
+    assert "also listed under: Auth Push" in out
+    assert "### Reporting Pack (Major)" in remote(origin, "ABOUT.MD")
+    assert main(base + ["feature", "initiative", "1.2.1", "Auth Push", "--remove"]) == 0
+    about = remote(origin, "ABOUT.MD")
+    auth = about.split("### Auth Push")[1].split("###")[0]
+    assert "1.2.1" not in auth and "1.1.1" in auth
+
+
+def test_feature_initiative_unknown_feature_or_membership(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    before = run_git(origin, ["rev-parse", "main"])
+    assert main(base + ["feature", "initiative", "9.9.9", "Auth Push"]) == 1
+    assert main(base + ["feature", "initiative", "1.2.1", "Auth Push", "--remove"]) == 1
+    assert main(base + ["feature", "initiative", "1.2.1", "Nope", "--remove"]) == 1
+    assert run_git(origin, ["rev-parse", "main"]) == before

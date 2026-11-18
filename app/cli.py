@@ -5,6 +5,8 @@
     strategy feature score  3.1.1 8 [3]
     strategy feature add    3.1 "Feature name" [--status idea] [--value 8] [--effort 3] [--notes ...]
     strategy feature move   3.1.1 4.2
+    strategy feature rename 3.1.1 "New name"
+    strategy feature initiative 3.1.1 "Search Overhaul" [--major] [--remove]
     strategy bug add "Login times out" --severity high
     strategy bug status 12 resolved --fix 0.4.2
     strategy bug close  12 --resolved-in 0.4.2
@@ -199,6 +201,14 @@ def build_parser() -> argparse.ArgumentParser:
     fm = feature.add_parser("move", help="move a feature to another sub-area (it gets a new WBS code)")
     fm.add_argument("wbs"); fm.add_argument("target_prefix")
     n = feature.add_parser("notes"); n.add_argument("wbs"); n.add_argument("text")
+    rn = feature.add_parser("rename", help="change a feature's name; its WBS code and everything that cites the code are untouched")
+    rn.add_argument("wbs"); rn.add_argument("name")
+    fi = feature.add_parser("initiative", help="list a feature under an initiative in ABOUT.MD (created if missing); --remove takes it out")
+    fi.add_argument("wbs"); fi.add_argument("name", help="initiative name")
+    fi.add_argument("--minor", dest="kind", action="store_const", const="minor", default="minor",
+                    help="size of the initiative if it has to be created (default)")
+    fi.add_argument("--major", dest="kind", action="store_const", const="major", help="create it as Major if it does not exist")
+    fi.add_argument("--remove", action="store_true", help="take the feature out of the initiative instead")
     dc = feature.add_parser("decline", help="retire a feature: nothing to build; kept in the table, out of every progress count")
     dc.add_argument("wbs"); dc.add_argument("--reason", required=True, help="why, and what covers it instead (becomes the start of its notes)")
     ri = feature.add_parser("reinstate", help="undo a decline: back to Idea, unscored; the decline reason stays in the notes")
@@ -492,6 +502,34 @@ def run(args: argparse.Namespace) -> str:
         elif args.action == "notes":
             edits = [("PRODUCT.MD", lambda t: product_parser.transform_feature_notes(t, args.wbs, args.text), True)]
             summary = f"feature {args.wbs} notes updated"
+        elif args.action == "rename":
+            _check_text("feature name", args.name, single_line=True)
+            new_name = args.name.strip()
+            if not new_name:
+                raise CliError("feature name cannot be empty")
+            edits = [("PRODUCT.MD", lambda t: product_parser.transform_feature_name(t, args.wbs, new_name), True)]
+            summary = f"feature {args.wbs} renamed: {new_name}"
+        elif args.action == "initiative":
+            def check_exists(text: str) -> str:
+                if product_parser.get_feature_status(text, args.wbs) is None:
+                    raise CliError(f"{key}: no feature {args.wbs} in PRODUCT.MD")
+                return text
+
+            def assign(text: str) -> str:
+                same = about_parser.normalize_name
+                others = [i.name for i in about_parser._parse_text(text).initiatives
+                          if args.wbs in i.items and same(i.name) != same(args.name)]
+                notes[:] = [f"{args.wbs} is also listed under: {', '.join(others)}"] if others and not args.remove else []
+                if args.remove:
+                    try:
+                        return about_parser.transform_remove_from_initiative(text, args.name, args.wbs)
+                    except ValueError as e:
+                        raise CliError(str(e))
+                return about_parser.transform_add_to_initiative(text, args.name, args.kind, [args.wbs])
+
+            edits = [("PRODUCT.MD", check_exists, True), ("ABOUT.MD", assign, True)]
+            summary = (f"feature {args.wbs} removed from initiative {args.name}" if args.remove
+                       else f"feature {args.wbs} added to initiative {args.name}")
         elif args.action == "decline":
             _check_text("reason", args.reason)
             today = date.today().isoformat()
