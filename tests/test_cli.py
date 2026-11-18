@@ -386,3 +386,14 @@ def test_find_manifest_finds_program_planning_clone_beside_projects(tmp_path):
     (tmp_path / "program-planning" / "PROGRAM.MD").write_text("x")
     (tmp_path / "hub").mkdir()
     assert find_manifest(None, tmp_path / "hub") == tmp_path / "program-planning" / "PROGRAM.MD"
+
+
+def test_reinstate_undoes_a_decline(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["feature", "decline", "1.1.2", "--reason", "Covered by 1.1.1"]) == 0
+    assert main(base + ["feature", "reinstate", "1.1.2"]) == 0
+    assert "feature 1.1.2 reinstated" in capsys.readouterr().out
+    row = next(l for l in remote(origin, "PRODUCT.MD").splitlines() if l.startswith("| 1.1.2 |"))
+    cells = [c.strip() for c in row.split("|")]
+    assert cells[3] == "Idea" and cells[6].startswith("Reinstated (") and "Covered by 1.1.1" in cells[6]
+    assert main(base + ["feature", "reinstate", "1.1.2"]) == 1

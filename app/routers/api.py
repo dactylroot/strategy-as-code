@@ -2,6 +2,7 @@ from __future__ import annotations
 import io
 import re
 import zipfile
+from datetime import date
 import tempfile
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
@@ -154,26 +155,39 @@ def move_feature(wbs: str, body: MoveFeatureBody, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/features/{wbs:path}")
-@program_write("feature {wbs} deleted")
-def delete_feature(wbs: str, request: Request):
+class DeclineFeatureBody(BaseModel):
+    reason: str
+
+
+def _edit_product(request: Request, fn):
+    """Apply `fn(text) -> text` to PRODUCT.MD (the session's copy or the file); a ValueError is a 400 or 404."""
     s = _session(request)
     try:
         if s:
-            text = product_parser.transform_delete_feature(s.get_file("PRODUCT.MD"), wbs)
+            text = fn(s.get_file("PRODUCT.MD"))
             s.set_file("PRODUCT.MD", text)
-            updated = {"product_md": text}
-        else:
-            lock = product_parser._lock_for(settings.product_md)
-            with lock:
-                text = product_parser.transform_delete_feature(
-                    settings.product_md.read_text(encoding="utf-8"), wbs
-                )
-                product_parser._atomic_write(settings.product_md, text)
-            updated = {}
+            return {"ok": True, "product_md": text}
+        lock = product_parser._lock_for(settings.product_md)
+        with lock:
+            text = fn(settings.product_md.read_text(encoding="utf-8"))
+            product_parser._atomic_write(settings.product_md, text)
+        return {"ok": True}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    return {"ok": True, **updated}
+        raise HTTPException(status_code=404 if "not found" in str(e) else 400, detail=str(e))
+
+
+@router.post("/features/{wbs:path}/decline")
+@program_write("feature {wbs} declined")
+def decline_feature(wbs: str, body: DeclineFeatureBody, request: Request):
+    today = date.today().isoformat()
+    return _edit_product(request, lambda t: product_parser.transform_decline_feature(t, wbs, body.reason, today))
+
+
+@router.post("/features/{wbs:path}/reinstate")
+@program_write("feature {wbs} reinstated")
+def reinstate_feature(wbs: str, request: Request):
+    today = date.today().isoformat()
+    return _edit_product(request, lambda t: product_parser.transform_reinstate_feature(t, wbs, today))
 
 
 @router.post("/features")

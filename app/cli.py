@@ -201,6 +201,8 @@ def build_parser() -> argparse.ArgumentParser:
     n = feature.add_parser("notes"); n.add_argument("wbs"); n.add_argument("text")
     dc = feature.add_parser("decline", help="retire a feature: nothing to build; kept in the table, out of every progress count")
     dc.add_argument("wbs"); dc.add_argument("--reason", required=True, help="why, and what covers it instead (becomes the start of its notes)")
+    ri = feature.add_parser("reinstate", help="undo a decline: back to Idea, unscored; the decline reason stays in the notes")
+    ri.add_argument("wbs")
     sc = feature.add_parser("score"); sc.add_argument("wbs"); sc.add_argument("value", type=_score_arg, help="1-10, or '' / '-' to clear")
     sc.add_argument("effort", type=_score_arg, nargs="?", help="1-10, or '' / '-' to clear")
 
@@ -492,15 +494,13 @@ def run(args: argparse.Namespace) -> str:
             summary = f"feature {args.wbs} notes updated"
         elif args.action == "decline":
             _check_text("reason", args.reason)
-            reason = args.reason.strip().rstrip(".")
-            note = f"Declined ({date.today().isoformat()}): {reason}."
-            def _decline(t, wbs=args.wbs):
-                t = product_parser.transform_feature_status(t, wbs, FeatureStatus.declined)
-                t = product_parser.transform_feature_score(t, wbs, None, None)
-                old = next((f.notes for f in product_parser._parse_text(t).all_features if f.wbs == wbs), "")
-                return product_parser.transform_feature_notes(t, wbs, f"{note} {old}".strip())
-            edits = [("PRODUCT.MD", _decline, True)]
+            today = date.today().isoformat()
+            edits = [("PRODUCT.MD", lambda t: product_parser.transform_decline_feature(t, args.wbs, args.reason, today), True)]
             summary = f"feature {args.wbs} declined"
+        elif args.action == "reinstate":
+            today = date.today().isoformat()
+            edits = [("PRODUCT.MD", lambda t: product_parser.transform_reinstate_feature(t, args.wbs, today), True)]
+            summary = f"feature {args.wbs} reinstated"
         elif args.action == "score":
             edits = [("PRODUCT.MD", lambda t: product_parser.transform_feature_score(t, args.wbs, args.value, args.effort), True)]
             summary = f"feature {args.wbs} score {args.value}/{args.effort if args.effort is not None else '-'}"

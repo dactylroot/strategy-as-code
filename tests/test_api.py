@@ -380,3 +380,48 @@ def test_inline_markdown_escapes_html_and_renders_bold():
     out = str(_inline_markdown("reads **Accounts** and <script>x</script> via `api`"))
     assert "<strong>Accounts</strong>" in out and "<code>api</code>" in out
     assert "<script>" not in out and "&lt;script&gt;" in out
+
+
+class TestDeclineAndReinstate:
+    def _row(self, client, wbs):
+        data = client.get("/api/product").json()
+        return next(f for a in data["wbs_areas"] for sa in a["sub_areas"] for f in sa["features"] if f["wbs"] == wbs)
+
+    def test_decline_then_reinstate_round_trip(self, client):
+        client.patch("/api/features/1.1.2", json={"value": 8, "effort": 5})
+        r = client.post("/api/features/1.1.2/decline", json={"reason": "Covered by 1.1.1."})
+        assert r.status_code == 200
+        row = self._row(client, "1.1.2")
+        assert row["status"] == "Declined" and row["value"] is None and row["effort"] is None
+        assert row["notes"].startswith("Declined (") and "Covered by 1.1.1." in row["notes"]
+        r = client.post("/api/features/1.1.2/reinstate")
+        assert r.status_code == 200
+        row = self._row(client, "1.1.2")
+        assert row["status"] == "Idea" and row["value"] is None
+        assert row["notes"].startswith("Reinstated (") and "Covered by 1.1.1." in row["notes"]
+
+    def test_decline_needs_a_reason_and_an_existing_feature(self, client):
+        assert client.post("/api/features/1.1.2/decline", json={"reason": "  "}).status_code == 400
+        assert client.post("/api/features/1.1.2/decline", json={"reason": "a | b"}).status_code == 400
+        assert client.post("/api/features/9.9.9/decline", json={"reason": "x"}).status_code == 404
+
+    def test_decline_twice_and_reinstate_of_a_live_feature_are_refused(self, client):
+        assert client.post("/api/features/1.1.2/decline", json={"reason": "x"}).status_code == 200
+        assert client.post("/api/features/1.1.2/decline", json={"reason": "y"}).status_code == 400
+        assert client.post("/api/features/1.1.2/reinstate").status_code == 200
+        assert client.post("/api/features/1.1.2/reinstate").status_code == 400
+
+    def test_delete_route_is_retired(self, client):
+        assert client.delete("/api/features/1.1.2").status_code in (404, 405)
+        assert self._row(client, "1.1.2")["wbs"] == "1.1.2"
+
+
+class TestDeclinedRendering:
+    def test_features_page_shows_a_declined_row_as_a_badge_without_a_status_select(self, client):
+        client.post("/api/features/1.1.2/decline", json={"reason": "Covered by 1.1.1"})
+        panel = client.get("/features").text
+        assert "Reinstate Feature" in panel and "Decline Feature" in panel and "Delete Feature" not in panel
+        html = client.get("/dashboard").text
+        row = html[html.index('data-wbs="1.1.2"'):]
+        row = row[:row.index("</tr>")]
+        assert 'data-stage="Declined"' in row and "status-select" not in row

@@ -502,20 +502,38 @@ def transform_add_feature(text: str, req: NewFeature, *, created_at: str | None 
     )
 
 
-def transform_delete_feature(text: str, wbs: str) -> str:
-    text = _normalize_corrupted_rows(text)
-    row_pat = re.compile(rf"^\| {re.escape(wbs)} \|[^\n]+\|$\n?", re.MULTILINE)
-    new_text, n = row_pat.subn("", text)
-    if n == 0:
+def transform_decline_feature(text: str, wbs: str, reason: str, today: str) -> str:
+    """Retire a feature: status Declined, Value and Effort cleared, and "Declined (date): reason." leads its notes.
+    The row stays, so its code, its initiative and bug references and its reason are kept."""
+    reason = reason.strip().rstrip(".").strip()
+    if not reason:
+        raise ValueError("A reason is required to decline a feature")
+    if "|" in reason:
+        raise ValueError("Reason cannot contain '|'")
+    feature = next((f for f in _parse_text(text).all_features if f.wbs == wbs), None)
+    if feature is None:
         raise ValueError(f"Feature {wbs!r} not found")
-    return re.sub(r"\n{3,}", "\n\n", new_text)
+    if feature.status == FeatureStatus.declined:
+        raise ValueError(f"Feature {wbs} is already declined")
+    text = transform_feature_status(text, wbs, FeatureStatus.declined)
+    text = transform_feature_score(text, wbs, None, None)
+    return transform_feature_notes(text, wbs, f"Declined ({today}): {reason}. {feature.notes}".strip())
 
 
-def delete_feature(path: Path, wbs: str) -> None:
-    lock = _lock_for(path)
-    with lock:
-        text = path.read_text(encoding="utf-8")
-        _atomic_write(path, transform_delete_feature(text, wbs))
+_DECLINED_PREFIX = re.compile(r"^Declined \((\d{4}-\d{2}-\d{2})\):")
+
+
+def transform_reinstate_feature(text: str, wbs: str, today: str) -> str:
+    """Undo a decline: back to Idea (Value and Effort stay blank, to be scored again). The decline reason stays in the
+    notes as history: "Declined (d):" becomes "Reinstated (today), declined d:"."""
+    feature = next((f for f in _parse_text(text).all_features if f.wbs == wbs), None)
+    if feature is None:
+        raise ValueError(f"Feature {wbs!r} not found")
+    if feature.status != FeatureStatus.declined:
+        raise ValueError(f"Feature {wbs} is not declined")
+    text = transform_feature_status(text, wbs, FeatureStatus.idea)
+    notes = _DECLINED_PREFIX.sub(lambda m: f"Reinstated ({today}), declined {m.group(1)}:", feature.notes.strip())
+    return transform_feature_notes(text, wbs, notes)
 
 
 def transform_move_feature(text: str, wbs: str, target_prefix: str) -> tuple[str, Feature]:
