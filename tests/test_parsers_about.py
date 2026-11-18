@@ -198,6 +198,55 @@ class TestTransformUpdateInitiatives:
 
 
 
+BARE_ABOUT = """# About Something
+
+Intro prose.
+
+## Initiatives
+
+### Alpha (Major)
+- 1.1.1
+- 1.1.2
+
+### Beta (Minor)
+- 2.1.1
+
+## Backlog
+- 3.1.1 Later
+"""
+
+
+class TestNoRoadmapHeading:
+    """A file with `## Initiatives` and `## Backlog` straight under its title (Account Insights) reads and rewrites like one with `# Roadmap`."""
+
+    def test_reads_initiatives_and_backlog(self):
+        doc = parser._parse_text(BARE_ABOUT)
+        assert [(i.name, i.kind, i.items) for i in doc.initiatives] == [
+            ("Alpha", "major", ["1.1.1", "1.1.2"]), ("Beta", "minor", ["2.1.1"])]
+        assert doc.roadmap_section("Backlog").items == ["3.1.1 Later"]
+        assert doc.roadmap_section("Initiatives") is None
+
+    def test_add_keeps_the_other_initiatives(self):
+        out = parser.transform_add_to_initiative(BARE_ABOUT, "Gamma", "minor", ["4.1.1"])
+        doc = parser._parse_text(out)
+        assert [i.name for i in doc.initiatives] == ["Alpha", "Beta", "Gamma"]
+        out = parser.transform_add_to_initiative(out, "Gamma", "minor", ["4.1.2"])
+        assert parser._parse_text(out).initiatives[2].items == ["4.1.1", "4.1.2"]
+        assert "3.1.1 Later" in out
+
+    def test_remove_keeps_the_other_initiatives(self):
+        out = parser.transform_remove_from_initiative(BARE_ABOUT, "Alpha", "1.1.2")
+        assert [(i.name, i.items) for i in parser._parse_text(out).initiatives] == [("Alpha", ["1.1.1"]), ("Beta", ["2.1.1"])]
+
+    def test_refuses_to_rewrite_initiatives_it_cannot_read(self, monkeypatch):
+        import pytest
+        monkeypatch.setattr(parser, "_parse_initiatives", lambda body: [])
+        with pytest.raises(ValueError, match="could not be read"):
+            parser.transform_add_to_initiative(BARE_ABOUT, "Gamma", "minor", ["4.1.1"])
+        with pytest.raises(ValueError, match="could not be read"):
+            parser.transform_remove_from_initiative(BARE_ABOUT, "Alpha", "1.1.1")
+
+
 def test_rewrite_wbs_refs_only_touches_initiative_items():
     text = ("# Roadmap\n\n## Initiatives\n\n### A (Major)\n- 1.2.2\n- prog:1.2.2\n- 1.2.20\n\n"
             "## Backlog\n- 1.2.2 later\n")

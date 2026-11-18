@@ -69,12 +69,19 @@ def _parse_text(text: str) -> AboutDoc:
         ))
 
     # Parse roadmap sections
-    roadmap_text = top_sections.get("Roadmap", "")
+    roadmap_text = top_sections.get("Roadmap")
+    # A file with no `# Roadmap` heading (Account Insights' ABOUT.MD keeps `## Initiatives` and `## Backlog` straight under its
+    # title) still has them: read those two sections wherever they sit, outside the changelog.
+    bare = roadmap_text is None
+    if bare:
+        roadmap_text = "\n".join(body for name, body in top_sections.items() if name != "Changelog") if top_sections else text
     initiatives: list[Initiative] = []
     # Skip any preamble before first ## heading
     for sm in re.finditer(r"\n## ([^\n]+)\n(.*?)(?=\n## |\Z)", "\n" + roadmap_text, re.DOTALL):
         name = sm.group(1).strip()
         body = sm.group(2)
+        if bare and name not in ("Initiatives", "Backlog"):
+            continue
         if name == "Initiatives":
             initiatives = _parse_initiatives(body)
         else:
@@ -164,9 +171,20 @@ def transform_update_initiatives(text: str, initiatives: list[InitiativeUpdate])
 
 
 
+def _unreadable_initiatives(text: str) -> bool:
+    """True when the file has `### ` initiative headings under `## Initiatives` that the parser did not read back, so rewriting the
+    section from the parsed list would delete them."""
+    m = re.search(r"(?:^|\n)## Initiatives\n(.*?)(?=\n## |\n# |\Z)", text, flags=re.DOTALL)
+    if not m:
+        return False
+    return len(re.findall(r"^### ", m.group(1), flags=re.MULTILINE)) != len(_parse_text(text).initiatives)
+
+
 def transform_add_to_initiative(text: str, name: str, kind: str, codes: list[str]) -> str:
     """List `codes` under the initiative called `name` (matched ignoring case and spacing), creating it with
     `kind` when the roadmap has none. Other initiatives and their members are kept."""
+    if _unreadable_initiatives(text):
+        raise ValueError("ABOUT.MD has initiatives that could not be read; refusing to rewrite the section")
     updates = [InitiativeUpdate(name=i.name, kind=i.kind, wbs=list(i.items)) for i in _parse_text(text).initiatives]
     hit = next((u for u in updates if normalize_name(u.name) == normalize_name(name)), None)
     if hit is None:
@@ -178,6 +196,8 @@ def transform_add_to_initiative(text: str, name: str, kind: str, codes: list[str
 
 def transform_remove_from_initiative(text: str, name: str, code: str) -> str:
     """Take `code` out of the initiative called `name`. The initiative stays, even if it ends up empty."""
+    if _unreadable_initiatives(text):
+        raise ValueError("ABOUT.MD has initiatives that could not be read; refusing to rewrite the section")
     updates = [InitiativeUpdate(name=i.name, kind=i.kind, wbs=list(i.items)) for i in _parse_text(text).initiatives]
     hit = next((u for u in updates if normalize_name(u.name) == normalize_name(name)), None)
     if hit is None:
