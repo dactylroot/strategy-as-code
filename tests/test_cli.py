@@ -355,3 +355,34 @@ def test_structure_sub_move_puts_a_sub_area_under_another_area(manifest, origin,
     assert main(base + ["structure", "sub", "move", "1.2", "--to-area", "2"]) == 0
     product = remote(origin, "PRODUCT.MD")
     assert "#### 2.1 Reporting" in product and "#### 1.2 " not in product and "| 2.1.1 | Export |" in product
+
+
+def test_score_can_be_cleared(manifest, origin):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["feature", "score", "1.1.2", "9", "4"]) == 0
+    assert main(base + ["feature", "score", "1.1.2", ""]) == 0
+    row = next(l for l in remote(origin, "PRODUCT.MD").splitlines() if l.startswith("| 1.1.2 |"))
+    assert row.split("|")[4].strip() == "" and row.split("|")[5].strip() == ""
+
+
+def test_decline_retires_a_feature_and_keeps_old_notes(manifest, origin, capsys):
+    base = ["--manifest", str(manifest)]
+    assert main(base + ["feature", "score", "1.1.2", "8", "5"]) == 0
+    assert main(base + ["feature", "decline", "1.1.2", "--reason", "Covered by 1.1.1."]) == 0
+    assert "feature 1.1.2 declined" in capsys.readouterr().out
+    row = next(l for l in remote(origin, "PRODUCT.MD").splitlines() if l.startswith("| 1.1.2 |"))
+    cells = [c.strip() for c in row.split("|")]
+    assert cells[3] == "Declined" and cells[4] == "" and cells[5] == ""
+    assert cells[6].startswith("Declined (") and "Covered by 1.1.1." in cells[6]
+
+
+def test_decline_needs_a_reason(manifest):
+    with pytest.raises(SystemExit):
+        main(["--manifest", str(manifest), "feature", "decline", "1.1.2"])
+
+
+def test_find_manifest_finds_program_planning_clone_beside_projects(tmp_path):
+    (tmp_path / "program-planning").mkdir()
+    (tmp_path / "program-planning" / "PROGRAM.MD").write_text("x")
+    (tmp_path / "hub").mkdir()
+    assert find_manifest(None, tmp_path / "hub") == tmp_path / "program-planning" / "PROGRAM.MD"

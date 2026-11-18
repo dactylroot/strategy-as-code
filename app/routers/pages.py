@@ -126,7 +126,7 @@ def structure_page(request: Request):
 
     wbs_json = json.dumps([
         {"number": a.number, "title": a.title,
-         "sub_areas": [{"prefix": sa.wbs_prefix, "title": sa.title, "count": len(sa.features),
+         "sub_areas": [{"prefix": sa.wbs_prefix, "title": sa.title, "count": sum(1 for f in sa.features if f.status != FeatureStatus.declined),
                         "done": sum(1 for f in sa.features if f.status in (FeatureStatus.live, FeatureStatus.released)),
                         "features": [{"wbs": f.wbs, "name": f.name, "status": f.stage} for f in sa.features]}
                        for sa in a.sub_areas]}

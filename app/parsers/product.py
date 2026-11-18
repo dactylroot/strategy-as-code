@@ -11,7 +11,7 @@ from ..models import (
 
 # Scoped/Scored are matched here for backward compatibility with rows written
 # before those became derived (never stored) states - see _normalize_status_str.
-_STATUS_PAT = r"(?:Released|Live|Planned|Gap|Idea|Scoped|Scored|In-Progress)"
+_STATUS_PAT = r"(?:Released|Live|Planned|Gap|Idea|Scoped|Scored|In-Progress|Declined)"
 
 _LEGACY_STATUS_ALIASES = {"Scoped": "Idea", "Scored": "Idea"}
 
@@ -742,7 +742,8 @@ def transform_sync_scope_item(text: str, prefix: str) -> str:
     sub = next((sa for a in _parse_text(text).wbs_areas for sa in a.sub_areas if sa.wbs_prefix == prefix), None)
     if sub is None:
         return text
-    shipped = bool(sub.features) and all(f.status in (FeatureStatus.live, FeatureStatus.released) for f in sub.features)
+    active = [f for f in sub.features if f.status != FeatureStatus.declined]
+    shipped = bool(active) and all(f.status in (FeatureStatus.live, FeatureStatus.released) for f in active)
     sm = re.search(r"(^## Product Scope\n)(.*?)(?=\n## |\Z)", text, re.DOTALL | re.MULTILINE)
     line = _scope_line(sm.group(2), prefix) if sm else None
     if not line or scope_item_complete(text, prefix) == shipped:

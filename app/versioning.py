@@ -40,7 +40,9 @@ def _completed_initiatives(about: AboutDoc, product: ProductDoc | None):
     for ini in about.initiatives:
         if not ini.items:
             continue
-        if all(all_features.get(w) is not None and all_features[w].status in done for w in ini.items):
+        active = [w for w in ini.items
+                  if not (all_features.get(w) is not None and all_features[w].status == FeatureStatus.declined)]
+        if active and all(all_features.get(w) is not None and all_features[w].status in done for w in active):
             (major if ini.kind == "major" else minor).append(ini.name)
     return major, minor
 

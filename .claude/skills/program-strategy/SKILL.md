@@ -92,6 +92,8 @@ S=<skill-dir>/scripts/strategy
 $S feature status 3.1.1 live            # idea | in-progress | live  (never 'released' from a code change)
 $S feature notes  3.1.1 "Does X now"
 $S feature score  3.1.1 8 3             # value [effort]
+$S feature score  3.1.1 ""              # clear the value (and effort); "-" also clears a column
+$S feature decline 3.1.1 --reason "Covered by 1.1.4"   # retire it: status Declined, score cleared, reason leads the notes; out of every progress count, row kept
 $S feature add    3.1 "Feature name" --value 8 --notes "..."   # sub-area prefix; the next WBS code is assigned and printed
 $S feature move   3.1.1 4.2             # new WBS code; initiative bullets and bug WBS refs in this project follow it
 $S structure show                       # areas and sub-areas with feature counts

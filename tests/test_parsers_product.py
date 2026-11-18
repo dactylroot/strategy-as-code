@@ -420,3 +420,14 @@ class TestReplaceSection:
         text = "# Title\n\n## Summary\nHi.\n"
         with pytest.raises(ValueError):
             parser.transform_users(text, "### Admin\nBio.")
+
+
+def test_declined_features_leave_every_progress_count():
+    from app.models import FeatureStatus
+    text = ("# P\n\n## Features\n\n### 1. A\n\n#### 1.1 S\n\n| WBS | Feature | Status | Value | Effort | Notes |\n"
+            "| --- | --- | --- | --- | --- | --- |\n| 1.1.1 | One | Live |  |  |  |\n| 1.1.2 | Two | Declined |  |  | Declined: no |\n")
+    doc = parser._parse_text(text)
+    assert [f.status for f in doc.all_features] == [FeatureStatus.live, FeatureStatus.declined]
+    assert doc.total_features == 1 and doc.overall_completion_pct == 1.0
+    assert doc.wbs_areas[0].sub_areas[0].completion_pct == 1.0
+    assert doc.all_features[1].stage == "Declined"

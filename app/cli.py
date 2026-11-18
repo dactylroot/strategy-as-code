@@ -23,7 +23,7 @@ safe to run from a feature branch. `initiative` commands change the program
 manifest's Initiatives section instead (the manifest repository when
 PROGRAM_MANIFEST_REPO is set, else the PROGRAM.MD file found as below). The program manifest comes from --manifest,
 $STRATEGY_MANIFEST, or the nearest PROGRAM.MD at or below a parent of the
-current directory. Pass --chart to regenerate docs/wbs.* in the same commit;
+current directory (including a program-planning/ clone beside the projects). Pass --chart to regenerate docs/wbs.* in the same commit;
 it is off by default.
 """
 from __future__ import annotations
@@ -32,6 +32,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Callable
 
@@ -70,7 +71,8 @@ def find_manifest(explicit: str | None, start: Path | None = None) -> Path:
         return p
     here = (start or Path.cwd()).resolve()
     for d in (here, *here.parents):
-        for rel in ("PROGRAM.MD", "program/PROGRAM.MD"):
+        # a clone of the program repository beside the projects: <parent>/program-planning/PROGRAM.MD
+        for rel in ("PROGRAM.MD", "program/PROGRAM.MD", "program-planning/PROGRAM.MD"):
             if (d / rel).is_file():
                 return d / rel
     raise CliError("no PROGRAM.MD found; pass --manifest or set STRATEGY_MANIFEST")
@@ -159,6 +161,13 @@ def _apply(reg: Registry, key: str, edits: list[Edit], message: str | Callable[[
     return edit(reg, key, fn, message, actor)
 
 
+def _score_arg(text: str):
+    """A score column value: an integer, or '' / '-' to clear the column."""
+    if text.strip() in ("", "-"):
+        return None
+    return int(text)
+
+
 def _check_text(label: str, value: str, *, single_line: bool = False) -> None:
     if "|" in value:
         raise CliError(f"{label} cannot contain '|' (it would split the table row)")
@@ -190,8 +199,10 @@ def build_parser() -> argparse.ArgumentParser:
     fm = feature.add_parser("move", help="move a feature to another sub-area (it gets a new WBS code)")
     fm.add_argument("wbs"); fm.add_argument("target_prefix")
     n = feature.add_parser("notes"); n.add_argument("wbs"); n.add_argument("text")
-    sc = feature.add_parser("score"); sc.add_argument("wbs"); sc.add_argument("value", type=int)
-    sc.add_argument("effort", type=int, nargs="?")
+    dc = feature.add_parser("decline", help="retire a feature: nothing to build; kept in the table, out of every progress count")
+    dc.add_argument("wbs"); dc.add_argument("--reason", required=True, help="why, and what covers it instead (becomes the start of its notes)")
+    sc = feature.add_parser("score"); sc.add_argument("wbs"); sc.add_argument("value", type=_score_arg, help="1-10, or '' / '-' to clear")
+    sc.add_argument("effort", type=_score_arg, nargs="?", help="1-10, or '' / '-' to clear")
 
     ib = top.add_parser("inbox").add_subparsers(dest="action", required=True)
     ib.add_parser("list").add_argument("--all", action="store_true", help="include archived items")
@@ -479,6 +490,17 @@ def run(args: argparse.Namespace) -> str:
         elif args.action == "notes":
             edits = [("PRODUCT.MD", lambda t: product_parser.transform_feature_notes(t, args.wbs, args.text), True)]
             summary = f"feature {args.wbs} notes updated"
+        elif args.action == "decline":
+            _check_text("reason", args.reason)
+            reason = args.reason.strip().rstrip(".")
+            note = f"Declined ({date.today().isoformat()}): {reason}."
+            def _decline(t, wbs=args.wbs):
+                t = product_parser.transform_feature_status(t, wbs, FeatureStatus.declined)
+                t = product_parser.transform_feature_score(t, wbs, None, None)
+                old = next((f.notes for f in product_parser._parse_text(t).all_features if f.wbs == wbs), "")
+                return product_parser.transform_feature_notes(t, wbs, f"{note} {old}".strip())
+            edits = [("PRODUCT.MD", _decline, True)]
+            summary = f"feature {args.wbs} declined"
         elif args.action == "score":
             edits = [("PRODUCT.MD", lambda t: product_parser.transform_feature_score(t, args.wbs, args.value, args.effort), True)]
             summary = f"feature {args.wbs} score {args.value}/{args.effort if args.effort is not None else '-'}"

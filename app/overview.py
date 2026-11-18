@@ -108,7 +108,7 @@ def _load_content(s: ProjectSummary, root) -> None:
     product = product_parser._parse_text((root / "PRODUCT.MD").read_text(encoding="utf-8"))
     s.title = product.title
     feats = product.all_features
-    s.total = len(feats)
+    s.total = sum(1 for f in feats if f.status != FeatureStatus.declined)
     s.stages_by_wbs = {f.wbs: (f.name, "In-Progress" if f.status == FeatureStatus.planned else
                                ("Idea" if f.stage == "Gap" else f.stage)) for f in feats}
     s.features = {st: 0 for st in STAGES}
@@ -116,7 +116,8 @@ def _load_content(s: ProjectSummary, root) -> None:
         stage = "In-Progress" if f.status == FeatureStatus.planned else f.stage
         if stage == "Gap":
             stage = "Idea"
-        s.features[stage] = s.features.get(stage, 0) + 1
+        if stage != "Declined":
+            s.features[stage] = s.features.get(stage, 0) + 1
     done = s.features["Live"] + s.features["Released"]
     s.done_pct = round(100 * done / s.total) if s.total else 0
     s.awaiting_uat = s.features["Live"]
@@ -136,7 +137,7 @@ def _load_content(s: ProjectSummary, root) -> None:
         about = about_parser._parse_text(afile.read_text(encoding="utf-8"))
         by_wbs = {f.wbs: f for f in feats}
         for ini in about.initiatives:
-            members = [by_wbs[w] for w in ini.items if w in by_wbs]
+            members = [by_wbs[w] for w in ini.items if w in by_wbs and by_wbs[w].status != FeatureStatus.declined]
             n_done = sum(1 for f in members if f.status in (FeatureStatus.live, FeatureStatus.released))
             s.initiatives.append((ini.name, ini.kind, n_done, len(members)))
             s.initiative_members.append((ini.name, ini.kind, [f.wbs for f in members]))
@@ -358,8 +359,11 @@ def unified_initiatives(projects: list[ProjectSummary]) -> tuple[list[ProgramIni
             hit = proj.stages_by_wbs.get(wbs) if proj else None
             name, stage = hit if hit else ("", "")
             is_done = stage in _STAGE_DONE
+            declined = stage == "Declined"
             v.members.append({"project": key, "wbs": wbs, "name": name, "stage": stage or "Unavailable",
-                              "done": is_done, "missing": hit is None, "blocked_by": [], "source": source})
+                              "done": is_done or declined, "missing": hit is None, "blocked_by": [], "source": source})
+            if declined:    # retired: listed, never counted
+                continue
             v.total += 1
             v.done += is_done
             v.awaiting_uat += stage == "Live"

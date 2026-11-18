@@ -11,6 +11,7 @@ class FeatureStatus(str, Enum):
     in_progress = "In-Progress"
     live       = "Live"
     released   = "Released"
+    declined   = "Declined"   # retired: nothing to build; kept for the record, out of every progress count
 
 
 class Feature(BaseModel):
@@ -63,9 +64,10 @@ class WBSSubArea(BaseModel):
     @computed_field
     @property
     def completion_pct(self) -> float:
-        if not self.features:
+        active = [f for f in self.features if f.status != FeatureStatus.declined]
+        if not active:
             return 0.0
-        return sum(1 for f in self.features if f.status in (FeatureStatus.live, FeatureStatus.released)) / len(self.features)
+        return sum(1 for f in active if f.status in (FeatureStatus.live, FeatureStatus.released)) / len(active)
 
     @computed_field
     @property
@@ -96,7 +98,7 @@ class WBSArea(BaseModel):
     @computed_field
     @property
     def completion_pct(self) -> float:
-        features = self.all_features
+        features = [f for f in self.all_features if f.status != FeatureStatus.declined]
         if not features:
             return 0.0
         return sum(1 for f in features if f.status in (FeatureStatus.live, FeatureStatus.released)) / len(features)
@@ -153,7 +155,7 @@ class ProductDoc(BaseModel):
     @computed_field
     @property
     def total_features(self) -> int:
-        return len(self.all_features)
+        return sum(1 for f in self.all_features if f.status != FeatureStatus.declined)
 
     @computed_field
     @property
