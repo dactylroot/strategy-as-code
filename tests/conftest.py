@@ -6,6 +6,11 @@ _auth_fd, _auth_tmp = tempfile.mkstemp(suffix=".yml")
 os.close(_auth_fd)
 os.environ["AUTH_CONFIG"] = _auth_tmp
 
+# The suite runs the app standalone or against its own throwaway program: a manifest named in the developer's environment
+# (PROGRAM_MANIFEST_REPO and friends) would switch every test into program mode, so none may leak in.
+for _var in ("PROGRAM_MANIFEST_REPO", "PROGRAM_MANIFEST_PATH", "PROGRAM_MANIFEST_BRANCH", "PROGRAM_MANIFEST", "STRATEGY_MANIFEST"):
+    os.environ.pop(_var, None)
+
 import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient

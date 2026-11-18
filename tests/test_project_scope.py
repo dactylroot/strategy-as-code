@@ -218,7 +218,7 @@ def test_branch_mode_project_commits_to_its_planning_branch(client, program, tmp
     assert client.patch("/p/alpha/api/features/1.1.2", json={"notes": "on planning"}).status_code == 200
     assert run_git(origin_of(program, "alpha"), ["rev-parse", "main"]) == main_tip
     assert "on planning" in remote_text(program, "alpha", "PRODUCT.MD", ref="planning")
-    assert "committed to <code>planning</code>" in client.get("/p/alpha/dashboard").text
+    assert "Program project, saved to planning" in client.get("/p/alpha/dashboard").text    # the scope chip's tooltip names the branch
 
 
 def test_unreachable_remote_on_write_is_a_502_and_nothing_is_lost_locally(client, program, tmp_path):
@@ -385,7 +385,8 @@ def test_overview_counts_the_inbox(client, program):
     client.get("/p/alpha/features")
     client.post("/p/alpha/api/inbox", json={"type": "feature", "title": "One"})
     page = client.get("/p").text
-    assert "Needs triage" in page and "<b>1</b> waiting" in page and "Inbox is empty" in page   # beta has none
+    assert "Needs triage" in page and "<b>1</b> waiting" in page
+    assert page.count("Needs triage") == 1                                                      # only alpha has an inbox item; beta has none
 
 
 def test_overview_flags_members_blocked_by_an_upstream_member(client, program, tmp_path):
